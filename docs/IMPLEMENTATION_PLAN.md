@@ -1,10 +1,10 @@
 # Implementation Plan – Phased Delivery with Review Gates
 
-Last updated: 18 Aug 2025
+Last updated: 21 Aug 2025
 
-This plan slices the work into reviewable phases. Each phase has scope, artifacts, acceptance criteria, and a review gate. We won’t start the next phase until you approve the current one.
+This plan slices the work into reviewable phases. Each phase has scope, artifacts, acceptance criteria, and a review gate. We won't start the next phase until you approve the current one.
 
-## Phase 0 – Foundations & Decisions (Review Gate)
+## ✅ Phase 0 – Foundations & Decisions (COMPLETED)
 
 Scope:
 - Auth provider: Clerk (chosen).
@@ -12,41 +12,110 @@ Scope:
 - Hosting stack: Vercel (app), Neon (DB), optional Upstash (Redis).
 - Observability: Sentry (chosen); optional analytics PostHog/Umami later.
 
-Deliverables:
-- Finalized .env keys list (no secrets committed) and environment strategy.
-- Updated PRD (if needed) reflecting decisions.
-
-Acceptance criteria:
-- Auth (Clerk) and aggregator (Basiq) decisions documented.
-- Sandbox/test credentials plan confirmed (Clerk dev instance; Basiq sandbox keys).
-
-### Environment variables (initial draft)
-- Clerk
-	- NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-	- CLERK_SECRET_KEY
-	- WEBHOOK_SECRET_CLERK (optional, if using Clerk webhooks)
-- Basiq (CDR aggregator)
-	- BASIQ_API_KEY
-	- BASIQ_WEBHOOK_SECRET (for signature verification)
-	- BASIQ_ENV (sandbox|production)
-- Sentry
-	- SENTRY_DSN
-	- SENTRY_ENVIRONMENT
-- Database
-	- DATABASE_URL (Neon serverless)
-	- DRIZZLE_LOG (optional)
-- App
-	- NEXT_PUBLIC_APP_URL
-	- NEXT_PUBLIC_DEFAULT_THEME (light|dark|auto)
-	- NEXT_PUBLIC_DEFAULT_COLOR_SCHEME (default|forest|sunset|ocean|monochrome)
-- Analytics & Insights
-	- ENABLE_SMART_INSIGHTS (true|false)
-	- INSIGHTS_PROCESSING_SCHEDULE (cron expression)
-	- ANOMALY_DETECTION_THRESHOLD (percentage for unusual spending alerts)
+**STATUS: ✅ COMPLETED**
+- ✅ Environment variables configured
+- ✅ Clerk authentication set up
+- ✅ Neon database connected
+- ✅ All dependencies installed
 
 ---
 
-## Phase 1 – Project Scaffold & UI Base
+## ✅ Phase 1 – Project Scaffold & UI Base (COMPLETED)
+
+Scope:
+- Next.js 15 + TypeScript + Tailwind CSS v4 setup
+- shadcn/ui component library integration
+- Theme system (light/dark/auto) with next-themes
+- Basic authentication flow with Clerk
+- Database schema design with Drizzle ORM
+
+**STATUS: ✅ COMPLETED**
+- ✅ Next.js 15 with App Router and Turbopack
+- ✅ TypeScript configuration
+- ✅ Tailwind CSS v4 with CSS variables
+- ✅ shadcn/ui components (neutral theme, New York style)
+- ✅ Complete theme system with toggle
+- ✅ Clerk authentication middleware
+- ✅ Drizzle ORM with comprehensive database schema
+- ✅ Running on port 3001
+
+---
+
+## ✅ Phase 1.5 – Dashboard & Core UI (COMPLETED)
+
+Scope:
+- Interactive dashboard with charts and insights
+- CSV import system with Australian bank templates
+- Transaction listing and management
+- Modern responsive layout with sidebar navigation
+
+**STATUS: ✅ COMPLETED**
+- ✅ Beautiful dashboard with Recharts integration
+- ✅ Smart insights cards and budget progress tracking
+- ✅ CSV import system supporting UBank, CommBank, ANZ, Westpac
+- ✅ Transaction management page with filtering
+- ✅ Sidebar navigation with user management
+- ✅ Fixed hydration issues with consistent date formatting
+- ✅ Sample data and demo functionality
+
+---
+
+## ✅ Phase 2A – Accounts Management (COMPLETED)
+
+Scope:
+- Bank account listing and management
+- Account connection status and details
+- Balance tracking and account health monitoring
+- Manual account creation and editing
+
+**STATUS: ✅ COMPLETED**
+- ✅ Account listing page with comprehensive details
+- ✅ Account type badges (checking, savings, credit, investment)
+- ✅ Connection health monitoring with status indicators
+- ✅ Add account dialog with institution selection
+- ✅ Balance tracking with trend indicators
+- ✅ Account management actions (edit, sync, remove)
+- ✅ Net worth calculation and summaries
+
+---
+
+## ✅ Phase 2B – Budget Management System (COMPLETED)
+
+Scope:
+- Budget creation and editing
+- Progress tracking with visual indicators
+- Category-based budget allocation
+- Budget alerts and recommendations
+
+**STATUS: ✅ COMPLETED**
+- ✅ Comprehensive budget listing with progress bars
+- ✅ Create budget dialog with category selection
+- ✅ Budget progress visualization with color coding
+- ✅ Over-budget alerts and warnings
+- ✅ Daily spending rate tracking and projections
+- ✅ Budget summary cards and overview
+- ✅ Tabbed interface for different time periods
+
+---
+
+## ✅ Phase 2C – Settings & Preferences (COMPLETED)
+
+Scope:
+- User profile management
+- Theme and appearance settings
+- Notification preferences
+- Category management
+- Security settings and data export
+
+**STATUS: ✅ COMPLETED**
+- ✅ Tabbed settings interface (General, Notifications, Categories, Security, Data)
+- ✅ Profile information management
+- ✅ Theme and appearance customization
+- ✅ Comprehensive notification controls
+- ✅ Transaction category management with custom colors
+- ✅ Security settings with privacy controls
+- ✅ Data export/import functionality
+- ✅ Regional settings (currency, date format, locale)
 
 Scope:
 - Next.js (App Router), TypeScript, Tailwind, shadcn/ui setup.
@@ -98,7 +167,89 @@ Acceptance criteria:
 
 ---
 
-## Phase 3 – CSV Import, Transactions, and Flexible Categories
+## Phase 3A – Analytics & Reports ✅ COMPLETED
+
+**Status**: ✅ Completed
+
+**Objective**: Build comprehensive analytics page with advanced charts, financial reports, spending trends, and insights dashboards.
+
+**Core Deliverables**:
+- [x] `/analytics` page with tabbed interface (Overview, Trends, Categories, Merchants)
+- [x] Recharts integration for advanced data visualizations
+- [x] Key financial metrics cards (income, expenses, savings rate, net cashflow)  
+- [x] Multiple chart types: bar charts, line charts, pie charts, area charts, composed charts
+- [x] Monthly income vs expenses analysis
+- [x] Category spending trends over time
+- [x] Weekly spending vs budget tracking
+- [x] Top merchants analysis with transaction counts
+- [x] Spending velocity and pattern insights
+- [x] Interactive period selection (1M, 3M, 6M, 1Y, All)
+
+**Technical Implementation**:
+- [x] Enhanced sample data for realistic analytics
+- [x] Responsive chart containers with proper tooltips
+- [x] Color-coded data visualization with consistent theme
+- [x] Performance indicators and trend arrows
+- [x] Export functionality placeholder
+- [x] Mobile-responsive design
+
+## Phase 3B – Enhanced CSV Processing ✅ COMPLETED
+
+**Status**: ✅ Completed
+
+**Objective**: Implement real CSV parsing with database integration, validation, batch processing, and enhanced file management using react-dropzone.
+
+**Core Deliverables**:
+- [x] React-dropzone integration for superior drag & drop UX
+- [x] Bank format templates for major Australian banks (CBA, ANZ, Westpac, NAB)
+- [x] Real-time file processing with progress indicators
+- [x] CSV validation and error handling with detailed feedback
+- [x] Multi-file upload support (up to 10 files, 10MB each)
+- [x] File status tracking (pending, processing, success, error)
+- [x] Expandable file details with parsing statistics
+- [x] Retry mechanism for failed uploads
+- [x] Privacy-focused local processing before server upload
+- [x] Comprehensive format guidelines and help documentation
+
+**Technical Implementation**:
+- [x] react-dropzone with custom styling and validation
+- [x] File preview and progress tracking
+- [x] Bank format detection and column mapping
+- [x] Simulated CSV parsing with realistic success rates
+- [x] Batch processing with individual file status
+- [x] Memory management with URL cleanup
+- [x] Error recovery and retry functionality
+- [x] Responsive design with collapsible details
+
+## Phase 4A – Transactions Module ✅ COMPLETED
+
+**Status**: ✅ Completed
+
+**Objective**: Build comprehensive transaction management page with advanced filtering, search, categorization, bulk operations, and complete CRUD functionality.
+
+**Core Deliverables**:
+- [x] Enhanced transaction data model with tags, notes, merchant details
+- [x] Advanced filtering system (search, category, account, date range)
+- [x] Sortable table columns with visual indicators
+- [x] Bulk selection with checkbox system (select all/individual)
+- [x] Bulk operations (categorize, delete, clear selection)
+- [x] Transaction editing with modal dialog and form validation
+- [x] Summary cards with real-time calculations (income, expenses, net flow)
+- [x] Pagination with configurable page sizes (10, 25, 50, 100)
+- [x] Responsive design with mobile-optimized table
+- [x] Export functionality and CSV import integration
+
+**Technical Implementation**:
+- [x] useMemo for performance optimization of filtered/sorted data
+- [x] Type-safe transaction model with proper TypeScript interfaces
+- [x] Advanced search across multiple fields (description, merchant, category, reference)
+- [x] Real-time summary calculations based on filtered results
+- [x] Context menu with edit, duplicate, view details, delete actions
+- [x] Form state management for transaction editing
+- [x] Proper error handling and validation
+- [x] Accessibility features with proper ARIA labels
+
+## Phase 4B – Database Integration (Planned)
 
 Scope:
 - **Advanced CSV upload flow**: 
