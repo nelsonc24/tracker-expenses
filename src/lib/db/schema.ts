@@ -20,6 +20,7 @@ export const matchTypeEnum = pgEnum('match_type', ['contains', 'regex', 'amount'
 export const priorityEnum = pgEnum('priority', ['low', 'medium', 'high'])
 export const importStatusEnum = pgEnum('import_status', ['uploading', 'processing', 'completed', 'failed'])
 export const stagingStatusEnum = pgEnum('staging_status', ['pending', 'processed', 'failed'])
+export const frequencyEnum = pgEnum('frequency', ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'])
 
 // Users table
 export const users = pgTable('users', {
@@ -189,4 +190,26 @@ export const csvImports = pgTable('csv_imports', {
   errorLog: jsonb('error_log').$type<any[]>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   completedAt: timestamp('completed_at', { withTimezone: true })
+})
+
+// Recurring transactions table
+export const recurringTransactions = pgTable('recurring_transactions', {
+  id: uuid('id').primaryKey().$defaultFn(() => createId()),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
+  categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
+  name: varchar('name', { length: 200 }).notNull(),
+  description: text('description'),
+  amountMinor: bigint('amount_minor', { mode: 'number' }).notNull(), // in cents
+  currency: varchar('currency', { length: 3 }).default('AUD').notNull(),
+  frequency: frequencyEnum('frequency').notNull(), // 'daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'
+  startDate: timestamp('start_date', { withTimezone: true }).notNull(),
+  endDate: timestamp('end_date', { withTimezone: true }),
+  nextDate: timestamp('next_date', { withTimezone: true }).notNull(),
+  lastProcessed: timestamp('last_processed', { withTimezone: true }),
+  isActive: boolean('is_active').default(true).notNull(),
+  autoProcess: boolean('auto_process').default(false).notNull(),
+  tags: jsonb('tags').$type<string[]>().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
 })

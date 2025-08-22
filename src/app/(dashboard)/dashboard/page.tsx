@@ -9,7 +9,8 @@ import {
   CreditCard,
   ArrowUpRight,
   Plus,
-  Download
+  Download,
+  Calendar
 } from 'lucide-react'
 import { 
   InsightCard, 
@@ -29,7 +30,8 @@ import {
   getUserCategories,
   getUserBudgets,
   getTransactionSummary,
-  getCategorySpending
+  getCategorySpending,
+  getRecurringTransactionsSummary
 } from '@/lib/db-utils'
 import { redirect } from 'next/navigation'
 
@@ -50,7 +52,8 @@ async function getDashboardData(userId: string) {
     thisMonthSummary,
     lastMonthSummary,
     categorySpending,
-    last30DaysTransactions
+    last30DaysTransactions,
+    recurringSummary
   ] = await Promise.all([
     getUserAccounts(userId),
     getUserCategories(userId),
@@ -63,7 +66,8 @@ async function getDashboardData(userId: string) {
       startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
       endDate: now,
       limit: 1000 
-    })
+    }),
+    getRecurringTransactionsSummary(userId)
   ])
 
   // Calculate total balance across accounts
@@ -112,7 +116,8 @@ async function getDashboardData(userId: string) {
     budgetProgress,
     trendData,
     categoryData,
-    monthlyData
+    monthlyData,
+    recurringSummary
   }
 }
 
@@ -202,7 +207,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <InsightCard
           title="Total Balance"
           value={`$${dashboardData.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -230,6 +235,17 @@ export default async function DashboardPage() {
           value={`${Math.round(dashboardData.budgetProgress)}%`}
           icon={<BarChart3 className="h-4 w-4 text-muted-foreground" />}
           description={dashboardData.budgetProgress > 80 ? "Over budget target" : "On track for monthly goals"}
+        />
+        <InsightCard
+          title="Recurring"
+          value={`${dashboardData.recurringSummary.active}/${dashboardData.recurringSummary.total}`}
+          change={dashboardData.recurringSummary.due > 0 ? { 
+            value: dashboardData.recurringSummary.due, 
+            type: 'decrease', 
+            period: 'due now' 
+          } : undefined}
+          icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+          description={`$${dashboardData.recurringSummary.monthlyTotal.toLocaleString()} monthly total`}
         />
         <InsightCard
           title="Income vs Expenses"

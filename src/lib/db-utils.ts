@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/db'
-import { users, accounts, categories, transactions, budgets } from '@/db/schema'
+import { users, accounts, categories, transactions, budgets, recurringTransactions } from '@/db/schema'
 import { eq, and, desc, asc, count, sum, gte, lte, like, or } from 'drizzle-orm'
 
 // Type helpers for better TypeScript support
@@ -173,6 +173,70 @@ export async function createDefaultCategories(userId: string): Promise<SelectCat
   return createdCategories
 }
 
+export async function getCategoryById(categoryId: string): Promise<SelectCategory | null> {
+  try {
+    const result = await db.select().from(categories).where(eq(categories.id, categoryId)).limit(1)
+    return (result as SelectCategory[])?.[0] || null
+  } catch (error) {
+    console.error('Error fetching category by ID:', error)
+    return null
+  }
+}
+
+export async function updateCategory(
+  categoryId: string, 
+  updates: {
+    name?: string
+    color?: string
+    icon?: string
+    parentId?: string | null
+  }
+): Promise<SelectCategory | null> {
+  try {
+    const updateData: any = {}
+    if (updates.name !== undefined) updateData.name = updates.name
+    if (updates.color !== undefined) updateData.color = updates.color
+    if (updates.icon !== undefined) updateData.icon = updates.icon
+    if (updates.parentId !== undefined) updateData.parentId = updates.parentId
+    
+    // Always update the updatedAt timestamp
+    updateData.updatedAt = new Date()
+
+    // Generate slug from name if name is being updated
+    if (updates.name) {
+      updateData.slug = updates.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    }
+
+    const result = await db
+      .update(categories)
+      .set(updateData)
+      .where(eq(categories.id, categoryId))
+      .returning()
+    
+    return (result as SelectCategory[])?.[0] || null
+  } catch (error) {
+    console.error('Error updating category:', error)
+    return null
+  }
+}
+
+export async function deleteCategory(categoryId: string): Promise<boolean> {
+  try {
+    // First, update any child categories to have no parent
+    await db
+      .update(categories)
+      .set({ parentId: null })
+      .where(eq(categories.parentId, categoryId))
+
+    // Delete the category
+    const result = await db.delete(categories).where(eq(categories.id, categoryId))
+    return true
+  } catch (error) {
+    console.error('Error deleting category:', error)
+    return false
+  }
+}
+
 // Transaction utilities
 export async function getUserTransactions(
   userId: string,
@@ -232,7 +296,7 @@ export async function getUserTransactions(
       ]
       
       if (searchConditions.length > 0) {
-        conditions.push(or(...searchConditions))
+        conditions.push(or(...searchConditions)!)
       }
     }
 
@@ -484,5 +548,79 @@ export async function getCategorySpending(
   } catch (error) {
     console.error('Error getting category spending:', error)
     return []
+  }
+}
+
+// Recurring transactions utilities
+export async function getUserRecurringTransactions(userId: string): Promise<any[]> {
+  try {
+    const result = await db
+      .select({
+        recurringTransaction: recurringTransactions,
+        account: accounts,
+        category: categories,
+      })
+      .from(recurringTransactions)
+      .leftJoin(accounts, eq(recurringTransactions.accountId, accounts.id))
+      .leftJoin(categories, eq(recurringTransactions.categoryId, categories.id))
+      .where(eq(recurringTransactions.userId, userId))
+      .orderBy(desc(recurringTransactions.createdAt))
+
+    return result
+  } catch (error) {
+    console.error('Error getting user recurring transactions:', error)
+    return []
+  }
+}
+
+export async function getRecurringTransactionsSummary(userId: string): Promise<{
+  total: number
+  active: number
+  due: number
+  monthlyTotal: number
+}> {
+  try {
+    const result = await db
+      .select({
+        id: recurringTransactions.id,
+        amount: recurringTransactions.amount,
+        isActive: recurringTransactions.isActive,
+        nextDate: recurringTransactions.nextDate,
+        frequency: recurringTransactions.frequency,
+      })
+      .from(recurringTransactions)
+      .where(eq(recurringTransactions.userId, userId))
+
+    const now = new Date()
+    const dueTransactions = result.filter(rt => 
+      rt.isActive && new Date(rt.nextDate) <= now
+    )
+
+    // Calculate monthly equivalent amounts
+    const frequencyMultipliers = {
+      daily: 30,
+      weekly: 4.33,
+      biweekly: 2.17,
+      monthly: 1,
+      quarterly: 0.33,
+      yearly: 0.083
+    }
+
+    const monthlyTotal = result
+      .filter(rt => rt.isActive)
+      .reduce((sum, rt) => {
+        const multiplier = frequencyMultipliers[rt.frequency as keyof typeof frequencyMultipliers] || 1
+        return sum + (parseFloat(rt.amount) * multiplier)
+      }, 0)
+
+    return {
+      total: result.length,
+      active: result.filter(rt => rt.isActive).length,
+      due: dueTransactions.length,
+      monthlyTotal
+    }
+  } catch (error) {
+    console.error('Error getting recurring transactions summary:', error)
+    return { total: 0, active: 0, due: 0, monthlyTotal: 0 }
   }
 }

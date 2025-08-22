@@ -13,7 +13,9 @@ import {
   Upload,
   Target,
   TrendingUp,
-  Users
+  FolderOpen,
+  Calendar,
+  LineChart
 } from 'lucide-react'
 
 export default async function DashboardLayout({
@@ -29,12 +31,15 @@ export default async function DashboardLayout({
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Transactions', href: '/dashboard/transactions', icon: BarChart3 },
-    { name: 'Accounts', href: '/dashboard/accounts', icon: CreditCard },
-    { name: 'Budgets', href: '/dashboard/budgets', icon: Target },
-    { name: 'Analytics', href: '/dashboard/analytics', icon: TrendingUp },
-    { name: 'Import', href: '/dashboard/import', icon: Upload },
-    { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+    { name: 'Transactions', href: '/transactions', icon: BarChart3 },
+    { name: 'Accounts', href: '/accounts', icon: CreditCard },
+    { name: 'Categories', href: '/categories', icon: FolderOpen },
+    { name: 'Budgets', href: '/budgets', icon: Target },
+    { name: 'Recurring', href: '/recurring', icon: Calendar },
+    { name: 'Analytics', href: '/analytics', icon: TrendingUp },
+    { name: 'Advanced Analytics', href: '/advanced-analytics', icon: LineChart },
+    { name: 'Import', href: '/import', icon: Upload },
+    { name: 'Settings', href: '/settings', icon: Settings },
   ]
 
   return (

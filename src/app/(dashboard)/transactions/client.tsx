@@ -39,7 +39,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { 
   Search, 
   Filter, 
@@ -60,6 +59,16 @@ import {
   FileText
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
+import { BulkOperationsBar } from '@/components/bulk-operations-bar'
+import { AdvancedSearch } from '@/components/advanced-search'
+import { KeyboardShortcutsHelp } from '@/components/keyboard-shortcuts-help'
+import { TransactionTemplates } from '@/components/transaction-templates'
+import { MobileTransactionCard } from '@/components/mobile-transaction-card'
+import { MobileNavigation } from '@/components/mobile-navigation'
+import { MobileActionBar } from '@/components/mobile-action-bar'
+import { useKeyboardShortcuts, KeyboardShortcut, SHORTCUT_CATEGORIES } from '@/hooks/use-keyboard-shortcuts'
+import { useResponsive, useMobileOptimizations } from '@/hooks/use-responsive'
+import { TransactionTemplate } from '@/lib/validations/templates'
 
 // Enhanced sample transaction data
 const SAMPLE_TRANSACTIONS = [
@@ -266,51 +275,89 @@ export function TransactionsPageClient({
 }: TransactionsPageClientProps) {
   const [transactions] = useState<Transaction[]>(SAMPLE_TRANSACTIONS)
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('All Categories')
-  const [accountFilter, setAccountFilter] = useState('All Accounts')
-  const [dateRange, setDateRange] = useState('all')
+  // Remove old filter states since we're using advanced search
+  // const [searchQuery, setSearchQuery] = useState('')
+  // const [categoryFilter, setCategoryFilter] = useState('All Categories')
+  // const [accountFilter, setAccountFilter] = useState('All Accounts')  
+  // const [dateRange, setDateRange] = useState('all')
   const [sortField, setSortField] = useState<SortField>('date')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  
+  // Advanced search state
+  const [activeFilters, setActiveFilters] = useState<any>(null)
+  const [savedSearches, setSavedSearches] = useState<any[]>([])
+
+  // Mobile responsiveness
+  const { isMobile, isTablet, screenSize } = useResponsive()
+  const { itemsPerPage, showSimplifiedUI, enableSwipeGestures } = useMobileOptimizations()
+
+  // Adjust page size based on screen size
+  const responsivePageSize = isMobile ? itemsPerPage : pageSize
+  // Get unique merchants for search
+  const uniqueMerchants = Array.from(new Set(transactions.map(t => t.merchant).filter(Boolean)))
 
   // Filter and sort transactions
   const filteredTransactions = useMemo(() => {
     let filtered = transactions.filter(transaction => {
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        const searchableText = `${transaction.description} ${transaction.merchant} ${transaction.category} ${transaction.reference}`.toLowerCase()
-        if (!searchableText.includes(query)) return false
-      }
-
-      // Category filter
-      if (categoryFilter !== 'All Categories' && transaction.category !== categoryFilter) {
-        return false
-      }
-
-      // Account filter
-      if (accountFilter !== 'All Accounts' && transaction.account !== accountFilter) {
-        return false
-      }
-
-      // Date filter
-      if (dateRange !== 'all') {
-        const transactionDate = new Date(transaction.date)
-        const now = new Date()
-        const daysAgo = {
-          '7d': 7,
-          '30d': 30,
-          '90d': 90,
-        }[dateRange]
-        
-        if (daysAgo) {
-          const cutoffDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000)
-          if (transactionDate < cutoffDate) return false
+      // Advanced search filters take precedence
+      if (activeFilters) {
+        // Search query filter
+        if (activeFilters.query) {
+          const query = activeFilters.query.toLowerCase()
+          const searchableText = `${transaction.description} ${transaction.merchant} ${transaction.category} ${transaction.reference}`.toLowerCase()
+          if (!searchableText.includes(query)) return false
         }
+
+        // Category filter
+        if (activeFilters.categories.length > 0) {
+          // Note: This assumes we have category IDs in the transaction. 
+          // You may need to adapt this based on your actual data structure
+          if (!activeFilters.categories.includes(transaction.category)) {
+            return false
+          }
+        }
+
+        // Account filter
+        if (activeFilters.accounts.length > 0) {
+          if (!activeFilters.accounts.includes(transaction.account)) {
+            return false
+          }
+        }
+
+        // Merchant filter
+        if (activeFilters.merchants.length > 0) {
+          if (!activeFilters.merchants.includes(transaction.merchant)) {
+            return false
+          }
+        }
+
+        // Amount range filter
+        if (activeFilters.amountMin !== null || activeFilters.amountMax !== null) {
+          const amount = Math.abs(transaction.amount)
+          if (activeFilters.amountMin !== null && amount < activeFilters.amountMin) return false
+          if (activeFilters.amountMax !== null && amount > activeFilters.amountMax) return false
+        }
+
+        // Date range filter
+        if (activeFilters.dateFrom || activeFilters.dateTo) {
+          const transactionDate = new Date(transaction.date)
+          if (activeFilters.dateFrom && transactionDate < new Date(activeFilters.dateFrom)) return false
+          if (activeFilters.dateTo && transactionDate > new Date(activeFilters.dateTo)) return false
+        }
+
+        // Transaction type filter
+        if (activeFilters.transactionTypes.length > 0) {
+          const transactionType = transaction.amount >= 0 ? 'credit' : 'debit'
+          if (!activeFilters.transactionTypes.includes(transactionType)) {
+            return false
+          }
+        }
+
+        return true
       }
 
       return true
@@ -340,12 +387,12 @@ export function TransactionsPageClient({
     })
 
     return filtered
-  }, [transactions, searchQuery, categoryFilter, accountFilter, dateRange, sortField, sortDirection])
+  }, [transactions, sortField, sortDirection, activeFilters])
 
   // Pagination
-  const totalPages = Math.ceil(filteredTransactions.length / pageSize)
-  const startIndex = (currentPage - 1) * pageSize
-  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + pageSize)
+  const totalPages = Math.ceil(filteredTransactions.length / responsivePageSize)
+  const startIndex = (currentPage - 1) * responsivePageSize
+  const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + responsivePageSize)
 
   // Selection handlers
   const isAllSelected = selectedTransactions.length === paginatedTransactions.length && paginatedTransactions.length > 0
@@ -366,6 +413,134 @@ export function TransactionsPageClient({
       setSelectedTransactions(prev => prev.filter(id => id !== transactionId))
     }
   }
+
+  // Keyboard shortcuts configuration
+  const keyboardShortcuts: KeyboardShortcut[] = [
+    // Navigation
+    {
+      key: 'ArrowUp',
+      action: () => {
+        if (currentPage > 1) {
+          setCurrentPage(currentPage - 1)
+        }
+      },
+      description: 'Go to previous page',
+      category: SHORTCUT_CATEGORIES.NAVIGATION
+    },
+    {
+      key: 'ArrowDown', 
+      action: () => {
+        const totalPages = Math.ceil(filteredTransactions.length / pageSize)
+        if (currentPage < totalPages) {
+          setCurrentPage(currentPage + 1)
+        }
+      },
+      description: 'Go to next page',
+      category: SHORTCUT_CATEGORIES.NAVIGATION
+    },
+    
+    // Search & Filter
+    {
+      key: 'f',
+      ctrlKey: true,
+      action: () => {
+        // Focus on search input in AdvancedSearch
+        const searchInput = document.querySelector('input[placeholder*="search" i]') as HTMLInputElement
+        if (searchInput) {
+          searchInput.focus()
+        }
+      },
+      description: 'Focus search input',
+      category: SHORTCUT_CATEGORIES.SEARCH
+    },
+    {
+      key: 'Escape',
+      action: () => {
+        // Clear active filters
+        setActiveFilters(null)
+        // Clear selected transactions
+        setSelectedTransactions([])
+        // Close edit dialog if open
+        setIsEditDialogOpen(false)
+        setEditingTransaction(null)
+      },
+      description: 'Clear filters and selections',
+      category: SHORTCUT_CATEGORIES.SEARCH
+    },
+    
+    // Bulk Operations
+    {
+      key: 'a',
+      ctrlKey: true,
+      action: () => {
+        // Select all visible transactions
+        const visibleTransactionIds = paginatedTransactions.map(t => t.id)
+        setSelectedTransactions(visibleTransactionIds)
+      },
+      description: 'Select all visible transactions',
+      category: SHORTCUT_CATEGORIES.BULK_OPERATIONS
+    },
+    {
+      key: 'd',
+      ctrlKey: true,
+      action: () => {
+        // Deselect all transactions
+        setSelectedTransactions([])
+      },
+      description: 'Deselect all transactions',
+      category: SHORTCUT_CATEGORIES.BULK_OPERATIONS
+    },
+    
+    // Actions
+    {
+      key: 'n',
+      ctrlKey: true,
+      action: () => {
+        // Focus on add transaction (if implemented)
+        console.log('Add new transaction shortcut')
+      },
+      description: 'Add new transaction',
+      category: SHORTCUT_CATEGORIES.ACTIONS
+    },
+    {
+      key: 't',
+      ctrlKey: true,
+      action: () => {
+        // Open templates dialog
+        const templatesButton = document.querySelector('button:has(.lucide-file-text)') as HTMLButtonElement
+        if (templatesButton) {
+          templatesButton.click()
+        }
+      },
+      description: 'Open transaction templates',
+      category: SHORTCUT_CATEGORIES.ACTIONS
+    },
+    {
+      key: 'r',
+      ctrlKey: true,
+      action: () => {
+        // Refresh transactions
+        window.location.reload()
+      },
+      description: 'Refresh page',
+      category: SHORTCUT_CATEGORIES.ACTIONS
+    },
+    
+    // UI
+    {
+      key: '?',
+      shiftKey: true,
+      action: () => {
+        // This will be handled by opening the help dialog
+        console.log('Show keyboard shortcuts help')
+      },
+      description: 'Show keyboard shortcuts help',
+      category: SHORTCUT_CATEGORIES.UI
+    }
+  ]
+
+  // Use keyboard shortcuts
+  useKeyboardShortcuts({ shortcuts: keyboardShortcuts })
 
   // Sort handler
   const handleSort = (field: SortField) => {
@@ -406,6 +581,90 @@ export function TransactionsPageClient({
     console.log('Exporting transactions:', filteredTransactions)
   }
 
+  // Advanced search handlers
+  const handleAdvancedSearch = (filters: any) => {
+    setActiveFilters(filters)
+    setCurrentPage(1) // Reset to first page
+  }
+
+  const handleClearFilters = () => {
+    setActiveFilters(null)
+    setCurrentPage(1)
+  }
+
+  const handleSaveSearch = (search: any) => {
+    setSavedSearches(prev => [...prev, search])
+  }
+
+  const handleDeleteSearch = (searchId: string) => {
+    setSavedSearches(prev => prev.filter(s => s.id !== searchId))
+  }
+
+  // Handle template application
+  const handleApplyTemplate = async (template: TransactionTemplate, overrides?: any) => {
+    try {
+      const response = await fetch('/api/templates/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateId: template.id,
+          overrides,
+        }),
+      })
+
+      if (response.ok) {
+        const { transaction, message } = await response.json()
+        console.log('Transaction created from template:', transaction)
+        
+        // In a real app, you would update the transactions list
+        // For now, just show a success message
+        alert(message || 'Transaction created from template successfully!')
+        
+        // Optionally trigger a refresh of the transactions list
+        if (onTransactionCreate) {
+          onTransactionCreate(transaction)
+        }
+      } else {
+        throw new Error('Failed to apply template')
+      }
+    } catch (error) {
+      console.error('Error applying template:', error)
+      alert('Failed to create transaction from template')
+    }
+  }
+
+  // Mobile action handlers
+  const handleMobileQuickAdd = () => {
+    console.log('Quick add transaction on mobile')
+    // Open quick add dialog or navigate to add transaction page
+  }
+
+  const handleMobileSearch = () => {
+    // Focus search input or open search modal
+    const searchInput = document.querySelector('input[placeholder*="search" i]') as HTMLInputElement
+    if (searchInput) {
+      searchInput.focus()
+    }
+  }
+
+  const handleMobileFilter = () => {
+    // Open advanced search in mobile-friendly mode
+    console.log('Open mobile filters')
+  }
+
+  const handleMobileTemplates = () => {
+    // Open templates in mobile view
+    const templatesButton = document.querySelector('button:has(.lucide-file-text)') as HTMLButtonElement
+    if (templatesButton) {
+      templatesButton.click()
+    }
+  }
+
+  const handleMobileBulkActions = () => {
+    // Open bulk actions sheet
+    console.log('Open bulk actions')
+  }
+
   // Calculate summary statistics
   const totalIncome = filteredTransactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0)
   const totalExpenses = filteredTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0)
@@ -413,8 +672,14 @@ export function TransactionsPageClient({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Mobile Navigation */}
+      <MobileNavigation currentPath="/transactions" />
+
+      {/* Header - Hide on mobile, show on desktop */}
+      <div className={cn(
+        "flex items-center justify-between",
+        isMobile && "hidden"
+      )}>
         <div>
           <h1 className="text-3xl font-bold">Transactions</h1>
           <p className="text-muted-foreground mt-2">
@@ -430,11 +695,20 @@ export function TransactionsPageClient({
             <Upload className="h-4 w-4 mr-2" />
             Import CSV
           </Button>
+          <TransactionTemplates
+            categories={propCategories.map(c => c.name)}
+            accounts={propAccounts.map(a => a.name)}
+            onApplyTemplate={handleApplyTemplate}
+          />
+          <KeyboardShortcutsHelp shortcuts={keyboardShortcuts} />
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className={cn(
+        "grid gap-4",
+        isMobile ? "grid-cols-1" : "md:grid-cols-3"
+      )}>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Income</CardTitle>
@@ -484,108 +758,29 @@ export function TransactionsPageClient({
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col space-y-4 md:flex-row md:items-center md:space-y-0 md:space-x-4">
-            {/* Search */}
-            <div className="flex-1 min-w-0">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search transactions..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
+      {/* Advanced Search */}
+      <AdvancedSearch
+        onSearch={handleAdvancedSearch}
+        onClearFilters={handleClearFilters}
+        categories={propCategories}
+        accounts={propAccounts}
+        merchants={uniqueMerchants}
+        savedSearches={savedSearches}
+        onSaveSearch={handleSaveSearch}
+        onDeleteSearch={handleDeleteSearch}
+      />
 
-            {/* Category Filter */}
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map(category => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Account Filter */}
-            <Select value={accountFilter} onValueChange={setAccountFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ACCOUNTS.map(account => (
-                  <SelectItem key={account} value={account}>
-                    {account}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Date Range Filter */}
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
-                <SelectItem value="90d">Last 90 days</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Bulk Actions */}
-      {selectedTransactions.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">
-                {selectedTransactions.length} transaction{selectedTransactions.length !== 1 ? 's' : ''} selected
-              </span>
-              <div className="flex items-center space-x-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Tag className="h-4 w-4 mr-2" />
-                      Categorize
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuLabel>Change Category</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {CATEGORIES.slice(1).map(category => (
-                      <DropdownMenuItem 
-                        key={category}
-                        onClick={() => handleBulkCategorize(category)}
-                      >
-                        {category}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button variant="outline" size="sm" onClick={handleBulkDelete}>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setSelectedTransactions([])}>
-                  Clear Selection
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Enhanced Bulk Operations */}
+      <BulkOperationsBar
+        selectedTransactionIds={selectedTransactions}
+        onClearSelection={() => setSelectedTransactions([])}
+        onOperationComplete={() => {
+          // Trigger a refresh of transactions data
+          console.log('Bulk operation completed, should refresh data')
+        }}
+        categories={propCategories}
+        accounts={propAccounts}
+      />
 
       {/* Transactions Table */}
       <Card>
@@ -601,14 +796,15 @@ export function TransactionsPageClient({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
+          {/* Desktop Table View */}
+          {!isMobile && (
+            <div className="overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
                       checked={isAllSelected}
-                      indeterminate={isIndeterminate}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
@@ -731,7 +927,25 @@ export function TransactionsPageClient({
                 ))}
               </TableBody>
             </Table>
-          </div>
+            </div>
+          )}
+
+          {/* Mobile Cards View */}
+          {isMobile && (
+            <div className="space-y-4">
+              {paginatedTransactions.map((transaction) => (
+                <MobileTransactionCard
+                  key={transaction.id}
+                  transaction={transaction}
+                  isSelected={selectedTransactions.includes(transaction.id)}
+                  onSelect={(checked) => handleSelectTransaction(transaction.id, checked)}
+                  onEdit={() => handleEditTransaction(transaction)}
+                  onDelete={() => console.log('Delete', transaction.id)}
+                  onDuplicate={() => console.log('Duplicate', transaction.id)}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -806,7 +1020,7 @@ export function TransactionsPageClient({
                     type="number"
                     step="0.01"
                     value={editingTransaction.amount}
-                    onChange={(e) => setEditingTransaction(prev => 
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingTransaction(prev => 
                       prev ? { ...prev, amount: Number(e.target.value) } : null
                     )}
                   />
@@ -844,10 +1058,10 @@ export function TransactionsPageClient({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-notes">Notes</Label>
-                <Textarea
+                <Input
                   id="edit-notes"
                   value={editingTransaction.notes || ''}
-                  onChange={(e) => setEditingTransaction(prev => 
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingTransaction(prev => 
                     prev ? { ...prev, notes: e.target.value } : null
                   )}
                   placeholder="Add notes about this transaction..."
@@ -865,6 +1079,17 @@ export function TransactionsPageClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Mobile Action Bar */}
+      <MobileActionBar
+        selectedCount={selectedTransactions.length}
+        onQuickAdd={handleMobileQuickAdd}
+        onSearch={handleMobileSearch}
+        onFilter={handleMobileFilter}
+        onExport={handleExport}
+        onTemplates={handleMobileTemplates}
+        onBulkActions={handleMobileBulkActions}
+      />
     </div>
   )
 }
