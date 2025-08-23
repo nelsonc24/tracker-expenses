@@ -18,10 +18,12 @@ import {
   RecentTransactionsCard,
   SpendingInsightsCard 
 } from '@/components/dashboard-insights'
-import { 
-  SpendingTrendChart, 
+import {
   CategoryBreakdownChart, 
-  MonthlyComparisonChart 
+  MonthlyComparisonChart, 
+  SpendingTrendChart, 
+  BudgetProgressChart,
+  InteractivePieChart,
 } from '@/components/charts'
 import { 
   getCurrentUser,
