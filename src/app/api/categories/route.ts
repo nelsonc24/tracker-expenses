@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description, color, icon, parentId } = body
+    const { name, description, color, icon, customIconUrl, parentId } = body
 
     const category = await createCategory({
       userId: user.id,
@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
       description,
       color,
       icon,
+      customIconUrl,
       parentId
     })
 

@@ -1,16 +1,18 @@
-import { SignUp } from '@clerk/nextjs'
+import { SignIn } from '@clerk/nextjs'
 
-export default function SignUpPage() {
+export default function SignInPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">Create your account</h1>
+          <h1 className="text-2xl font-bold">Welcome back</h1>
           <p className="text-muted-foreground mt-2">
-            Start tracking your expenses and take control of your finances
+            Sign in to your Expenses Tracker account
           </p>
         </div>
-        <SignUp 
+        <SignIn 
+          redirectUrl="/dashboard"
+          afterSignInUrl="/dashboard"
           appearance={{
             elements: {
               rootBox: "mx-auto",

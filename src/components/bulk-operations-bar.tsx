@@ -42,13 +42,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-// Simple toast replacement
-const showToast = (message: string, type: 'success' | 'error' = 'success') => {
-  console.log(`${type.toUpperCase()}: ${message}`)
-  // In a real app, you'd implement a toast system here
-  alert(`${type.toUpperCase()}: ${message}`)
-}
+import { toast } from 'sonner'
 
 interface BulkOperationsProps {
   selectedTransactionIds: string[]
@@ -165,13 +159,21 @@ export function BulkOperationsBar({
         })
       })
 
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Operation failed')
+      let result
+      try {
+        result = await response.json()
+      } catch (jsonError) {
+        console.error('Failed to parse JSON response:', jsonError)
+        throw new Error('Server returned an invalid response. Please try again.')
       }
 
-      showToast(result.message, 'success')
+      if (!response.ok) {
+        // Use the structured error message if available
+        const errorMessage = result.operation?.message || result.error || 'Operation failed'
+        throw new Error(errorMessage)
+      }
+
+      toast.success(result.message)
       onOperationComplete()
       onClearSelection()
       setDialogOpen(false)
@@ -180,7 +182,22 @@ export function BulkOperationsBar({
 
     } catch (error) {
       console.error('Bulk operation error:', error)
-      showToast(error instanceof Error ? error.message : 'Operation failed', 'error')
+      
+      // Handle different types of errors with appropriate messages
+      let errorMessage = 'Operation failed'
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+      }
+      
+      // Add contextual help based on the operation
+      if (operation === 'categorize' && errorMessage.includes('not found')) {
+        errorMessage += ' The category may have been deleted. Please try refreshing the page.'
+      } else if (operation === 'update_account' && errorMessage.includes('not found')) {
+        errorMessage += ' The account may have been deleted. Please try refreshing the page.'
+      }
+      
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -227,7 +244,7 @@ export function BulkOperationsBar({
     switch (selectedOperation) {
       case 'categorize':
         if (!categoryId) {
-          showToast('Please select a category', 'error')
+          toast.error('Please select a category')
           return
         }
         payload = { categoryId }
@@ -235,7 +252,7 @@ export function BulkOperationsBar({
 
       case 'update_account':
         if (!accountId) {
-          showToast('Please select an account', 'error')
+          toast.error('Please select an account')
           return
         }
         payload = { accountId }

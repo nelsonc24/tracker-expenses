@@ -22,6 +22,7 @@ import {
   Building2,
   ChevronDown,
   ChevronUp,
+  Eye,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 
@@ -46,6 +47,7 @@ type MobileTransactionCardProps = {
   onEdit: () => void
   onDelete: () => void
   onDuplicate: () => void
+  onViewDetails?: () => void
   showDetails?: boolean
 }
 
@@ -56,6 +58,7 @@ export function MobileTransactionCard({
   onEdit,
   onDelete,
   onDuplicate,
+  onViewDetails,
   showDetails = false
 }: MobileTransactionCardProps) {
   const [isExpanded, setIsExpanded] = useState(showDetails)
@@ -194,6 +197,12 @@ export function MobileTransactionCard({
                   <Copy className="mr-2 h-4 w-4" />
                   Duplicate
                 </DropdownMenuItem>
+                {onViewDetails && (
+                  <DropdownMenuItem onClick={onViewDetails}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    View Details
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem 
                   onClick={onDelete}
                   className="text-destructive focus:text-destructive"

@@ -56,7 +56,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { name, color, icon, parentId } = body
+    const { name, color, icon, customIconUrl, parentId } = body
 
     // Validate that parent category exists and belongs to user
     if (parentId) {
@@ -75,6 +75,7 @@ export async function PATCH(
       name,
       color,
       icon,
+      customIconUrl,
       parentId: parentId || null
     })
 

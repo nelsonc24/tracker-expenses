@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,8 +44,8 @@ const sampleCSVData = [
 const bankTemplates = [
   {
     name: "UBank",
-    format: "Transaction Date, Effective Date, Description, Transaction Type, Debit Amount, Credit Amount, Balance",
-    sample: "2024-01-15,2024-01-15,WOOLWORTHS 1234 SYDNEY NSW,Purchase,85.50,,1234.56"
+    format: "Date and time, Description, Debit, Credit, From account, To account, Payment type, Category, Receipt number, Transaction ID",
+    sample: '"20:38 20-08-25","Direct Credit Example","","$200.00","","Bills account","Direct Entry","Uncategorised","","""12345"""'
   },
   {
     name: "CommBank",
@@ -77,33 +77,130 @@ export default function ImportPage() {
   const [importStatus, setImportStatus] = useState<'idle' | 'uploading' | 'processing' | 'completed' | 'error'>('idle')
   const [progress, setProgress] = useState(0)
   const [parsedTransactions, setParsedTransactions] = useState<any[]>([])
+  const [isImporting, setIsImporting] = useState(false)
+  const [activeTab, setActiveTab] = useState("upload")
+  const [importResult, setImportResult] = useState<{
+    importedCount: number
+    skippedCount: number
+    totalProcessed: number
+    duplicateTransactions: any[]
+  } | null>(null)
+  
+  // Auto-switch tabs based on import progress
+  useEffect(() => {
+    if (importStatus === 'completed' && parsedTransactions.length > 0) {
+      setActiveTab("review")
+    } else if (importStatus === 'completed' && importResult) {
+      // If import is done and we have results, stay on review to show results
+      setActiveTab("review")
+    }
+  }, [importStatus, parsedTransactions.length, importResult])
   
   const steps: ImportStep[] = [
     { step: 1, title: 'Upload File', description: 'Select your CSV file', status: selectedFile ? 'completed' : 'current' },
-    { step: 2, title: 'Parse Data', description: 'Extract transaction data', status: importStatus === 'processing' ? 'current' : importStatus === 'completed' ? 'completed' : 'pending' },
-    { step: 3, title: 'Review', description: 'Check imported transactions', status: importStatus === 'completed' ? 'current' : 'pending' },
-    { step: 4, title: 'Import', description: 'Save to your account', status: 'pending' }
+    { step: 2, title: 'Parse Data', description: 'Extract transaction data', status: importStatus === 'processing' ? 'current' : importStatus === 'completed' || importStatus === 'error' ? 'completed' : 'pending' },
+    { step: 3, title: 'Review', description: 'Check imported transactions', status: importStatus === 'completed' && !isImporting ? 'current' : importStatus === 'error' ? 'error' : 'pending' },
+    { step: 4, title: 'Import', description: 'Save to your account', status: isImporting ? 'current' : importStatus === 'completed' && parsedTransactions.length === 0 ? 'completed' : 'pending' }
   ]
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file)
-    // Auto-start processing for demo
-    setTimeout(() => {
-      setImportStatus('processing')
-      setProgress(25)
-      
-      setTimeout(() => {
+    setImportStatus('processing')
+    setProgress(25)
+    
+    // Read and parse the actual CSV file
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string
+        const lines = text.split('\n').filter(line => line.trim())
+        
         setProgress(50)
+        
+        // Skip header row and parse CSV data
+        const dataLines = lines.slice(1)
+        const parsedData = dataLines.map(line => {
+          // Parse CSV line (handle commas in quoted fields)
+          const fields = parseCSVLine(line)
+          
+          // Map actual UBank CSV format to our expected format
+          // UBank format: Date and time, Description, Debit, Credit, From account, To account, Payment type, Category, Receipt number, Transaction ID
+          const dateTime = fields[0]?.replace(/"/g, '').trim() || ''
+          const description = fields[1]?.replace(/"/g, '').trim() || ''
+          const debit = fields[2]?.replace(/[$"]/g, '').trim() || ''
+          const credit = fields[3]?.replace(/[$"]/g, '').trim() || ''
+          const paymentType = fields[6]?.replace(/"/g, '').trim() || ''
+          const transactionId = fields[9]?.replace(/"/g, '').trim() || ''  // Extract Transaction ID
+          
+          // Convert UBank date format (HH:MM DD-MM-YY) to standard date
+          const convertDate = (dateTimeStr: string) => {
+            if (!dateTimeStr) return ''
+            const parts = dateTimeStr.split(' ')
+            if (parts.length !== 2) return dateTimeStr
+            
+            const [time, date] = parts
+            const [day, month, year] = date.split('-')
+            return `20${year}-${month}-${day}` // Convert to YYYY-MM-DD format
+          }
+          
+          return {
+            "Transaction Date": convertDate(dateTime),
+            "Effective Date": convertDate(dateTime),
+            "Description": description,
+            "Transaction Type": paymentType || (debit ? 'Debit' : 'Credit'),
+            "Debit Amount": debit,
+            "Credit Amount": credit,
+            "Balance": '', // UBank doesn't provide running balance in this export
+            "Transaction ID": transactionId // Store the bank's Transaction ID
+          }
+        }).filter(transaction => 
+          // Filter out empty rows
+          transaction["Transaction Date"] && transaction.Description
+        )
+        
+        setProgress(75)
+        
         setTimeout(() => {
-          setProgress(75)
-          setTimeout(() => {
-            setProgress(100)
-            setImportStatus('completed')
-            setParsedTransactions(sampleCSVData)
-          }, 500)
+          setProgress(100)
+          setImportStatus('completed')
+          setParsedTransactions(parsedData)
         }, 500)
-      }, 500)
-    }, 1000)
+        
+      } catch (error) {
+        console.error('Error parsing CSV:', error)
+        setImportStatus('error')
+      }
+    }
+    
+    reader.onerror = () => {
+      console.error('Error reading file')
+      setImportStatus('error')
+    }
+    
+    reader.readAsText(file)
+  }
+
+  // Helper function to parse CSV line handling quoted fields
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = []
+    let current = ''
+    let inQuotes = false
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      
+      if (char === '"') {
+        inQuotes = !inQuotes
+      } else if (char === ',' && !inQuotes) {
+        result.push(current)
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    
+    result.push(current) // Add the last field
+    return result
   }
 
   const handleDrop = (e: React.DragEvent) => {
@@ -119,6 +216,74 @@ export default function ImportPage() {
     const file = e.target.files?.[0]
     if (file) {
       handleFileSelect(file)
+    }
+  }
+
+  const handleImportTransactions = async () => {
+    if (parsedTransactions.length === 0) return
+    
+    setIsImporting(true)
+    
+    try {
+      // Transform the sample CSV data to match the API expected format
+      const transactionsToImport = parsedTransactions.map(transaction => ({
+        date: transaction["Transaction Date"],
+        description: transaction.Description,
+        amount: transaction["Debit Amount"] 
+          ? -parseFloat(transaction["Debit Amount"]) 
+          : parseFloat(transaction["Credit Amount"] || "0"),
+        category: transaction["Transaction Type"] === "Purchase" ? "Shopping" : 
+                 transaction["Transaction Type"] === "Credit" ? "Income" : "Other",
+        account: "Primary Account", // Default account
+        reference: transaction["Transaction ID"] || transaction["Transaction Type"], // Use Transaction ID as reference
+        transactionId: transaction["Transaction ID"], // Send Transaction ID separately for database storage
+        balance: transaction.Balance ? parseFloat(transaction.Balance.replace(",", "")) : null
+      }))
+
+      const response = await fetch('/api/transactions/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transactions: transactionsToImport,
+          uploadId: `upload_${Date.now()}`
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to import transactions')
+      }
+
+      const result = await response.json()
+      
+      // Store import result for display
+      setImportResult({
+        importedCount: result.importedCount,
+        skippedCount: result.skippedCount,
+        totalProcessed: result.totalProcessed,
+        duplicateTransactions: result.duplicateTransactions || []
+      })
+      
+      // Show success state
+      setImportStatus('completed')
+      
+      // Clear the parsed transactions to show the result
+      setParsedTransactions([])
+      
+      // Reset form after success
+      setTimeout(() => {
+        setSelectedFile(null)
+        setImportStatus('idle')
+        setProgress(0)
+        setImportResult(null)
+      }, 5000) // Give more time to read the results
+      
+    } catch (error) {
+      console.error('Import error:', error)
+      setImportStatus('error')
+    } finally {
+      setIsImporting(false)
     }
   }
 
@@ -180,7 +345,7 @@ export default function ImportPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="upload" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="upload">Upload CSV</TabsTrigger>
           <TabsTrigger value="templates">Bank Templates</TabsTrigger>
@@ -330,11 +495,74 @@ export default function ImportPage() {
         </TabsContent>
 
         <TabsContent value="review" className="space-y-6">
+          {/* Success Message */}
+          {importStatus === 'completed' && importResult && (
+            <Card className="border-green-200 bg-green-50">
+              <CardContent className="pt-6">
+                <div className="flex items-center space-x-2 text-green-800">
+                  <div className="h-4 w-4 rounded-full bg-green-500"></div>
+                  <p className="font-medium">Import completed successfully!</p>
+                </div>
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-green-700">Imported transactions:</span>
+                    <span className="font-medium text-green-800">{importResult.importedCount}</span>
+                  </div>
+                  {importResult.skippedCount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-orange-700">Skipped duplicates:</span>
+                      <span className="font-medium text-orange-800">{importResult.skippedCount}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-green-300 pt-2">
+                    <span className="text-green-700">Total processed:</span>
+                    <span className="font-medium text-green-800">{importResult.totalProcessed}</span>
+                  </div>
+                </div>
+                
+                {/* Show duplicate transactions if any */}
+                {importResult.duplicateTransactions.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-orange-800 mb-2">Skipped duplicate transactions:</p>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {importResult.duplicateTransactions.map((tx, index) => (
+                        <div key={index} className="text-xs p-2 bg-orange-50 rounded border border-orange-200">
+                          <div className="font-medium">{tx.description}</div>
+                          <div className="text-orange-600">{tx.date} • ${Math.abs(tx.amount).toFixed(2)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <p className="text-sm text-green-600 mt-3">
+                  {importResult.importedCount > 0 && "New transactions have been added to your account. "}
+                  You can view them in the Transactions page.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Error Message */}
+          {importStatus === 'error' && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="pt-6">
+                <div className="flex items-center space-x-2 text-red-800">
+                  <div className="h-4 w-4 rounded-full bg-red-500"></div>
+                  <p className="font-medium">Import failed</p>
+                </div>
+                <p className="text-sm text-red-600 mt-1">
+                  There was an error importing your transactions. Please try again.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Review Imported Transactions</CardTitle>
               <CardDescription>
-                Verify the imported data before saving to your account
+                Verify the imported data before saving to your account. Duplicate transactions will be automatically detected and skipped.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -346,6 +574,11 @@ export default function ImportPage() {
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                         <span>{transaction["Transaction Date"]}</span>
                         <Badge variant="outline">{transaction["Transaction Type"]}</Badge>
+                        {transaction["Transaction ID"] && (
+                          <span className="text-xs bg-muted px-2 py-1 rounded">
+                            ID: {transaction["Transaction ID"]}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
@@ -369,11 +602,23 @@ export default function ImportPage() {
                   {parsedTransactions.length} transactions ready to import
                 </div>
                 <div className="flex space-x-2">
-                  <Button variant="outline">
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedFile(null)
+                      setParsedTransactions([])
+                      setImportStatus('idle')
+                      setProgress(0)
+                    }}
+                    disabled={isImporting}
+                  >
                     Cancel
                   </Button>
-                  <Button>
-                    Import Transactions
+                  <Button 
+                    onClick={handleImportTransactions}
+                    disabled={isImporting || parsedTransactions.length === 0}
+                  >
+                    {isImporting ? 'Importing...' : 'Import Transactions'}
                   </Button>
                 </div>
               </div>

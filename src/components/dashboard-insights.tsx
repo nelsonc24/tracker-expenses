@@ -53,7 +53,7 @@ export function InsightCard({
             <span className={cn(
               change.type === 'increase' ? 'text-green-500' : 'text-red-500'
             )}>
-              {Math.abs(change.value)}% from {change.period}
+              {Math.abs(change.value).toFixed(1)}% from {change.period}
             </span>
           </div>
         )}

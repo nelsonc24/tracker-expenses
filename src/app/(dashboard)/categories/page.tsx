@@ -62,6 +62,7 @@ interface Category {
   parentId: string | null
   color: string | null
   icon: string | null
+  customIconUrl?: string | null
   isDefault: boolean
   sortOrder: number
   createdAt: Date
@@ -119,6 +120,7 @@ export default function CategoriesPage() {
     description: '',
     color: '#6b7280',
     icon: 'hash',
+    customIconUrl: '',
     parentId: '',
   })
 
@@ -208,6 +210,7 @@ export default function CategoriesPage() {
           name: formData.name,
           color: formData.color,
           icon: formData.icon,
+          customIconUrl: formData.customIconUrl || null,
           parentId: formData.parentId || null,
         }),
       })
@@ -236,6 +239,7 @@ export default function CategoriesPage() {
           name: formData.name,
           color: formData.color,
           icon: formData.icon,
+          customIconUrl: formData.customIconUrl || null,
           parentId: formData.parentId || null,
         }),
       })
@@ -281,6 +285,7 @@ export default function CategoriesPage() {
       description: '',
       color: '#6b7280',
       icon: 'hash',
+      customIconUrl: '',
       parentId: '',
     })
   }
@@ -292,6 +297,7 @@ export default function CategoriesPage() {
       description: '',
       color: category.color || '#6b7280',
       icon: category.icon || 'hash',
+      customIconUrl: category.customIconUrl || '',
       parentId: category.parentId || '',
     })
     setIsEditDialogOpen(true)
@@ -325,7 +331,29 @@ export default function CategoriesPage() {
     return filtered
   }
 
-  function renderCategoryIcon(iconName: string | null, color: string | null) {
+  function renderCategoryIcon(iconName: string | null, customIconUrl: string | null, color: string | null) {
+    // Use custom icon URL if available
+    if (customIconUrl) {
+      return (
+        <div 
+          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: color || '#6b7280' }}
+        >
+          <img 
+            src={customIconUrl} 
+            alt="Category icon" 
+            className="w-4 h-4 object-contain filter brightness-0 invert"
+            onError={(e) => {
+              // Fallback to default icon if custom icon fails to load
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+            }}
+          />
+        </div>
+      )
+    }
+
+    // Fallback to lucide icon
     const IconComponent = iconName && iconMapping[iconName as keyof typeof iconMapping] 
       ? iconMapping[iconName as keyof typeof iconMapping] 
       : Hash
@@ -361,7 +389,7 @@ export default function CategoriesPage() {
                   </Button>
                 )}
                 
-                {renderCategoryIcon(category.icon, category.color)}
+                {renderCategoryIcon(category.icon, category.customIconUrl || null, category.color)}
                 
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">
@@ -493,14 +521,14 @@ export default function CategoriesPage() {
 
               <div>
                 <Label htmlFor="parent">Parent Category (Optional)</Label>
-                <Select value={formData.parentId} onValueChange={(value) => 
-                  setFormData({ ...formData, parentId: value })
+                <Select value={formData.parentId || "none"} onValueChange={(value) => 
+                  setFormData({ ...formData, parentId: value === "none" ? "" : value })
                 }>
                   <SelectTrigger>
                     <SelectValue placeholder="Select parent category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None (Top Level)</SelectItem>
+                    <SelectItem value="none">None (Top Level)</SelectItem>
                     {categories.map(category => (
                       <SelectItem key={category.id} value={category.id}>
                         {category.name}
@@ -532,6 +560,19 @@ export default function CategoriesPage() {
                     })}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="customIconUrl">Custom Icon URL (Optional)</Label>
+                <Input
+                  id="customIconUrl"
+                  value={formData.customIconUrl}
+                  onChange={(e) => setFormData({ ...formData, customIconUrl: e.target.value })}
+                  placeholder="https://example.com/icon.png"
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  Leave empty to use the selected icon above. Custom icon will override the selected icon.
+                </p>
               </div>
 
               <div>
@@ -666,14 +707,14 @@ export default function CategoriesPage() {
 
             <div>
               <Label htmlFor="edit-parent">Parent Category (Optional)</Label>
-              <Select value={formData.parentId} onValueChange={(value) => 
-                setFormData({ ...formData, parentId: value })
+              <Select value={formData.parentId || "none"} onValueChange={(value) => 
+                setFormData({ ...formData, parentId: value === "none" ? "" : value })
               }>
                 <SelectTrigger>
                   <SelectValue placeholder="Select parent category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None (Top Level)</SelectItem>
+                  <SelectItem value="none">None (Top Level)</SelectItem>
                   {categories
                     .filter(cat => cat.id !== selectedCategory?.id) // Don't allow self as parent
                     .map(category => (
@@ -707,6 +748,19 @@ export default function CategoriesPage() {
                   })}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-customIconUrl">Custom Icon URL (Optional)</Label>
+              <Input
+                id="edit-customIconUrl"
+                value={formData.customIconUrl}
+                onChange={(e) => setFormData({ ...formData, customIconUrl: e.target.value })}
+                placeholder="https://example.com/icon.png"
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                Leave empty to use the selected icon above. Custom icon will override the selected icon.
+              </p>
             </div>
 
             <div>

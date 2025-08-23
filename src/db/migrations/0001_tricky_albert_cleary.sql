@@ -1,0 +1,1 @@
+ALTER TABLE "categories" ADD COLUMN "custom_icon_url" text;

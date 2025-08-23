@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import { useUser } from '@clerk/nextjs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +17,14 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { 
   Settings, 
   User, 
@@ -27,10 +36,12 @@ import {
   Edit,
   Trash2,
   Download,
-  Upload
+  Upload,
+  Loader2,
+  AlertTriangle
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 // Sample categories data
 const sampleCategories = [
@@ -48,6 +59,7 @@ const colorOptions = [
 ]
 
 export default function SettingsPage() {
+  const { user, isLoaded } = useUser()
   const [selectedTab, setSelectedTab] = useState('general')
   const [notifications, setNotifications] = useState({
     budgetAlerts: true,
@@ -69,6 +81,40 @@ export default function SettingsPage() {
     smartCategories: true,
     duplicateDetection: true,
   })
+
+  // State for clear transactions confirmation dialog
+  const [clearTransactionsDialogOpen, setClearTransactionsDialogOpen] = useState(false)
+  const [isClearing, setIsClearing] = useState(false)
+
+  // Function to handle clearing all transactions
+  const handleClearAllTransactions = async () => {
+    setIsClearing(true)
+    
+    try {
+      const response = await fetch('/api/transactions/clear', {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to clear transactions')
+      }
+
+      const result = await response.json()
+      
+      toast.success(`All transaction data has been cleared successfully. Deleted ${result.deletedCount} transactions.`)
+      setClearTransactionsDialogOpen(false)
+      
+      // Trigger a page refresh to update all data
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+    } catch (error) {
+      console.error('Error clearing transactions:', error)
+      toast.error('Failed to clear transaction data. Please try again.')
+    } finally {
+      setIsClearing(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -105,16 +151,29 @@ export default function SettingsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" defaultValue="John" />
+                  <Input 
+                    id="firstName" 
+                    defaultValue={user?.firstName || ''} 
+                    disabled={!isLoaded}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" defaultValue="Doe" />
+                  <Input 
+                    id="lastName" 
+                    defaultValue={user?.lastName || ''} 
+                    disabled={!isLoaded}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" type="email" defaultValue="john.doe@example.com" disabled />
+                <Input 
+                  id="email" 
+                  type="email" 
+                  defaultValue={user?.emailAddresses[0]?.emailAddress || ''} 
+                  disabled 
+                />
                 <p className="text-xs text-muted-foreground">
                   Email address is managed by your authentication provider
                 </p>
@@ -532,7 +591,12 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <h4 className="font-medium text-red-600">Danger Zone</h4>
                 <div className="space-y-3">
-                  <Button variant="outline" className="w-full justify-start border-red-200 text-red-600 hover:bg-red-50">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start border-red-200 text-red-600 hover:bg-red-50"
+                    onClick={() => setClearTransactionsDialogOpen(true)}
+                    disabled={isClearing}
+                  >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Clear All Transaction Data
                   </Button>
@@ -546,6 +610,38 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Clear Transactions Confirmation Dialog */}
+      <Dialog open={clearTransactionsDialogOpen} onOpenChange={setClearTransactionsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Clear All Transaction Data
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to clear all your transaction data? This action will permanently delete all transactions and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setClearTransactionsDialogOpen(false)}
+              disabled={isClearing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleClearAllTransactions}
+              disabled={isClearing}
+              variant="destructive"
+            >
+              {isClearing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Clear All Data
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -59,6 +59,7 @@ export const categories = pgTable('categories', {
   description: text('description'),
   color: text('color').default('#6b7280').notNull(),
   icon: text('icon').default('folder').notNull(),
+  customIconUrl: text('custom_icon_url'),
   parentId: uuid('parent_id').references(() => categories.id, { onDelete: 'set null' }),
   isDefault: boolean('is_default').default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),

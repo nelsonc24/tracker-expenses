@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
+import crypto from 'crypto'
+import { db } from '@/db'
+import { transactions as transactionsTable, accounts as accountsTable, categories as categoriesTable } from '@/db/schema'
+import { eq, and } from 'drizzle-orm'
 
 // Types for transaction processing
 interface TransactionData {
@@ -11,6 +15,19 @@ interface TransactionData {
   merchant?: string
   reference?: string
   balance?: number
+  transactionId?: string  // Added bank transaction ID
+}
+
+// Generate a consistent hash for duplicate detection
+function generateTransactionHash(tx: TransactionData, userId: string): string {
+  // Use transaction ID as primary identifier if available, otherwise fall back to composite hash
+  if (tx.transactionId) {
+    return crypto.createHash('sha256').update(`${userId}-${tx.transactionId}`).digest('hex').substring(0, 16)
+  }
+  
+  // Fallback to composite hash for banks that don't provide unique transaction IDs
+  const hashInput = `${userId}-${tx.date}-${tx.description}-${tx.amount}-${tx.account}`
+  return crypto.createHash('sha256').update(hashInput).digest('hex').substring(0, 16)
 }
 
 export async function POST(request: NextRequest) {
@@ -22,41 +39,85 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { transactions, uploadId } = body
+    const { transactions: transactionData, uploadId } = body
 
     // Validate request data
-    if (!transactions || !Array.isArray(transactions)) {
+    if (!transactionData || !Array.isArray(transactionData)) {
       return NextResponse.json({ error: 'Invalid transactions data' }, { status: 400 })
     }
 
-    // Process transactions (in a real app, this would use Drizzle ORM)
-    const processedTransactions = transactions.map((tx: TransactionData) => ({
-      id: Math.random().toString(36).substr(2, 9),
-      userId,
-      uploadId,
-      date: new Date(tx.date),
-      description: tx.description.trim(),
-      amount: parseFloat(tx.amount.toString()),
-      category: tx.category,
-      account: tx.account,
-      merchant: tx.merchant || extractMerchant(tx.description),
-      reference: tx.reference || null,
-      balance: tx.balance ? parseFloat(tx.balance.toString()) : null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }))
+    // Get existing transaction hashes from database to check for duplicates
+    const existingHashes = await db
+      .select({ hash: transactionsTable.duplicateCheckHash })
+      .from(transactionsTable)
+      .where(eq(transactionsTable.userId, userId))
+    
+    const existingTransactionHashes = new Set<string>(
+      existingHashes.map(row => row.hash).filter((hash): hash is string => Boolean(hash))
+    )
 
-    // TODO: In Phase 4B, replace with actual database operations using Drizzle ORM
-    // await db.insert(transactions).values(processedTransactions)
+    // Get or create default account and category for imports
+    const defaultAccount = await getOrCreateDefaultAccount(userId)
+    const defaultCategory = await getOrCreateDefaultCategory(userId)
+
+    // Process transactions and check for duplicates
+    const newTransactions: any[] = []
+    const duplicateTransactions: any[] = []
+
+    for (const tx of transactionData) {
+      const transactionHash = generateTransactionHash(tx, userId)
+      
+      if (existingTransactionHashes.has(transactionHash)) {
+        duplicateTransactions.push({
+          ...tx,
+          hash: transactionHash,
+          reason: 'Duplicate transaction already exists'
+        })
+      } else {
+        newTransactions.push({
+          id: crypto.randomUUID(),
+          userId,
+          accountId: defaultAccount.id,
+          categoryId: defaultCategory.id,
+          amount: parseFloat(tx.amount.toString()).toFixed(2),
+          description: tx.description.trim(),
+          merchant: tx.merchant || extractMerchant(tx.description),
+          reference: tx.reference || null,
+          transactionDate: new Date(tx.date),
+          type: parseFloat(tx.amount.toString()) < 0 ? 'debit' : 'credit',
+          status: 'cleared',
+          duplicateCheckHash: transactionHash,
+          originalData: tx,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        
+        // Add to existing set to prevent duplicates within the same batch
+        existingTransactionHashes.add(transactionHash)
+      }
+    }
+
+    // Save transactions to database
+    if (newTransactions.length > 0) {
+      await db.insert(transactionsTable).values(newTransactions)
+    }
     
     // For now, simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise(resolve => setTimeout(resolve, 500))
 
     return NextResponse.json({
       success: true,
-      message: `Successfully imported ${processedTransactions.length} transactions`,
-      importedCount: processedTransactions.length,
-      transactions: processedTransactions
+      message: `Successfully imported ${newTransactions.length} transactions${duplicateTransactions.length > 0 ? `, skipped ${duplicateTransactions.length} duplicates` : ''}`,
+      importedCount: newTransactions.length,
+      skippedCount: duplicateTransactions.length,
+      totalProcessed: transactionData.length,
+      newTransactions,
+      duplicateTransactions: duplicateTransactions.map(tx => ({
+        description: tx.description,
+        date: tx.date,
+        amount: tx.amount,
+        reason: tx.reason
+      }))
     })
 
   } catch (error) {
@@ -119,6 +180,50 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// Helper functions to get or create default account and category
+async function getOrCreateDefaultAccount(userId: string) {
+  // Try to get existing account
+  const existingAccounts = await db.select().from(accountsTable).where(eq(accountsTable.userId, userId)).limit(1)
+  
+  if (existingAccounts.length === 0) {
+    // Create default account
+    const insertedAccounts = await db.insert(accountsTable).values({
+      userId,
+      name: 'Primary Account',
+      institution: 'Imported Data',
+      accountNumber: 'IMPORTED',
+      accountType: 'checking',
+      balance: '0.00',
+      currency: 'AUD',
+      isActive: true
+    }).returning()
+    
+    return (insertedAccounts as any[])[0]
+  }
+  
+  return existingAccounts[0]
+}
+
+async function getOrCreateDefaultCategory(userId: string) {
+  // Try to get existing category
+  const existingCategories = await db.select().from(categoriesTable).where(eq(categoriesTable.userId, userId)).limit(1)
+  
+  if (existingCategories.length === 0) {
+    // Create default category
+    const insertedCategories = await db.insert(categoriesTable).values({
+      userId,
+      name: 'General',
+      color: '#6B7280',
+      icon: '💳',
+      isSystem: false
+    }).returning()
+    
+    return (insertedCategories as any[])[0]
+  }
+  
+  return existingCategories[0]
 }
 
 // Helper function to extract merchant name from description

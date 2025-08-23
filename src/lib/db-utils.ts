@@ -128,6 +128,7 @@ export async function createCategory(categoryData: {
   description?: string
   color?: string
   icon?: string
+  customIconUrl?: string
   parentId?: string
 }): Promise<SelectCategory | null> {
   try {
@@ -189,6 +190,7 @@ export async function updateCategory(
     name?: string
     color?: string
     icon?: string
+    customIconUrl?: string
     parentId?: string | null
   }
 ): Promise<SelectCategory | null> {
@@ -197,6 +199,7 @@ export async function updateCategory(
     if (updates.name !== undefined) updateData.name = updates.name
     if (updates.color !== undefined) updateData.color = updates.color
     if (updates.icon !== undefined) updateData.icon = updates.icon
+    if (updates.customIconUrl !== undefined) updateData.customIconUrl = updates.customIconUrl
     if (updates.parentId !== undefined) updateData.parentId = updates.parentId
     
     // Always update the updatedAt timestamp
@@ -622,5 +625,88 @@ export async function getRecurringTransactionsSummary(userId: string): Promise<{
   } catch (error) {
     console.error('Error getting recurring transactions summary:', error)
     return { total: 0, active: 0, due: 0, monthlyTotal: 0 }
+  }
+}
+
+// Calculate actual account balance from transactions
+export async function calculateAccountBalance(accountId: string): Promise<number> {
+  try {
+    const result = await db
+      .select({ amount: transactions.amount })
+      .from(transactions)
+      .where(eq(transactions.accountId, accountId))
+
+    const balance = result.reduce((sum, tx) => {
+      return sum + parseFloat(tx.amount || '0')
+    }, 0)
+
+    return balance
+  } catch (error) {
+    console.error('Error calculating account balance:', error)
+    return 0
+  }
+}
+
+// Get accounts with calculated balances
+export async function getUserAccountsWithBalance(userId: string): Promise<(SelectAccount & { calculatedBalance: number })[]> {
+  try {
+    const userAccounts = await getUserAccounts(userId)
+    
+    const accountsWithBalance = await Promise.all(
+      userAccounts.map(async (account) => {
+        const calculatedBalance = await calculateAccountBalance(account.id)
+        return {
+          ...account,
+          calculatedBalance
+        }
+      })
+    )
+
+    return accountsWithBalance
+  } catch (error) {
+    console.error('Error getting user accounts with balance:', error)
+    return []
+  }
+}
+
+// Clear all transaction data for a user
+export async function clearAllTransactions(userId: string): Promise<number> {
+  try {
+    console.log(`Starting to clear all transactions for user: ${userId}`)
+    
+    // First, count how many transactions exist
+    const countResult = await db
+      .select({ count: count() })
+      .from(transactions)
+      .where(eq(transactions.userId, userId))
+    
+    const existingCount = countResult[0]?.count || 0
+    console.log(`Found ${existingCount} transactions to delete for user: ${userId}`)
+    
+    if (existingCount === 0) {
+      console.log(`No transactions found for user: ${userId}`)
+      return 0
+    }
+    
+    // Delete all transactions for the user
+    const result = await db
+      .delete(transactions)
+      .where(eq(transactions.userId, userId))
+    
+    console.log(`Delete operation completed. Result:`, result)
+    
+    // Verify deletion by counting remaining transactions
+    const remainingCountResult = await db
+      .select({ count: count() })
+      .from(transactions)
+      .where(eq(transactions.userId, userId))
+    
+    const remainingCount = remainingCountResult[0]?.count || 0
+    console.log(`Remaining transactions after deletion: ${remainingCount}`)
+    
+    return existingCount
+  } catch (error) {
+    console.error('Error clearing all transactions:', error)
+    throw error
   }
 }

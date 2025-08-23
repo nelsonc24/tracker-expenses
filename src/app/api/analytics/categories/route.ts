@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
-import { db } from '@/lib/db'
-import { transactions, categories } from '@/lib/db/schema'
+import { db } from '@/db'
+import { transactions, categories } from '@/db/schema'
 import { eq, sql, and } from 'drizzle-orm'
 
 export async function GET() {
@@ -16,7 +16,7 @@ export async function GET() {
       .select({
         categoryId: transactions.categoryId,
         transactionCount: sql<number>`count(*)`.as('transaction_count'),
-        totalAmount: sql<number>`sum(${transactions.amountMinor})`.as('total_amount')
+        totalAmount: sql<number>`sum(${transactions.amount})`.as('total_amount')
       })
       .from(transactions)
       .where(

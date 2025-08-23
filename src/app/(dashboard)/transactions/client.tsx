@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -226,7 +228,20 @@ const ACCOUNTS = [
   'Westpac Choice'
 ]
 
-type Transaction = typeof SAMPLE_TRANSACTIONS[0]
+type Transaction = {
+  id: string
+  description: string
+  amount: number
+  category: string
+  date: string
+  account: string
+  type?: 'debit' | 'credit' | 'transfer'
+  merchant: string
+  reference: string
+  tags: string[]
+  notes: string
+  balance: number
+}
 type SortField = 'date' | 'amount' | 'description' | 'category'
 type SortDirection = 'asc' | 'desc'
 
@@ -273,10 +288,25 @@ export function TransactionsPageClient({
   onTransactionDelete,
   onTransactionCreate
 }: TransactionsPageClientProps) {
-  const [transactions] = useState<Transaction[]>(SAMPLE_TRANSACTIONS)
+  const router = useRouter()
+  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
-  // Remove old filter states since we're using advanced search
-  // const [searchQuery, setSearchQuery] = useState('')
+  
+  // Update local state when props change
+  useEffect(() => {
+    if (propTransactions) {
+      // Transform API data to match the expected format
+      const transformedTransactions = propTransactions.map(transaction => ({
+        ...transaction,
+        merchant: transaction.merchant || '',
+        reference: transaction.reference || '',
+        balance: 0, // API doesn't provide balance, set to 0
+        tags: transaction.tags || [],
+        notes: transaction.notes || ''
+      }))
+      setTransactions(transformedTransactions)
+    }
+  }, [propTransactions])
   // const [categoryFilter, setCategoryFilter] = useState('All Categories')
   // const [accountFilter, setAccountFilter] = useState('All Accounts')  
   // const [dateRange, setDateRange] = useState('all')
@@ -286,6 +316,8 @@ export function TransactionsPageClient({
   const [pageSize, setPageSize] = useState(10)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isViewDetailsDialogOpen, setIsViewDetailsDialogOpen] = useState(false)
+  const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null)
   
   // Advanced search state
   const [activeFilters, setActiveFilters] = useState<any>(null)
@@ -298,7 +330,7 @@ export function TransactionsPageClient({
   // Adjust page size based on screen size
   const responsivePageSize = isMobile ? itemsPerPage : pageSize
   // Get unique merchants for search
-  const uniqueMerchants = Array.from(new Set(transactions.map(t => t.merchant).filter(Boolean)))
+  const uniqueMerchants = Array.from(new Set(transactions.map(t => t.merchant).filter(Boolean))) as string[]
 
   // Filter and sort transactions
   const filteredTransactions = useMemo(() => {
@@ -463,6 +495,9 @@ export function TransactionsPageClient({
         // Close edit dialog if open
         setIsEditDialogOpen(false)
         setEditingTransaction(null)
+        // Close view details dialog if open
+        setIsViewDetailsDialogOpen(false)
+        setViewingTransaction(null)
       },
       description: 'Clear filters and selections',
       category: SHORTCUT_CATEGORIES.SEARCH
@@ -558,12 +593,84 @@ export function TransactionsPageClient({
     setIsEditDialogOpen(true)
   }
 
-  const handleSaveTransaction = () => {
+  const handleSaveTransaction = async () => {
     if (!editingTransaction) return
-    // Here you would update the transaction in the database
-    console.log('Saving transaction:', editingTransaction)
-    setIsEditDialogOpen(false)
-    setEditingTransaction(null)
+    
+    try {
+      // Find the category ID from the category name
+      const selectedCategory = propCategories.find(cat => cat.name === editingTransaction.category)
+      const categoryId = selectedCategory ? selectedCategory.id : null
+      
+      // Find the account ID from the account name  
+      const selectedAccount = propAccounts.find(acc => acc.name === editingTransaction.account)
+      const accountId = selectedAccount ? selectedAccount.id : null
+
+      const response = await fetch(`/api/transactions/${editingTransaction.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          description: editingTransaction.description,
+          amount: editingTransaction.amount,
+          categoryId: categoryId,
+          accountId: accountId,
+          transactionDate: new Date(editingTransaction.date).toISOString(),
+          merchant: editingTransaction.merchant,
+          reference: editingTransaction.reference,
+          notes: editingTransaction.notes,
+          tags: editingTransaction.tags
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update transaction')
+      }
+
+      toast.success('Transaction updated successfully')
+      setIsEditDialogOpen(false)
+      setEditingTransaction(null)
+      
+      // Refresh the page to show updated data
+      window.location.reload()
+      
+    } catch (error) {
+      console.error('Error updating transaction:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to update transaction')
+    }
+  }
+
+  // View transaction details
+  const handleViewDetails = (transaction: Transaction) => {
+    setViewingTransaction({ ...transaction })
+    setIsViewDetailsDialogOpen(true)
+  }
+
+  // Duplicate transaction
+  const handleDuplicateTransaction = (transaction: Transaction) => {
+    const duplicatedTransaction = {
+      ...transaction,
+      id: `duplicate-${Date.now()}`, // Generate a temporary ID
+      description: `${transaction.description} (Copy)`,
+      date: new Date().toISOString().split('T')[0] // Set to today's date
+    }
+    
+    if (onTransactionCreate) {
+      onTransactionCreate(duplicatedTransaction)
+      toast.success(`Transaction duplicated successfully`)
+    }
+  }
+
+  // Delete transaction
+  const handleDeleteTransaction = (transaction: Transaction) => {
+    if (confirm(`Are you sure you want to delete the transaction "${transaction.description}"?`)) {
+      if (onTransactionDelete) {
+        onTransactionDelete(transaction.id)
+        toast.success(`Transaction deleted successfully`)
+      }
+    }
   }
 
   // Bulk operations
@@ -579,6 +686,10 @@ export function TransactionsPageClient({
 
   const handleExport = () => {
     console.log('Exporting transactions:', filteredTransactions)
+  }
+
+  const handleImport = () => {
+    router.push('/import')
   }
 
   // Advanced search handlers
@@ -691,7 +802,7 @@ export function TransactionsPageClient({
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button>
+          <Button onClick={handleImport}>
             <Upload className="h-4 w-4 mr-2" />
             Import CSV
           </Button>
@@ -907,16 +1018,16 @@ export function TransactionsPageClient({
                             <Edit className="h-4 w-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDuplicateTransaction(transaction)}>
                             <Copy className="h-4 w-4 mr-2" />
                             Duplicate
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewDetails(transaction)}>
                             <Eye className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">
+                          <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteTransaction(transaction)}>
                             <Trash2 className="h-4 w-4 mr-2" />
                             Delete
                           </DropdownMenuItem>
@@ -940,8 +1051,9 @@ export function TransactionsPageClient({
                   isSelected={selectedTransactions.includes(transaction.id)}
                   onSelect={(checked) => handleSelectTransaction(transaction.id, checked)}
                   onEdit={() => handleEditTransaction(transaction)}
-                  onDelete={() => console.log('Delete', transaction.id)}
-                  onDuplicate={() => console.log('Duplicate', transaction.id)}
+                  onDelete={() => handleDeleteTransaction(transaction)}
+                  onDuplicate={() => handleDuplicateTransaction(transaction)}
+                  onViewDetails={() => handleViewDetails(transaction)}
                 />
               ))}
             </div>
@@ -1048,9 +1160,9 @@ export function TransactionsPageClient({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.slice(1).map(category => (
-                      <SelectItem key={category} value={category}>
-                        {category}
+                    {propCategories.map(category => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1075,6 +1187,97 @@ export function TransactionsPageClient({
             </Button>
             <Button onClick={handleSaveTransaction}>
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Transaction Details Dialog */}
+      <Dialog open={isViewDetailsDialogOpen} onOpenChange={setIsViewDetailsDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+            <DialogDescription>
+              View detailed information about this transaction.
+            </DialogDescription>
+          </DialogHeader>
+          {viewingTransaction && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Date</Label>
+                  <p className="text-sm">{formatDate(viewingTransaction.date)}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Amount</Label>
+                  <p className={cn(
+                    "text-sm font-medium",
+                    viewingTransaction.amount >= 0 ? "text-green-600" : "text-red-600"
+                  )}>
+                    {viewingTransaction.amount >= 0 ? '+' : '-'}$
+                    {Math.abs(viewingTransaction.amount).toLocaleString('en-AU', { 
+                      minimumFractionDigits: 2 
+                    })}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-muted-foreground">Description</Label>
+                <p className="text-sm">{viewingTransaction.description}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Category</Label>
+                  <Badge variant="secondary">{viewingTransaction.category}</Badge>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Account</Label>
+                  <p className="text-sm">{viewingTransaction.account}</p>
+                </div>
+              </div>
+              {viewingTransaction.merchant && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Merchant</Label>
+                  <p className="text-sm">{viewingTransaction.merchant}</p>
+                </div>
+              )}
+              {viewingTransaction.reference && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Reference</Label>
+                  <p className="text-sm">{viewingTransaction.reference}</p>
+                </div>
+              )}
+              {viewingTransaction.notes && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
+                  <p className="text-sm">{viewingTransaction.notes}</p>
+                </div>
+              )}
+              {viewingTransaction.tags && viewingTransaction.tags.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Tags</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {viewingTransaction.tags.map((tag, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewDetailsDialogOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              setIsViewDetailsDialogOpen(false)
+              if (viewingTransaction) {
+                handleEditTransaction(viewingTransaction)
+              }
+            }}>
+              Edit Transaction
             </Button>
           </DialogFooter>
         </DialogContent>

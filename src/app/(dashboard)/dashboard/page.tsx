@@ -25,8 +25,9 @@ import {
 } from '@/components/charts'
 import { 
   getCurrentUser,
+  createOrUpdateUser,
   getUserTransactions,
-  getUserAccounts,
+  getUserAccountsWithBalance,
   getUserCategories,
   getUserBudgets,
   getTransactionSummary,
@@ -55,7 +56,7 @@ async function getDashboardData(userId: string) {
     last30DaysTransactions,
     recurringSummary
   ] = await Promise.all([
-    getUserAccounts(userId),
+    getUserAccountsWithBalance(userId),
     getUserCategories(userId),
     getUserBudgets(userId),
     getUserTransactions(userId, { limit: 10, sortBy: 'date', sortOrder: 'desc' }),
@@ -70,9 +71,9 @@ async function getDashboardData(userId: string) {
     getRecurringTransactionsSummary(userId)
   ])
 
-  // Calculate total balance across accounts
-  const totalBalance = accounts.reduce((sum, account) => 
-    sum + parseFloat(account.balance || '0'), 0
+  // Calculate total balance across accounts using calculated balances
+  const totalBalance = accounts.reduce((sum: number, account: any) => 
+    sum + account.calculatedBalance, 0
   )
 
   // Calculate budget progress
@@ -129,11 +130,28 @@ export default async function DashboardPage() {
   }
 
   // Get user from database
-  const dbUser = await getCurrentUser()
+  let dbUser = await getCurrentUser()
   
   if (!dbUser) {
-    // User not yet synced to database, redirect to sign-in to trigger webhook
-    redirect('/sign-in')
+    // User not yet synced to database, create the user
+    try {
+      dbUser = await createOrUpdateUser({
+        id: user.id,
+        email: user.emailAddresses[0]?.emailAddress || '',
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        imageUrl: user.imageUrl || '',
+      })
+      
+      if (!dbUser) {
+        // If still can't create user, redirect to setup page
+        redirect('/setup')
+      }
+    } catch (error) {
+      console.error('Error creating user:', error)
+      // Redirect to setup page instead of sign-in to avoid loop
+      redirect('/setup')
+    }
   }
 
   // Fetch all dashboard data
@@ -142,7 +160,7 @@ export default async function DashboardPage() {
   // Calculate derived values
   const monthlyChange = dashboardData.lastMonthSummary.totalExpenses > 0 
     ? ((dashboardData.thisMonthSummary.totalExpenses - dashboardData.lastMonthSummary.totalExpenses) / dashboardData.lastMonthSummary.totalExpenses) * 100
-    : 0
+    : dashboardData.thisMonthSummary.totalExpenses > 0 ? 100 : 0
 
   const topCategory = dashboardData.categorySpending[0]
   const avgDailySpend = dashboardData.thisMonthSummary.totalExpenses / new Date().getDate()
@@ -155,7 +173,7 @@ export default async function DashboardPage() {
     },
     avgDailySpend,
     monthlyTrend: monthlyChange >= 0 ? 'up' as const : 'down' as const,
-    trendPercentage: Math.abs(monthlyChange),
+    trendPercentage: Number(Math.abs(monthlyChange).toFixed(1)),
     unusualSpending: Math.abs(monthlyChange) > 20,
   }
 
@@ -212,7 +230,7 @@ export default async function DashboardPage() {
           title="Total Balance"
           value={`$${dashboardData.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           change={{ 
-            value: Math.abs(monthlyChange), 
+            value: Number(Math.abs(monthlyChange).toFixed(1)), 
             type: monthlyChange >= 0 ? 'increase' : 'decrease', 
             period: 'last month' 
           }}
@@ -223,7 +241,7 @@ export default async function DashboardPage() {
           title="This Month"
           value={`$${dashboardData.thisMonthSummary.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           change={{ 
-            value: Math.abs(monthlyChange), 
+            value: Number(Math.abs(monthlyChange).toFixed(1)), 
             type: monthlyChange >= 0 ? 'increase' : 'decrease', 
             period: 'last month' 
           }}
@@ -245,16 +263,16 @@ export default async function DashboardPage() {
             period: 'due now' 
           } : undefined}
           icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-          description={`$${dashboardData.recurringSummary.monthlyTotal.toLocaleString()} monthly total`}
+          description={`$${dashboardData.recurringSummary.monthlyTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} monthly total`}
         />
         <InsightCard
           title="Income vs Expenses"
           value={`$${dashboardData.thisMonthSummary.netAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          change={{ 
-            value: dashboardData.thisMonthSummary.netAmount >= 0 ? 100 : 0, 
+          change={dashboardData.thisMonthSummary.totalIncome > 0 ? { 
+            value: Number(((dashboardData.thisMonthSummary.totalExpenses / dashboardData.thisMonthSummary.totalIncome) * 100).toFixed(1)), 
             type: dashboardData.thisMonthSummary.netAmount >= 0 ? 'increase' : 'decrease', 
-            period: 'net amount' 
-          }}
+            period: 'expense ratio' 
+          } : undefined}
           icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
           description="This month's net amount"
         />
