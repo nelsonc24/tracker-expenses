@@ -9,4 +9,5 @@ Provide project context and coding guidelines that AI should follow when generat
 - Ensure all new features are covered by tests.
 - Keep security in mind and validate all user inputs.
 - Use the provided utility functions for common tasks (e.g., date formatting, database operations).
+- When creating test scripts or utility scripts, place them in a `scripts/` folder instead of the project root.
 - if you need to run the app manually, use `bun run dev` to start the development server and make sure to kill the port before starting a new instance using `lsof -ti:3001 | xargs kill -9` to free up port 3001.
