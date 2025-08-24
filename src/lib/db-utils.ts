@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/db'
 import { users, accounts, categories, transactions, budgets, recurringTransactions } from '@/db/schema'
-import { eq, and, desc, asc, count, sum, gte, lte, like, or } from 'drizzle-orm'
+import { eq, and, desc, asc, count, sum, gte, lte, like, or, sql } from 'drizzle-orm'
 
 // Type helpers for better TypeScript support
 type InsertUser = typeof users.$inferInsert
@@ -103,6 +103,85 @@ export async function createAccount(accountData: {
     return (result as SelectAccount[])?.[0] || null
   } catch (error) {
     console.error('Error creating account:', error)
+    return null
+  }
+}
+
+export async function updateAccount(
+  accountId: string,
+  userId: string,
+  updateData: {
+    name?: string
+    institution?: string
+    accountType?: string
+    accountNumber?: string
+    bsb?: string
+    balance?: string
+    isActive?: boolean
+    metadata?: any
+  }
+): Promise<SelectAccount | null> {
+  try {
+    const result = await db
+      .update(accounts)
+      .set({
+        ...updateData,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
+      .returning()
+    return (result as SelectAccount[])?.[0] || null
+  } catch (error) {
+    console.error('Error updating account:', error)
+    return null
+  }
+}
+
+export async function deleteAccount(accountId: string, userId: string): Promise<boolean> {
+  try {
+    // First check if account has transactions
+    const transactionCount = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(transactions)
+      .where(eq(transactions.accountId, accountId))
+    
+    const hasTransactions = transactionCount[0]?.count > 0
+
+    if (hasTransactions) {
+      // Don't delete account with transactions, just deactivate it
+      const result = await db
+        .update(accounts)
+        .set({
+          isActive: false,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
+        .returning()
+      return result.length > 0
+    } else {
+      // Safe to delete account with no transactions
+      const result = await db
+        .delete(accounts)
+        .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
+        .returning()
+      return result.length > 0
+    }
+  } catch (error) {
+    console.error('Error deleting account:', error)
+    return false
+  }
+}
+
+export async function getAccountById(accountId: string, userId: string): Promise<SelectAccount | null> {
+  try {
+    const result = await db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.id, accountId), eq(accounts.userId, userId)))
+      .limit(1)
+    return (result as SelectAccount[])?.[0] || null
+  } catch (error) {
+    console.error('Error getting account by ID:', error)
     return null
   }
 }
@@ -628,19 +707,30 @@ export async function getRecurringTransactionsSummary(userId: string): Promise<{
   }
 }
 
-// Calculate actual account balance from transactions
+// Calculate actual account balance from initial balance plus transactions
 export async function calculateAccountBalance(accountId: string): Promise<number> {
   try {
-    const result = await db
+    // Get the account's initial balance
+    const accountResult = await db
+      .select({ balance: accounts.balance })
+      .from(accounts)
+      .where(eq(accounts.id, accountId))
+      .limit(1)
+
+    const initialBalance = parseFloat(accountResult[0]?.balance || '0')
+
+    // Get all transactions for this account
+    const transactionsResult = await db
       .select({ amount: transactions.amount })
       .from(transactions)
       .where(eq(transactions.accountId, accountId))
 
-    const balance = result.reduce((sum, tx) => {
+    const transactionsTotal = transactionsResult.reduce((sum, tx) => {
       return sum + parseFloat(tx.amount || '0')
     }, 0)
 
-    return balance
+    // Return initial balance plus transactions total
+    return initialBalance + transactionsTotal
   } catch (error) {
     console.error('Error calculating account balance:', error)
     return 0

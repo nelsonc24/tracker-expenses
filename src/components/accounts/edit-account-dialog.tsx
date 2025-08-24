@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { 
@@ -10,7 +10,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,21 +20,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 
-interface FormData {
+interface Account {
+  id: string
+  name: string
   institution: string
-  accountName: string
+  accountType: string
+  accountNumber?: string
+  bsb?: string
+  balance: string
+  isActive: boolean
+}
+
+interface EditAccountDialogProps {
+  account: Account
+  isOpen: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+interface FormData {
+  name: string
+  institution: string
   accountType: string
   accountNumber: string
   bsb: string
   balance: string
+  isActive: boolean
 }
 
 interface FormErrors {
+  name?: string
   institution?: string
-  accountName?: string
   accountType?: string
   balance?: string
 }
@@ -51,29 +68,44 @@ const institutionLabels = {
   'Other': 'Other'
 }
 
-export function AddAccountDialog() {
+export function EditAccountDialog({ account, isOpen, onOpenChange }: EditAccountDialogProps) {
   const router = useRouter()
-  const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState<FormData>({
+    name: '',
     institution: '',
-    accountName: '',
     accountType: '',
     accountNumber: '',
     bsb: '',
-    balance: ''
+    balance: '',
+    isActive: true
   })
   const [errors, setErrors] = useState<FormErrors>({})
+
+  // Initialize form data when account changes
+  useEffect(() => {
+    if (account) {
+      setFormData({
+        name: account.name,
+        institution: account.institution,
+        accountType: account.accountType,
+        accountNumber: account.accountNumber || '',
+        bsb: account.bsb || '',
+        balance: account.balance,
+        isActive: account.isActive
+      })
+    }
+  }, [account])
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {}
 
-    if (!formData.institution) {
-      newErrors.institution = 'Institution is required'
+    if (!formData.name.trim()) {
+      newErrors.name = 'Account name is required'
     }
 
-    if (!formData.accountName.trim()) {
-      newErrors.accountName = 'Account name is required'
+    if (!formData.institution) {
+      newErrors.institution = 'Institution is required'
     }
 
     if (!formData.accountType) {
@@ -101,18 +133,19 @@ export function AddAccountDialog() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/accounts', {
-        method: 'POST',
+      const response = await fetch(`/api/accounts/${account.id}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: formData.accountName,
+          name: formData.name,
           institution: formData.institution,
           accountType: formData.accountType,
           accountNumber: formData.accountNumber || undefined,
           bsb: formData.bsb || undefined,
           balance: formData.balance,
+          isActive: formData.isActive,
           metadata: {
             description: `${formData.accountType} account at ${formData.institution}`,
           }
@@ -121,59 +154,56 @@ export function AddAccountDialog() {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Failed to create account')
+        throw new Error(error.error || 'Failed to update account')
       }
 
-      const account = await response.json()
+      const updatedAccount = await response.json()
       
-      toast.success('Account added successfully!')
-      setIsOpen(false)
+      toast.success('Account updated successfully!')
+      onOpenChange(false)
       
-      // Reset form
-      setFormData({
-        institution: '',
-        accountName: '',
-        accountType: '',
-        accountNumber: '',
-        bsb: '',
-        balance: ''
-      })
-      setErrors({})
-      
-      // Refresh the page to show the new account
+      // Refresh the page to show the updated account
       router.refresh()
     } catch (error) {
-      console.error('Error creating account:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to create account')
+      console.error('Error updating account:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to update account')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleFieldChange = (field: keyof FormData, value: string) => {
+  const handleFieldChange = (field: keyof FormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-    // Clear error when user starts typing
-    if (errors[field as keyof FormErrors]) {
+    // Clear error when user starts typing (for string fields)
+    if (typeof value === 'string' && errors[field as keyof FormErrors]) {
       setErrors(prev => ({ ...prev, [field]: undefined }))
     }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Account
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add New Account</DialogTitle>
+          <DialogTitle>Edit Account</DialogTitle>
           <DialogDescription>
-            Connect a new bank account or add a manual account to track.
+            Update your account details and settings.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="name">Account Name *</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => handleFieldChange('name', e.target.value)}
+              placeholder="e.g., Everyday Account"
+              className={errors.name ? 'border-red-500' : ''}
+            />
+            {errors.name && (
+              <p className="text-sm text-red-500">{errors.name}</p>
+            )}
+          </div>
+
           <div className="grid gap-2">
             <Label htmlFor="institution">Institution *</Label>
             <Select 
@@ -191,20 +221,6 @@ export function AddAccountDialog() {
             </Select>
             {errors.institution && (
               <p className="text-sm text-red-500">{errors.institution}</p>
-            )}
-          </div>
-          
-          <div className="grid gap-2">
-            <Label htmlFor="account-name">Account Name *</Label>
-            <Input
-              id="account-name"
-              value={formData.accountName}
-              onChange={(e) => handleFieldChange('accountName', e.target.value)}
-              placeholder="e.g., Everyday Account"
-              className={errors.accountName ? 'border-red-500' : ''}
-            />
-            {errors.accountName && (
-              <p className="text-sm text-red-500">{errors.accountName}</p>
             )}
           </div>
           
@@ -264,11 +280,20 @@ export function AddAccountDialog() {
               <p className="text-sm text-red-500">{errors.balance}</p>
             )}
           </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="is-active"
+              checked={formData.isActive}
+              onCheckedChange={(checked) => handleFieldChange('isActive', checked)}
+            />
+            <Label htmlFor="is-active">Account is active</Label>
+          </div>
         </div>
         <DialogFooter>
           <Button 
             variant="outline" 
-            onClick={() => setIsOpen(false)}
+            onClick={() => onOpenChange(false)}
             disabled={isLoading}
           >
             Cancel
@@ -277,7 +302,7 @@ export function AddAccountDialog() {
             onClick={handleSubmit}
             disabled={isLoading}
           >
-            {isLoading ? 'Adding...' : 'Add Account'}
+            {isLoading ? 'Updating...' : 'Update Account'}
           </Button>
         </DialogFooter>
       </DialogContent>
