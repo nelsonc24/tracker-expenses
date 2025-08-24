@@ -154,7 +154,7 @@ export default function BudgetsPage() {
               const spentResponse = await fetch(`/api/transactions?categoryId=${budget.categoryId}&startDate=${startMonth}-01&endDate=${endMonth}-31`)
               if (spentResponse.ok) {
                 const transactions = await spentResponse.json()
-                spentAmount = transactions.reduce((sum: number, t: any) => sum + Math.abs(parseFloat(t.amount)), 0)
+                spentAmount = transactions.reduce((sum: number, t: { amount: string }) => sum + Math.abs(parseFloat(t.amount)), 0)
               }
             }
 
@@ -363,7 +363,7 @@ export default function BudgetsPage() {
               ${totalBudget.toLocaleString('en-AU')}
             </div>
             <p className="text-xs text-muted-foreground">
-              This month's limit
+              This month&apos;s limit
             </p>
           </CardContent>
         </Card>
@@ -576,7 +576,7 @@ export default function BudgetsPage() {
                         <div className="flex items-center space-x-2 p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
                           <AlertTriangle className="h-4 w-4 text-red-500" />
                           <p className="text-sm text-red-700 dark:text-red-300">
-                            You're ${(budget.spent - budget.amount).toFixed(2)} over budget this month.
+                            You&apos;re ${(budget.spent - budget.amount).toFixed(2)} over budget this month.
                           </p>
                         </div>
                       )}
@@ -585,7 +585,7 @@ export default function BudgetsPage() {
                         <div className="flex items-center space-x-2 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg">
                           <AlertTriangle className="h-4 w-4 text-yellow-500" />
                           <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                            You're approaching your budget limit. ${remainingAmount.toFixed(2)} remaining.
+                            You&apos;re approaching your budget limit. ${remainingAmount.toFixed(2)} remaining.
                           </p>
                         </div>
                       )}
@@ -604,7 +604,7 @@ export default function BudgetsPage() {
                 <PiggyBank className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium">Previous Month Data</h3>
                 <p className="text-muted-foreground">
-                  Previous month's budget performance will be shown here
+                  Previous month&apos;s budget performance will be shown here
                 </p>
               </div>
             </CardContent>

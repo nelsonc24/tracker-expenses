@@ -490,7 +490,7 @@ export default function AdvancedAnalyticsPage() {
                         />
                         <YAxis />
                         <Tooltip 
-                          formatter={(value: any) => [`$${value.toLocaleString()}`, '']}
+                          formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
                         />
                         <Legend />
                         <Bar dataKey="budget" fill="#3b82f6" name="Budget" fillOpacity={0.6} />
@@ -506,7 +506,7 @@ export default function AdvancedAnalyticsPage() {
                 <CardHeader>
                   <CardTitle>Budget Variance Details</CardTitle>
                   <CardDescription>
-                    Detailed breakdown of each budget's performance
+                    Detailed breakdown of each budget&apos;s performance
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -623,7 +623,7 @@ export default function AdvancedAnalyticsPage() {
                       />
                       <YAxis />
                       <Tooltip 
-                        formatter={(value: any) => [`$${value.toLocaleString()}`, '']}
+                        formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
                       />
                       <Legend />
                       <Bar dataKey="budget" fill="#3b82f6" name="Budget" fillOpacity={0.6} />
@@ -691,7 +691,7 @@ export default function AdvancedAnalyticsPage() {
                           <XAxis dataKey="month" />
                           <YAxis />
                           <Tooltip 
-                            formatter={(value: any, name: string) => {
+                            formatter={(value: number, name: string) => {
                               if (name.includes('forecast')) {
                                 return [`$${value.toLocaleString()} (forecast)`, name]
                               }

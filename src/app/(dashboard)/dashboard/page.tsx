@@ -74,7 +74,7 @@ async function getDashboardData(userId: string) {
   ])
 
   // Calculate total balance across accounts using calculated balances
-  const totalBalance = accounts.reduce((sum: number, account: any) => 
+  const totalBalance = accounts.reduce((sum: number, account: { calculatedBalance: number }) => 
     sum + account.calculatedBalance, 0
   )
 
@@ -211,7 +211,7 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold">Welcome back, {user?.firstName}!</h1>
           <p className="text-muted-foreground mt-2">
-            Here's your financial overview for today
+            Here&apos;s your financial overview for today
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -376,7 +376,7 @@ export default async function DashboardPage() {
                 <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
                   <h4 className="font-semibold text-green-900 dark:text-green-100">🎯 Goal Progress</h4>
                   <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                    You're on track to save $500 this month. Keep it up!
+                    You&apos;re on track to save $500 this month. Keep it up!
                   </p>
                 </div>
                 <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg">

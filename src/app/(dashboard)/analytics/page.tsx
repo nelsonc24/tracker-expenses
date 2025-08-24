@@ -206,7 +206,7 @@ export default function AnalyticsPage() {
                     />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value: any) => [`$${value.toLocaleString()}`, '']}
+                      formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
                       labelFormatter={(label) => new Date(label).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}
                     />
                     <Legend />
@@ -228,7 +228,7 @@ export default function AnalyticsPage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value: any) => [`$${value.toLocaleString()}`, '']} />
+                    <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, '']} />
                     <Area 
                       type="monotone" 
                       dataKey="savings" 
@@ -253,7 +253,7 @@ export default function AnalyticsPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="week" />
                   <YAxis />
-                  <Tooltip formatter={(value: any) => [`$${value.toLocaleString()}`, '']} />
+                  <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, '']} />
                   <Legend />
                   <Bar dataKey="spending" fill="#ef4444" name="Actual Spending" />
                   <Bar dataKey="budget" fill="#22c55e" name="Budget" fillOpacity={0.3} />
@@ -374,7 +374,7 @@ export default function AnalyticsPage() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }: { name?: string; percent?: number }) => `${name || ''} ${((percent || 0) * 100).toFixed(0)}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
@@ -389,7 +389,7 @@ export default function AnalyticsPage() {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: any) => [`$${value.toLocaleString()}`, '']} />
+                    <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, '']} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>

@@ -52,7 +52,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Invalid account type' }, { status: 400 })
     }
 
-    const updateData: Record<string, any> = {}
+    const updateData: Record<string, string | undefined> = {}
     if (name !== undefined) updateData.name = name
     if (institution !== undefined) updateData.institution = institution
     if (accountType !== undefined) updateData.accountType = accountType
