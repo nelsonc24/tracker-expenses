@@ -440,7 +440,26 @@ export function AdvancedSearch({
                       {category.name}
                       <X 
                         className="h-3 w-3 cursor-pointer" 
-                        onClick={() => setSelectedCategories(prev => prev.filter(id => id !== categoryId))}
+                        onClick={() => {
+                          const updatedCategories = selectedCategories.filter(id => id !== categoryId)
+                          setSelectedCategories(updatedCategories)
+                          
+                          // Auto-apply the updated filter
+                          const filters = {
+                            id: Date.now().toString(),
+                            name: 'Auto-applied Filter',
+                            query,
+                            categories: updatedCategories,
+                            accounts: selectedAccounts,
+                            merchants: selectedMerchants,
+                            amountMin,
+                            amountMax,
+                            dateFrom,
+                            dateTo,
+                            transactionTypes: selectedTypes,
+                          }
+                          onSearch(filters)
+                        }}
                       />
                     </Badge>
                   ) : null
@@ -487,7 +506,26 @@ export function AdvancedSearch({
                       {account.name}
                       <X 
                         className="h-3 w-3 cursor-pointer" 
-                        onClick={() => setSelectedAccounts(prev => prev.filter(id => id !== accountId))}
+                        onClick={() => {
+                          const updatedAccounts = selectedAccounts.filter(id => id !== accountId)
+                          setSelectedAccounts(updatedAccounts)
+                          
+                          // Auto-apply the updated filter
+                          const filters = {
+                            id: Date.now().toString(),
+                            name: 'Auto-applied Filter',
+                            query,
+                            categories: selectedCategories,
+                            accounts: updatedAccounts,
+                            merchants: selectedMerchants,
+                            amountMin,
+                            amountMax,
+                            dateFrom,
+                            dateTo,
+                            transactionTypes: selectedTypes,
+                          }
+                          onSearch(filters)
+                        }}
                       />
                     </Badge>
                   ) : null

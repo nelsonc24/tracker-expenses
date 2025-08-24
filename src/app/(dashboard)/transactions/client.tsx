@@ -233,8 +233,10 @@ type Transaction = {
   description: string
   amount: number
   category: string
+  categoryId: string | null
   date: string
   account: string
+  accountId: string | null
   type?: 'debit' | 'credit' | 'transfer'
   merchant: string
   reference: string
@@ -253,8 +255,10 @@ interface TransactionsPageClientProps {
     description: string
     amount: number
     category: string
+    categoryId: string | null
     date: string
     account: string
+    accountId: string | null
     type: 'debit' | 'credit' | 'transfer'
     merchant?: string
     reference?: string
@@ -394,16 +398,16 @@ export function TransactionsPageClient({
 
         // Category filter
         if (activeFilters.categories.length > 0) {
-          // Note: This assumes we have category IDs in the transaction. 
-          // You may need to adapt this based on your actual data structure
-          if (!activeFilters.categories.includes(transaction.category)) {
+          // Compare category IDs
+          if (!transaction.categoryId || !activeFilters.categories.includes(transaction.categoryId)) {
             return false
           }
         }
 
         // Account filter
         if (activeFilters.accounts.length > 0) {
-          if (!activeFilters.accounts.includes(transaction.account)) {
+          // Compare account IDs
+          if (!transaction.accountId || !activeFilters.accounts.includes(transaction.accountId)) {
             return false
           }
         }

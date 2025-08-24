@@ -8,8 +8,10 @@ interface Transaction {
   description: string
   amount: number
   category: string
+  categoryId: string | null
   date: string
   account: string
+  accountId: string | null
   type: 'debit' | 'credit' | 'transfer'
   merchant?: string
   reference?: string
