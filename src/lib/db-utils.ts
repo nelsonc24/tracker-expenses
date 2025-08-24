@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/db'
 import { users, accounts, categories, transactions, budgets, recurringTransactions } from '@/db/schema'
-import { eq, and, desc, asc, count, sum, gte, lte, like, or, sql } from 'drizzle-orm'
+import { eq, and, desc, asc, count, sum, gte, lte, lt, like, or, sql } from 'drizzle-orm'
 
 // Type helpers for better TypeScript support
 type InsertUser = typeof users.$inferInsert
@@ -597,7 +597,10 @@ export async function getCategorySpending(
   transactionCount: number
 }>> {
   try {
-    const conditions = [eq(transactions.userId, userId)]
+    const conditions = [
+      eq(transactions.userId, userId),
+      lt(transactions.amount, '0') // Only include expenses (negative amounts)
+    ]
     
     if (startDate) {
       conditions.push(gte(transactions.transactionDate, startDate))
