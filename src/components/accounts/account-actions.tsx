@@ -35,8 +35,8 @@ interface Account {
   name: string
   institution: string
   accountType: string
-  accountNumber?: string
-  bsb?: string
+  accountNumber: string | null
+  bsb: string | null
   balance: string
   isActive: boolean
   calculatedBalance: number
@@ -139,7 +139,7 @@ export function AccountActions({ account }: AccountActionsProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently remove "{account.name}" 
+              This action cannot be undone. This will permanently remove &quot;{account.name}&quot; 
               from your accounts. If this account has transactions, it will be deactivated 
               instead of deleted to preserve transaction history.
             </AlertDialogDescription>

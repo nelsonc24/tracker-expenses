@@ -42,7 +42,7 @@ export const accounts = pgTable('accounts', {
     color?: string
     icon?: string
     description?: string
-    connectionDetails?: Record<string, any>
+    connectionDetails?: Record<string, string | number | boolean>
   }>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -52,7 +52,7 @@ export const accounts = pgTable('accounts', {
 }))
 
 // Categories table
-export const categories = pgTable('categories', {
+export const categories: any = pgTable('categories', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   name: text('name').notNull(),
@@ -122,7 +122,7 @@ export const transactions = pgTable('transactions', {
     longitude?: number
     address?: string
   }>(),
-  originalData: jsonb('original_data').$type<Record<string, any>>(), // Raw import data
+  originalData: jsonb('original_data').$type<Record<string, string | number | boolean | null>>(), // Raw import data
   duplicateCheckHash: text('duplicate_check_hash'), // For duplicate detection
   reconciled: boolean('reconciled').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -158,7 +158,7 @@ export const importSessions = pgTable('import_sessions', {
   }>>().default([]),
   metadata: jsonb('metadata').$type<{
     mapping?: Record<string, string>
-    preview?: any[]
+    preview?: Record<string, string | number | boolean | null>[]
     duplicatesFound?: number
   }>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),

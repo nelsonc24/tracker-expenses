@@ -4,7 +4,7 @@ import { updateCategory, deleteCategory, getCategoryById } from '@/lib/db-utils'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await currentUser()
@@ -12,7 +12,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const category = await getCategoryById(params.id)
+    const { id } = await params
+    const category = await getCategoryById(id)
     
     if (!category) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
@@ -32,7 +33,7 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await currentUser()
@@ -40,8 +41,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     // Check if category exists and user owns it
-    const existingCategory = await getCategoryById(params.id)
+    const existingCategory = await getCategoryById(id)
     if (!existingCategory) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
@@ -66,12 +68,12 @@ export async function PATCH(
       }
       
       // Prevent circular references
-      if (parentId === params.id) {
+      if (parentId === id) {
         return NextResponse.json({ error: 'Category cannot be its own parent' }, { status: 400 })
       }
     }
 
-    const updatedCategory = await updateCategory(params.id, {
+    const updatedCategory = await updateCategory(id, {
       name,
       color,
       icon,
@@ -92,7 +94,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await currentUser()
@@ -100,8 +102,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     // Check if category exists and user owns it
-    const existingCategory = await getCategoryById(params.id)
+    const existingCategory = await getCategoryById(id)
     if (!existingCategory) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
@@ -115,7 +118,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Cannot delete system categories' }, { status: 400 })
     }
 
-    const success = await deleteCategory(params.id)
+    const success = await deleteCategory(id)
     
     if (!success) {
       return NextResponse.json({ error: 'Failed to delete category' }, { status: 500 })

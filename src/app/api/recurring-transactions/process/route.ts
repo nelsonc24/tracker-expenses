@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const { id, processAll = false } = body
 
     let processedCount = 0
-    let errors: string[] = []
+    const errors: string[] = []
 
     if (processAll) {
       // Process all due recurring transactions for the user
@@ -77,7 +77,26 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processRecurringTransaction(recurring: any) {
+async function processRecurringTransaction(recurring: {
+  id: string;
+  userId: string;
+  accountId: string;
+  categoryId: string | null;
+  name: string;
+  description: string;
+  amount: string;
+  currency: string;
+  frequency: string;
+  startDate: Date;
+  endDate: Date | null;
+  nextDate: Date;
+  lastProcessed: Date | null;
+  isActive: boolean;
+  autoProcess: boolean;
+  tags: string[] | null;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
   // Create the actual transaction
   await db.insert(transactions).values({
     userId: recurring.userId,

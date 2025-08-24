@@ -28,8 +28,8 @@ interface Account {
   name: string
   institution: string
   accountType: string
-  accountNumber?: string
-  bsb?: string
+  accountNumber: string | null
+  bsb: string | null
   balance: string
   isActive: boolean
 }

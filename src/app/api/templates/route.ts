@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createTransactionTemplateSchema, updateTransactionTemplateSchema, TransactionTemplate } from '@/lib/validations/templates'
 
 // Sample templates data (in a real app, this would be stored in a database)
-let templates: TransactionTemplate[] = [
+const templates: TransactionTemplate[] = [
   {
     id: '1',
     name: 'Monthly Rent',
