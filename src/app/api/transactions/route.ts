@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       type: transaction.type,
       merchant: transaction.merchant,
       reference: transaction.reference,
+      receiptNumber: transaction.receiptNumber,
       tags: transaction.tags,
       notes: transaction.notes
     }))
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
       description, 
       merchant, 
       reference, 
+      receiptNumber,
       transactionDate, 
       type, 
       tags, 
@@ -83,6 +85,7 @@ export async function POST(request: NextRequest) {
       description,
       merchant,
       reference,
+      receiptNumber,
       transactionDate: new Date(transactionDate),
       type,
       tags,

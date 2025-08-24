@@ -424,6 +424,7 @@ export async function createTransaction(transactionData: {
   description: string
   merchant?: string
   reference?: string
+  receiptNumber?: string
   transactionDate: Date
   type: 'debit' | 'credit' | 'transfer'
   tags?: string[]

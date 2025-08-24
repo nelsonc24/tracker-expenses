@@ -68,6 +68,7 @@ interface AdvancedSearchProps {
   savedSearches: SearchFilter[]
   onSaveSearch: (search: SearchFilter) => void
   onDeleteSearch: (searchId: string) => void
+  currentFilters?: SearchFilter | null // Add prop for current active filters
 }
 
 const TRANSACTION_TYPES = [
@@ -100,7 +101,8 @@ export function AdvancedSearch({
   merchants,
   savedSearches,
   onSaveSearch,
-  onDeleteSearch
+  onDeleteSearch,
+  currentFilters
 }: AdvancedSearchProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
@@ -116,6 +118,32 @@ export function AdvancedSearch({
   const [amountMax, setAmountMax] = useState<number | null>(null)
   const [dateFrom, setDateFrom] = useState<string | null>(null)
   const [dateTo, setDateTo] = useState<string | null>(null)
+
+  // Restore filter state when currentFilters changes
+  useEffect(() => {
+    if (currentFilters) {
+      setQuery(currentFilters.query || '')
+      setSelectedCategories(currentFilters.categories || [])
+      setSelectedAccounts(currentFilters.accounts || [])
+      setSelectedMerchants(currentFilters.merchants || [])
+      setSelectedTypes(currentFilters.transactionTypes || [])
+      setAmountMin(currentFilters.amountMin)
+      setAmountMax(currentFilters.amountMax)
+      setDateFrom(currentFilters.dateFrom)
+      setDateTo(currentFilters.dateTo)
+    } else {
+      // Clear all filters when no current filters
+      setQuery('')
+      setSelectedCategories([])
+      setSelectedAccounts([])
+      setSelectedMerchants([])
+      setSelectedTypes([])
+      setAmountMin(null)
+      setAmountMax(null)
+      setDateFrom(null)
+      setDateTo(null)
+    }
+  }, [currentFilters])
 
   // Quick search state
   const [quickSearch, setQuickSearch] = useState('')

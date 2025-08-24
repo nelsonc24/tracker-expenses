@@ -15,6 +15,13 @@
       "when": 1755920770201,
       "tag": "0001_tricky_albert_cleary",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1756006977208,
+      "tag": "0002_sparkling_marvel_boy",
+      "breakpoints": true
     }
   ]
 }

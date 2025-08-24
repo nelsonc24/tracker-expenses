@@ -20,7 +20,7 @@ const updateTransactionSchema = z.object({
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -29,7 +29,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const transactionId = params.id
+    const { id: transactionId } = await params
     const body = await request.json()
     const validatedData = updateTransactionSchema.parse(body)
 
@@ -220,7 +220,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -229,7 +229,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const transactionId = params.id
+    const { id: transactionId } = await params
 
     // Check if transaction exists and belongs to user
     const existingTransaction = await db

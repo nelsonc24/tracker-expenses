@@ -58,6 +58,13 @@ interface BulkOperationsProps {
     name: string
     institution?: string
   }>
+  transactions?: Array<{
+    id: string
+    amount: number
+    description: string
+    category: string
+    date: string
+  }>
 }
 
 type BulkOperation = 
@@ -118,7 +125,8 @@ export function BulkOperationsBar({
   onClearSelection,
   onOperationComplete,
   categories,
-  accounts
+  accounts,
+  transactions = []
 }: BulkOperationsProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -139,6 +147,40 @@ export function BulkOperationsBar({
   })
 
   const selectedCount = selectedTransactionIds.length
+
+  // Calculate total amount of selected transactions
+  const selectedTransactions = transactions.filter(t => selectedTransactionIds.includes(t.id))
+  const totalAmount = selectedTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
+  
+  // Calculate breakdown of income vs expenses
+  const incomeAmount = selectedTransactions
+    .filter(t => t.amount > 0)
+    .reduce((sum, t) => sum + t.amount, 0)
+  const expenseAmount = selectedTransactions
+    .filter(t => t.amount < 0)
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+  
+  // Format the total amount
+  const formatCurrency = (amount: number) => {
+    const isNegative = amount < 0
+    const absAmount = Math.abs(amount)
+    const formatted = new Intl.NumberFormat('en-AU', {
+      style: 'currency',
+      currency: 'AUD',
+      minimumFractionDigits: 2,
+    }).format(absAmount)
+    
+    return {
+      formatted: isNegative ? `-${formatted}` : formatted,
+      isNegative,
+      isPositive: amount > 0,
+      isZero: amount === 0
+    }
+  }
+
+  const { formatted: formattedTotal, isNegative, isPositive, isZero } = formatCurrency(totalAmount)
+  const hasMultipleTransactions = selectedCount > 1
+  const showBreakdown = hasMultipleTransactions && incomeAmount > 0 && expenseAmount > 0
 
   if (selectedCount === 0) {
     return null
@@ -478,15 +520,52 @@ export function BulkOperationsBar({
 
   return (
     <>
-      <div className="flex items-center justify-between p-4 bg-muted/50 border rounded-lg">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-muted/50 border rounded-lg gap-3 sm:gap-0">
         <div className="flex items-center gap-3">
           <CheckCircle className="h-4 w-4 text-green-600" />
-          <span className="font-medium">
-            {selectedCount} transaction{selectedCount !== 1 ? 's' : ''} selected
-          </span>
+          <div className="flex flex-col">
+            <span className="font-medium">
+              {selectedCount} transaction{selectedCount !== 1 ? 's' : ''} selected
+            </span>
+            {selectedCount > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className={cn(
+                  "text-sm font-medium",
+                  isNegative && "text-red-600",
+                  isPositive && "text-green-600",
+                  isZero && "text-muted-foreground"
+                )}>
+                  Total: {formattedTotal}
+                  {isNegative && (
+                    <span className="text-xs text-muted-foreground ml-1">(net expense)</span>
+                  )}
+                  {isPositive && (
+                    <span className="text-xs text-muted-foreground ml-1">(net income)</span>
+                  )}
+                  {isZero && (
+                    <span className="text-xs text-muted-foreground ml-1">(balanced)</span>
+                  )}
+                </span>
+                {showBreakdown && (
+                  <span className="text-xs text-muted-foreground">
+                    Income: {formatCurrency(incomeAmount).formatted} • 
+                    Expenses: {formatCurrency(expenseAmount).formatted}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         
         <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onClearSelection}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Clear Selection
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">

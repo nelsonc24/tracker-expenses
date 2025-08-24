@@ -3,9 +3,9 @@ import { currentUser } from '@clerk/nextjs/server'
 import { getAccountById, updateAccount, deleteAccount } from '@/lib/db-utils'
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -15,7 +15,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const account = await getAccountById(params.id, user.id)
+    const { id } = await params
+    const account = await getAccountById(id, user.id)
 
     if (!account) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 })
@@ -61,7 +62,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (isActive !== undefined) updateData.isActive = isActive
     if (metadata !== undefined) updateData.metadata = metadata
 
-    const account = await updateAccount(params.id, user.id, updateData)
+    const { id } = await params
+    const account = await updateAccount(id, user.id, updateData)
 
     if (!account) {
       return NextResponse.json({ error: 'Account not found or failed to update' }, { status: 404 })
@@ -81,7 +83,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const success = await deleteAccount(params.id, user.id)
+    const { id } = await params
+    const success = await deleteAccount(id, user.id)
 
     if (!success) {
       return NextResponse.json({ error: 'Account not found or failed to delete' }, { status: 404 })

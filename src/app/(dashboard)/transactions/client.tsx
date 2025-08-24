@@ -238,6 +238,7 @@ type Transaction = {
   type?: 'debit' | 'credit' | 'transfer'
   merchant: string
   reference: string
+  receiptNumber?: string
   tags: string[]
   notes: string
   balance: number
@@ -292,19 +293,40 @@ export function TransactionsPageClient({
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
   
-  // Update local state when props change
+    // Update local state when propTransactions changes
   useEffect(() => {
-    if (propTransactions) {
-      // Transform API data to match the expected format
-      const transformedTransactions = propTransactions.map(transaction => ({
-        ...transaction,
-        merchant: transaction.merchant || '',
-        reference: transaction.reference || '',
-        balance: 0, // API doesn't provide balance, set to 0
-        tags: transaction.tags || [],
-        notes: transaction.notes || ''
-      }))
+    if (propTransactions.length > 0) {
+      const transformedTransactions = propTransactions
+        .filter(transaction => transaction && transaction.id) // Filter out invalid transactions
+        .map(transaction => ({
+          ...transaction,
+          merchant: transaction.merchant || '',
+          reference: transaction.reference || '',
+          balance: 0, // API doesn't provide balance, set to 0
+          tags: transaction.tags || [],
+          notes: transaction.notes || ''
+        }))
+      
+      // Check for duplicate IDs and log them (filter out undefined/null IDs first)
+      const validIds = transformedTransactions
+        .map(t => t.id)
+        .filter(id => id !== undefined && id !== null && id !== '')
+      
+      const duplicateIds = validIds.filter((id, index) => validIds.indexOf(id) !== index)
+      if (duplicateIds.length > 0) {
+        console.warn('Duplicate transaction IDs found:', duplicateIds)
+      }
+      
+      // Check if we filtered out any transactions due to missing IDs
+      const filteredCount = propTransactions.length - transformedTransactions.length
+      if (filteredCount > 0) {
+        console.warn(`Filtered out ${filteredCount} transactions with missing or invalid IDs`)
+        console.warn('Sample invalid transaction:', propTransactions.find(t => !t || !t.id))
+      }
+      
       setTransactions(transformedTransactions)
+    } else {
+      setTransactions([])
     }
   }, [propTransactions])
   // const [categoryFilter, setCategoryFilter] = useState('All Categories')
@@ -318,12 +340,33 @@ export function TransactionsPageClient({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isViewDetailsDialogOpen, setIsViewDetailsDialogOpen] = useState(false)
   const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null)
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
+  const [categoryEditingTransaction, setCategoryEditingTransaction] = useState<Transaction | null>(null)
   
   // Advanced search state
   const [activeFilters, setActiveFilters] = useState<any>(null)
   const [savedSearches, setSavedSearches] = useState<any[]>([])
 
-  // Mobile responsiveness
+  // Load filters from localStorage on mount
+  useEffect(() => {
+    const savedFilters = localStorage.getItem('transaction-filters')
+    if (savedFilters) {
+      try {
+        setActiveFilters(JSON.parse(savedFilters))
+      } catch (error) {
+        console.error('Failed to load saved filters:', error)
+      }
+    }
+  }, [])
+
+  // Save filters to localStorage when they change
+  useEffect(() => {
+    if (activeFilters) {
+      localStorage.setItem('transaction-filters', JSON.stringify(activeFilters))
+    } else {
+      localStorage.removeItem('transaction-filters')
+    }
+  }, [activeFilters])  // Mobile responsiveness
   const { isMobile, isTablet, screenSize } = useResponsive()
   const { itemsPerPage, showSimplifiedUI, enableSwipeGestures } = useMobileOptimizations()
 
@@ -334,7 +377,12 @@ export function TransactionsPageClient({
 
   // Filter and sort transactions
   const filteredTransactions = useMemo(() => {
-    let filtered = transactions.filter(transaction => {
+    // First, ensure we only work with transactions that have valid IDs
+    const validTransactions = transactions.filter(transaction => 
+      transaction && transaction.id && typeof transaction.id === 'string' && transaction.id.trim() !== ''
+    )
+    
+    const filtered = validTransactions.filter(transaction => {
       // Advanced search filters take precedence
       if (activeFilters) {
         // Search query filter
@@ -618,6 +666,7 @@ export function TransactionsPageClient({
           transactionDate: new Date(editingTransaction.date).toISOString(),
           merchant: editingTransaction.merchant,
           reference: editingTransaction.reference,
+          receiptNumber: editingTransaction.receiptNumber,
           notes: editingTransaction.notes,
           tags: editingTransaction.tags
         })
@@ -629,12 +678,26 @@ export function TransactionsPageClient({
         throw new Error(result.error || 'Failed to update transaction')
       }
 
+      // Update the transaction locally to preserve filters
+      const updatedTransaction = {
+        ...editingTransaction,
+        category: editingTransaction.category,
+        account: editingTransaction.account
+      }
+      
+      // Update local state
+      setTransactions(prev => prev.map(t => 
+        t.id === updatedTransaction.id ? updatedTransaction : t
+      ))
+      
+      // Call the callback to update parent state
+      if (onTransactionUpdate) {
+        onTransactionUpdate(updatedTransaction)
+      }
+
       toast.success('Transaction updated successfully')
       setIsEditDialogOpen(false)
       setEditingTransaction(null)
-      
-      // Refresh the page to show updated data
-      window.location.reload()
       
     } catch (error) {
       console.error('Error updating transaction:', error)
@@ -648,11 +711,99 @@ export function TransactionsPageClient({
     setIsViewDetailsDialogOpen(true)
   }
 
+  // Handle category click for quick category change
+  const handleCategoryClick = (transaction: Transaction) => {
+    setCategoryEditingTransaction({ ...transaction })
+    setIsCategoryDialogOpen(true)
+  }
+
+  // Save category change
+  const handleSaveCategoryChange = async (newCategoryName: string) => {
+    if (!categoryEditingTransaction) return
+    
+    try {
+      // Find the category ID from the category name
+      const selectedCategory = propCategories.find(cat => cat.name === newCategoryName)
+      const categoryId = selectedCategory ? selectedCategory.id : null
+      
+      // Find the account ID from the account name  
+      const selectedAccount = propAccounts.find(acc => acc.name === categoryEditingTransaction.account)
+      const accountId = selectedAccount ? selectedAccount.id : null
+
+      const requestAmount = typeof categoryEditingTransaction.amount === 'string' 
+        ? parseFloat(categoryEditingTransaction.amount) 
+        : categoryEditingTransaction.amount
+
+      const response = await fetch(`/api/transactions/${categoryEditingTransaction.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          description: categoryEditingTransaction.description,
+          amount: requestAmount,
+          categoryId: categoryId,
+          accountId: accountId,
+          transactionDate: new Date(categoryEditingTransaction.date).toISOString(),
+          merchant: categoryEditingTransaction.merchant,
+          reference: categoryEditingTransaction.reference,
+          notes: categoryEditingTransaction.notes,
+          tags: categoryEditingTransaction.tags
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update transaction category')
+      }
+
+      // Use the API response which contains the properly formatted transaction data
+      let updatedTransaction
+      if (result.success && result.transaction) {
+        // Use the transaction data returned from the API (already properly formatted)
+        updatedTransaction = {
+          ...result.transaction,
+          balance: categoryEditingTransaction.balance || 0 // Preserve UI-specific fields
+        }
+      } else {
+        // Fallback to local update, ensuring proper data types
+        updatedTransaction = {
+          ...categoryEditingTransaction,
+          category: newCategoryName,
+          amount: Number(categoryEditingTransaction.amount) || 0, // Ensure amount is a number
+          merchant: categoryEditingTransaction.merchant || '',
+          reference: categoryEditingTransaction.reference || '',
+          tags: categoryEditingTransaction.tags || [],
+          notes: categoryEditingTransaction.notes || ''
+        }
+      }
+      
+      // Update local state
+      setTransactions(prev => prev.map(t => 
+        t.id === updatedTransaction.id ? updatedTransaction : t
+      ))
+      
+      // Call the callback to update parent state
+      if (onTransactionUpdate) {
+        onTransactionUpdate(updatedTransaction)
+      }
+
+      toast.success('Category updated successfully')
+      setIsCategoryDialogOpen(false)
+      setCategoryEditingTransaction(null)
+      
+    } catch (error) {
+      console.error('Error updating transaction category:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to update category')
+    }
+  }
+
   // Duplicate transaction
   const handleDuplicateTransaction = (transaction: Transaction) => {
     const duplicatedTransaction = {
       ...transaction,
-      id: `duplicate-${Date.now()}`, // Generate a temporary ID
+      id: `duplicate-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate a unique temporary ID
       description: `${transaction.description} (Copy)`,
       date: new Date().toISOString().split('T')[0] // Set to today's date
     }
@@ -701,6 +852,7 @@ export function TransactionsPageClient({
   const handleClearFilters = () => {
     setActiveFilters(null)
     setCurrentPage(1)
+    localStorage.removeItem('transaction-filters')
   }
 
   const handleSaveSearch = (search: any) => {
@@ -879,6 +1031,7 @@ export function TransactionsPageClient({
         savedSearches={savedSearches}
         onSaveSearch={handleSaveSearch}
         onDeleteSearch={handleDeleteSearch}
+        currentFilters={activeFilters}
       />
 
       {/* Enhanced Bulk Operations */}
@@ -891,6 +1044,7 @@ export function TransactionsPageClient({
         }}
         categories={propCategories}
         accounts={propAccounts}
+        transactions={filteredTransactions}
       />
 
       {/* Transactions Table */}
@@ -950,6 +1104,7 @@ export function TransactionsPageClient({
                     </Button>
                   </TableHead>
                   <TableHead>Account</TableHead>
+                  <TableHead>Receipt #</TableHead>
                   <TableHead className="text-right">
                     <Button 
                       variant="ghost" 
@@ -964,8 +1119,8 @@ export function TransactionsPageClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedTransactions.map((transaction) => (
-                  <TableRow key={transaction.id}>
+                {paginatedTransactions.map((transaction, index) => (
+                  <TableRow key={`${transaction.id}-${index}`}>
                     <TableCell>
                       <Checkbox
                         checked={selectedTransactions.includes(transaction.id)}
@@ -988,12 +1143,21 @@ export function TransactionsPageClient({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">
+                      <Badge 
+                        variant="secondary" 
+                        className="cursor-pointer hover:bg-secondary/80 transition-colors"
+                        onClick={() => handleCategoryClick(transaction)}
+                      >
                         {transaction.category}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">{transaction.account}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-muted-foreground">
+                        {transaction.receiptNumber || '-'}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className={cn(
@@ -1044,9 +1208,9 @@ export function TransactionsPageClient({
           {/* Mobile Cards View */}
           {isMobile && (
             <div className="space-y-4">
-              {paginatedTransactions.map((transaction) => (
+              {paginatedTransactions.map((transaction, index) => (
                 <MobileTransactionCard
-                  key={transaction.id}
+                  key={`${transaction.id}-${index}`}
                   transaction={transaction}
                   isSelected={selectedTransactions.includes(transaction.id)}
                   onSelect={(checked) => handleSelectTransaction(transaction.id, checked)}
@@ -1054,6 +1218,7 @@ export function TransactionsPageClient({
                   onDelete={() => handleDeleteTransaction(transaction)}
                   onDuplicate={() => handleDuplicateTransaction(transaction)}
                   onViewDetails={() => handleViewDetails(transaction)}
+                  onCategoryClick={() => handleCategoryClick(transaction)}
                 />
               ))}
             </div>
@@ -1179,6 +1344,17 @@ export function TransactionsPageClient({
                   placeholder="Add notes about this transaction..."
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-receipt">Receipt Number</Label>
+                <Input
+                  id="edit-receipt"
+                  value={editingTransaction.receiptNumber || ''}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingTransaction(prev => 
+                    prev ? { ...prev, receiptNumber: e.target.value } : null
+                  )}
+                  placeholder="Enter receipt number for reconciliation..."
+                />
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -1247,6 +1423,12 @@ export function TransactionsPageClient({
                   <p className="text-sm">{viewingTransaction.reference}</p>
                 </div>
               )}
+              {viewingTransaction.receiptNumber && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Receipt Number</Label>
+                  <p className="text-sm">{viewingTransaction.receiptNumber}</p>
+                </div>
+              )}
               {viewingTransaction.notes && (
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-muted-foreground">Notes</Label>
@@ -1278,6 +1460,56 @@ export function TransactionsPageClient({
               }
             }}>
               Edit Transaction
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Category Change Dialog */}
+      <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Category</DialogTitle>
+            <DialogDescription>
+              Update the category for this transaction.
+            </DialogDescription>
+          </DialogHeader>
+          {categoryEditingTransaction && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Transaction</Label>
+                <p className="text-sm text-muted-foreground">{categoryEditingTransaction.description}</p>
+                <p className="text-sm text-muted-foreground">
+                  {formatDate(categoryEditingTransaction.date)} • 
+                  {categoryEditingTransaction.amount >= 0 ? '+' : '-'}$
+                  {Math.abs(categoryEditingTransaction.amount).toLocaleString('en-AU', { 
+                    minimumFractionDigits: 2 
+                  })}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="category-select">New Category</Label>
+                <Select 
+                  defaultValue={categoryEditingTransaction.category}
+                  onValueChange={(value) => handleSaveCategoryChange(value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {propCategories.map(category => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCategoryDialogOpen(false)}>
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

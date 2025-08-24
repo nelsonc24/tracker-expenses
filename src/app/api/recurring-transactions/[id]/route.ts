@@ -6,7 +6,7 @@ import { eq, and } from 'drizzle-orm'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await currentUser()
@@ -14,12 +14,13 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const recurringTransaction = await db
       .select()
       .from(recurringTransactions)
       .where(
         and(
-          eq(recurringTransactions.id, params.id),
+          eq(recurringTransactions.id, id),
           eq(recurringTransactions.userId, user.id)
         )
       )
@@ -38,7 +39,7 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await currentUser()
@@ -46,13 +47,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     // Check if recurring transaction exists and belongs to user
     const existing = await db
       .select()
       .from(recurringTransactions)
       .where(
         and(
-          eq(recurringTransactions.id, params.id),
+          eq(recurringTransactions.id, id),
           eq(recurringTransactions.userId, user.id)
         )
       )
@@ -102,7 +104,7 @@ export async function PATCH(
       .set(updateData)
       .where(
         and(
-          eq(recurringTransactions.id, params.id),
+          eq(recurringTransactions.id, id),
           eq(recurringTransactions.userId, user.id)
         )
       )
@@ -117,7 +119,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await currentUser()
@@ -125,11 +127,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const result = await db
       .delete(recurringTransactions)
       .where(
         and(
-          eq(recurringTransactions.id, params.id),
+          eq(recurringTransactions.id, id),
           eq(recurringTransactions.userId, user.id)
         )
       )

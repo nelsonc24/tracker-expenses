@@ -34,7 +34,7 @@ export async function GET() {
       if (stat.categoryId) {
         statsMap[stat.categoryId] = {
           transactionCount: stat.transactionCount,
-          totalAmount: (stat.totalAmount || 0) / 100 // Convert from cents to dollars
+          totalAmount: Number(stat.totalAmount || 0) // Amount is already in dollars, no conversion needed
         }
       }
     })

@@ -35,6 +35,7 @@ type Transaction = {
   account: string
   merchant: string
   reference: string
+  receiptNumber?: string
   balance: number
   tags?: string[]
   notes?: string
@@ -48,6 +49,7 @@ type MobileTransactionCardProps = {
   onDelete: () => void
   onDuplicate: () => void
   onViewDetails?: () => void
+  onCategoryClick?: () => void
   showDetails?: boolean
 }
 
@@ -59,6 +61,7 @@ export function MobileTransactionCard({
   onDelete,
   onDuplicate,
   onViewDetails,
+  onCategoryClick,
   showDetails = false
 }: MobileTransactionCardProps) {
   const [isExpanded, setIsExpanded] = useState(showDetails)
@@ -117,7 +120,14 @@ export function MobileTransactionCard({
 
               {/* Secondary info - Category and Account */}
               <div className="flex items-center space-x-2 mb-2">
-                <Badge variant="secondary" className="text-xs">
+                <Badge 
+                  variant="secondary" 
+                  className={cn(
+                    "text-xs",
+                    onCategoryClick && "cursor-pointer hover:bg-secondary/80 transition-colors"
+                  )}
+                  onClick={onCategoryClick}
+                >
                   {transaction.category}
                 </Badge>
                 <span className="text-xs text-muted-foreground">•</span>
@@ -134,6 +144,15 @@ export function MobileTransactionCard({
                       <Tag className="h-3 w-3 text-muted-foreground" />
                       <span className="text-xs text-muted-foreground">
                         Ref: {transaction.reference}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {transaction.receiptNumber && (
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">
+                        Receipt: {transaction.receiptNumber}
                       </span>
                     </div>
                   )}

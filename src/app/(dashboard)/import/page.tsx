@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   Upload, 
   FileText, 
@@ -15,7 +16,8 @@ import {
   XCircle, 
   AlertCircle,
   Download,
-  Eye
+  Eye,
+  Building2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -85,6 +87,36 @@ export default function ImportPage() {
     totalProcessed: number
     duplicateTransactions: any[]
   } | null>(null)
+  const [accounts, setAccounts] = useState<any[]>([])
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('')
+  const [loadingAccounts, setLoadingAccounts] = useState(false)
+  
+  // Fetch user accounts on component mount
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      setLoadingAccounts(true)
+      try {
+        const response = await fetch('/api/accounts')
+        if (response.ok) {
+          const accounts = await response.json()
+          console.log('Fetched accounts:', accounts) // Debug log
+          setAccounts(accounts || [])
+          // Auto-select first account if available
+          if (accounts && accounts.length > 0) {
+            setSelectedAccountId(accounts[0].id)
+          }
+        } else {
+          console.error('Failed to fetch accounts:', response.status, response.statusText)
+        }
+      } catch (error) {
+        console.error('Error fetching accounts:', error)
+      } finally {
+        setLoadingAccounts(false)
+      }
+    }
+    
+    fetchAccounts()
+  }, [])
   
   // Auto-switch tabs based on import progress
   useEffect(() => {
@@ -97,10 +129,10 @@ export default function ImportPage() {
   }, [importStatus, parsedTransactions.length, importResult])
   
   const steps: ImportStep[] = [
-    { step: 1, title: 'Upload File', description: 'Select your CSV file', status: selectedFile ? 'completed' : 'current' },
-    { step: 2, title: 'Parse Data', description: 'Extract transaction data', status: importStatus === 'processing' ? 'current' : importStatus === 'completed' || importStatus === 'error' ? 'completed' : 'pending' },
-    { step: 3, title: 'Review', description: 'Check imported transactions', status: importStatus === 'completed' && !isImporting ? 'current' : importStatus === 'error' ? 'error' : 'pending' },
-    { step: 4, title: 'Import', description: 'Save to your account', status: isImporting ? 'current' : importStatus === 'completed' && parsedTransactions.length === 0 ? 'completed' : 'pending' }
+    { step: 1, title: 'Select Account', description: 'Choose destination account', status: selectedAccountId ? 'completed' : 'current' },
+    { step: 2, title: 'Upload File', description: 'Select your CSV file', status: selectedFile ? 'completed' : selectedAccountId ? 'current' : 'pending' },
+    { step: 3, title: 'Parse Data', description: 'Extract transaction data', status: importStatus === 'processing' ? 'current' : importStatus === 'completed' || importStatus === 'error' ? 'completed' : 'pending' },
+    { step: 4, title: 'Review & Import', description: 'Check and save transactions', status: importStatus === 'completed' && !isImporting ? 'current' : importStatus === 'error' ? 'error' : 'pending' }
   ]
 
   const handleFileSelect = (file: File) => {
@@ -127,9 +159,10 @@ export default function ImportPage() {
           // UBank format: Date and time, Description, Debit, Credit, From account, To account, Payment type, Category, Receipt number, Transaction ID
           const dateTime = fields[0]?.replace(/"/g, '').trim() || ''
           const description = fields[1]?.replace(/"/g, '').trim() || ''
-          const debit = fields[2]?.replace(/[$"]/g, '').trim() || ''
-          const credit = fields[3]?.replace(/[$"]/g, '').trim() || ''
+          const debit = fields[2]?.replace(/[$",]/g, '').trim() || '' // Remove commas too
+          const credit = fields[3]?.replace(/[$",]/g, '').trim() || '' // Remove commas too
           const paymentType = fields[6]?.replace(/"/g, '').trim() || ''
+          const receiptNumber = fields[8]?.replace(/"/g, '').trim() || ''  // Extract Receipt number
           const transactionId = fields[9]?.replace(/"/g, '').trim() || ''  // Extract Transaction ID
           
           // Convert UBank date format (HH:MM DD-MM-YY) to standard date
@@ -151,6 +184,7 @@ export default function ImportPage() {
             "Debit Amount": debit,
             "Credit Amount": credit,
             "Balance": '', // UBank doesn't provide running balance in this export
+            "Receipt Number": receiptNumber, // Store the bank's Receipt Number
             "Transaction ID": transactionId // Store the bank's Transaction ID
           }
         }).filter(transaction => 
@@ -222,23 +256,40 @@ export default function ImportPage() {
   const handleImportTransactions = async () => {
     if (parsedTransactions.length === 0) return
     
+    if (!selectedAccountId) {
+      alert('Please select an account for the imported transactions')
+      return
+    }
+    
     setIsImporting(true)
     
     try {
       // Transform the sample CSV data to match the API expected format
-      const transactionsToImport = parsedTransactions.map(transaction => ({
-        date: transaction["Transaction Date"],
-        description: transaction.Description,
-        amount: transaction["Debit Amount"] 
-          ? -parseFloat(transaction["Debit Amount"]) 
-          : parseFloat(transaction["Credit Amount"] || "0"),
-        category: transaction["Transaction Type"] === "Purchase" ? "Shopping" : 
-                 transaction["Transaction Type"] === "Credit" ? "Income" : "Other",
-        account: "Primary Account", // Default account
-        reference: transaction["Transaction ID"] || transaction["Transaction Type"], // Use Transaction ID as reference
-        transactionId: transaction["Transaction ID"], // Send Transaction ID separately for database storage
-        balance: transaction.Balance ? parseFloat(transaction.Balance.replace(",", "")) : null
-      }))
+      const transactionsToImport = parsedTransactions.map(transaction => {
+        // Helper function to safely parse currency amounts
+        const parseAmount = (amountStr: string): number => {
+          if (!amountStr) return 0
+          // Remove any currency symbols, commas, and spaces, then parse
+          const cleaned = amountStr.replace(/[$,\s]/g, '').trim()
+          const parsed = parseFloat(cleaned)
+          return isNaN(parsed) ? 0 : parsed
+        }
+
+        return {
+          date: transaction["Transaction Date"],
+          description: transaction.Description,
+          amount: transaction["Debit Amount"] 
+            ? -parseAmount(transaction["Debit Amount"]) 
+            : parseAmount(transaction["Credit Amount"] || "0"),
+          category: transaction["Transaction Type"] === "Purchase" ? "Shopping" : 
+                   transaction["Transaction Type"] === "Credit" ? "Income" : "Other",
+          account: selectedAccountId, // Use selected account ID instead of hardcoded string
+          reference: transaction["Transaction ID"] || transaction["Transaction Type"], // Use Transaction ID as reference
+          receiptNumber: transaction["Receipt Number"], // Send Receipt Number for reconciliation
+          transactionId: transaction["Transaction ID"], // Send Transaction ID separately for database storage
+          balance: transaction.Balance ? parseAmount(transaction.Balance) : null
+        }
+      })
 
       const response = await fetch('/api/transactions/import', {
         method: 'POST',
@@ -247,7 +298,8 @@ export default function ImportPage() {
         },
         body: JSON.stringify({
           transactions: transactionsToImport,
-          uploadId: `upload_${Date.now()}`
+          uploadId: `upload_${Date.now()}`,
+          accountId: selectedAccountId // Send account ID separately for better processing
         })
       })
 
@@ -355,12 +407,100 @@ export default function ImportPage() {
         </TabsList>
 
         <TabsContent value="upload" className="space-y-6">
-          {/* File Upload */}
-          <Card>
+          {/* Account Selection */}
+          <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
             <CardHeader>
-              <CardTitle>Upload CSV File</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold">1</div>
+                <Building2 className="h-5 w-5" />
+                Select Account
+              </CardTitle>
               <CardDescription>
-                Select a CSV file exported from your bank's online portal
+                Choose which account these imported transactions belong to. This helps organize your finances by bank.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="account-select">Account</Label>
+                {loadingAccounts ? (
+                  <div className="flex items-center space-x-2 p-2 text-muted-foreground">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <span>Loading accounts...</span>
+                  </div>
+                ) : accounts.length === 0 ? (
+                  <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                      <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-orange-900 dark:text-orange-100">
+                          No accounts found
+                        </p>
+                        <p className="text-sm text-orange-700 dark:text-orange-300">
+                          Please create an account first before importing transactions.
+                        </p>
+                        <Button variant="outline" size="sm" className="mt-2" asChild>
+                          <a href="/accounts">Create Account</a>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select an account for imported transactions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{account.name}</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {account.institution}
+                            </Badge>
+                            <span className="text-muted-foreground">
+                              ({account.accountType})
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {selectedAccountId && accounts.length > 0 && (
+                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm text-blue-700 dark:text-blue-300">
+                        Transactions will be imported to: <span className="font-medium">
+                          {accounts.find(acc => acc.id === selectedAccountId)?.name}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* File Upload */}
+          <Card className={cn(
+            "transition-all duration-200",
+            !selectedAccountId ? "opacity-60" : "border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800"
+          )}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+                  selectedAccountId ? "bg-green-500 text-white" : "bg-muted text-muted-foreground"
+                )}>2</div>
+                <Upload className="h-5 w-5" />
+                Upload CSV File
+              </CardTitle>
+              <CardDescription>
+                {selectedAccountId 
+                  ? "Select a CSV file exported from your bank's online portal"
+                  : "First select an account above, then upload your CSV file"
+                }
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -368,7 +508,8 @@ export default function ImportPage() {
                 <div
                   className={cn(
                     "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
-                    dragOver ? "border-primary bg-primary/10" : "border-muted-foreground/25"
+                    dragOver ? "border-primary bg-primary/10" : "border-muted-foreground/25",
+                    !selectedAccountId ? "opacity-50 pointer-events-none" : ""
                   )}
                   onDrop={handleDrop}
                   onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
@@ -376,21 +517,29 @@ export default function ImportPage() {
                 >
                   <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                   <div className="space-y-2">
-                    <p className="text-lg font-medium">Drop your CSV file here</p>
-                    <p className="text-muted-foreground">or click to browse</p>
+                    <p className="text-lg font-medium">
+                      {!selectedAccountId ? "Select an account first" : "Drop your CSV file here"}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {!selectedAccountId ? "Choose which account these transactions belong to" : "or click to browse"}
+                    </p>
                   </div>
-                  <Label htmlFor="file-upload" className="mt-4 inline-block">
-                    <Button asChild>
-                      <span>Choose File</span>
-                    </Button>
-                  </Label>
-                  <Input
-                    id="file-upload"
-                    type="file"
-                    accept=".csv"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
+                  {selectedAccountId && (
+                    <>
+                      <Label htmlFor="file-upload" className="mt-4 inline-block">
+                        <Button asChild>
+                          <span>Choose File</span>
+                        </Button>
+                      </Label>
+                      <Input
+                        id="file-upload"
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={handleFileChange}
+                      />
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center space-x-4 p-4 bg-muted/50 rounded-lg">
@@ -600,6 +749,11 @@ export default function ImportPage() {
               <div className="flex items-center justify-between mt-6 pt-6 border-t">
                 <div className="text-sm text-muted-foreground">
                   {parsedTransactions.length} transactions ready to import
+                  {selectedAccountId && accounts.length > 0 && (
+                    <span className="block mt-1 text-blue-600">
+                      → {accounts.find(acc => acc.id === selectedAccountId)?.name}
+                    </span>
+                  )}
                 </div>
                 <div className="flex space-x-2">
                   <Button 
@@ -616,7 +770,7 @@ export default function ImportPage() {
                   </Button>
                   <Button 
                     onClick={handleImportTransactions}
-                    disabled={isImporting || parsedTransactions.length === 0}
+                    disabled={isImporting || parsedTransactions.length === 0 || !selectedAccountId}
                   >
                     {isImporting ? 'Importing...' : 'Import Transactions'}
                   </Button>

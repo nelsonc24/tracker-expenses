@@ -109,6 +109,7 @@ export const transactions = pgTable('transactions', {
   description: text('description').notNull(),
   merchant: text('merchant'),
   reference: text('reference'),
+  receiptNumber: text('receipt_number'),
   transactionDate: timestamp('transaction_date').notNull(),
   postingDate: timestamp('posting_date'),
   balance: decimal('balance', { precision: 15, scale: 2 }),

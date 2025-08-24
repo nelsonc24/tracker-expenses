@@ -15,6 +15,7 @@ interface TransactionData {
   merchant?: string
   reference?: string
   balance?: number
+  receiptNumber?: string  // Added receipt number field
   transactionId?: string  // Added bank transaction ID
 }
 
@@ -39,11 +40,27 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { transactions: transactionData, uploadId } = body
+    const { transactions: transactionData, uploadId, accountId } = body
 
     // Validate request data
     if (!transactionData || !Array.isArray(transactionData)) {
       return NextResponse.json({ error: 'Invalid transactions data' }, { status: 400 })
+    }
+
+    // Validate account selection
+    if (!accountId) {
+      return NextResponse.json({ error: 'Account ID is required' }, { status: 400 })
+    }
+
+    // Verify the account belongs to the user
+    const userAccount = await db
+      .select()
+      .from(accountsTable)
+      .where(and(eq(accountsTable.id, accountId), eq(accountsTable.userId, userId)))
+      .limit(1)
+
+    if (userAccount.length === 0) {
+      return NextResponse.json({ error: 'Invalid account or account does not belong to user' }, { status: 403 })
     }
 
     // Get existing transaction hashes from database to check for duplicates
@@ -56,8 +73,7 @@ export async function POST(request: NextRequest) {
       existingHashes.map(row => row.hash).filter((hash): hash is string => Boolean(hash))
     )
 
-    // Get or create default account and category for imports
-    const defaultAccount = await getOrCreateDefaultAccount(userId)
+    // Get or create default category for imports (we still need this for categorization)
     const defaultCategory = await getOrCreateDefaultCategory(userId)
 
     // Process transactions and check for duplicates
@@ -77,12 +93,13 @@ export async function POST(request: NextRequest) {
         newTransactions.push({
           id: crypto.randomUUID(),
           userId,
-          accountId: defaultAccount.id,
+          accountId: accountId, // Use the selected account ID
           categoryId: defaultCategory.id,
           amount: parseFloat(tx.amount.toString()).toFixed(2),
           description: tx.description.trim(),
           merchant: tx.merchant || extractMerchant(tx.description),
           reference: tx.reference || null,
+          receiptNumber: tx.receiptNumber || null,
           transactionDate: new Date(tx.date),
           type: parseFloat(tx.amount.toString()) < 0 ? 'debit' : 'credit',
           status: 'cleared',
