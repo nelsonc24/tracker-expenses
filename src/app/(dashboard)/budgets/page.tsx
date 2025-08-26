@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { 
   Dialog,
@@ -26,12 +25,9 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { Skeleton } from '@/components/ui/skeleton'
 import { 
   Plus, 
   Target, 
-  TrendingUp,
-  TrendingDown,
   DollarSign,
   Calendar,
   AlertTriangle,
@@ -39,9 +35,25 @@ import {
   MoreHorizontal,
   Edit,
   Trash2,
-  PiggyBank
+  PiggyBank,
+  // Add category icons
+  ShoppingCart,
+  Car,
+  Home,
+  Utensils,
+  Coffee,
+  Gamepad2,
+  Plane,
+  Heart,
+  GraduationCap,
+  Briefcase,
+  CreditCard,
+  Gift,
+  Music,
+  Shirt,
+  Zap
 } from 'lucide-react'
-import { cn, formatDate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -55,12 +67,21 @@ interface Budget {
   id: string
   userId: string
   name: string
+  description?: string
+  amount: string // decimal from database
+  currency: string
   period: string
-  categoryId: string | null
-  amountMinor: number // amount in cents
-  rollover: boolean
-  startMonth: string | null
-  endMonth: string | null
+  startDate: Date
+  endDate?: Date
+  categoryIds: string[]
+  accountIds: string[]
+  alertThreshold: string
+  isActive: boolean
+  metadata?: {
+    color?: string
+    notifications?: boolean
+    rollover?: boolean
+  }
   createdAt: Date
   updatedAt: Date
 }
@@ -72,16 +93,8 @@ interface Category {
   icon?: string
 }
 
-interface Account {
-  id: string
-  name: string
-  institution: string
-  accountType: string
-  balance: string
-}
-
-interface BudgetWithProgress extends Budget {
-  amount: number // converted from amountMinor
+interface BudgetWithProgress extends Omit<Budget, 'amount'> {
+  amount: number // converted from decimal string
   spent: number
   remaining: number
   progressPercentage: number
@@ -96,11 +109,10 @@ export default function BudgetsPage() {
   const { user, isLoaded } = useUser()
   const [budgets, setBudgets] = useState<BudgetWithProgress[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isCreateBudgetOpen, setIsCreateBudgetOpen] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState('current')
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [newBudget, setNewBudget] = useState({
     name: '',
     description: '',
@@ -112,60 +124,81 @@ export default function BudgetsPage() {
     accountIds: [] as string[]
   })
 
+  // Add icon mapping function
+  const getCategoryIcon = (iconName: string) => {
+    const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+      'shopping-cart': ShoppingCart,
+      'car': Car,
+      'home': Home,
+      'utensils': Utensils,
+      'coffee': Coffee,
+      'gamepad2': Gamepad2,
+      'plane': Plane,
+      'heart': Heart,
+      'graduation-cap': GraduationCap,
+      'briefcase': Briefcase,
+      'credit-card': CreditCard,
+      'gift': Gift,
+      'music': Music,
+      'shirt': Shirt,
+      'zap': Zap,
+      'dollar-sign': DollarSign
+    }
+    
+    const IconComponent = iconMap[iconName] || DollarSign
+    return <IconComponent className="h-4 w-4" />
+  }
+
   // Fetch data on component mount
   useEffect(() => {
     if (!isLoaded || !user) return
 
     async function fetchData() {
       try {
-        setLoading(true)
         setError(null)
 
-        // Fetch budgets, categories, and accounts in parallel
-        const [budgetsRes, categoriesRes, accountsRes] = await Promise.all([
+        // Fetch budgets and categories in parallel
+        const [budgetsRes, categoriesRes] = await Promise.all([
           fetch('/api/budgets'),
-          fetch('/api/categories'),
-          fetch('/api/accounts')
+          fetch('/api/categories')
         ])
 
-        if (!budgetsRes.ok || !categoriesRes.ok || !accountsRes.ok) {
+        if (!budgetsRes.ok || !categoriesRes.ok) {
           throw new Error('Failed to fetch data')
         }
 
-        const [budgetsData, categoriesData, accountsData] = await Promise.all([
+        const [budgetsData, categoriesData] = await Promise.all([
           budgetsRes.json(),
-          categoriesRes.json(),
-          accountsRes.json()
+          categoriesRes.json()
         ])
 
         // Calculate budget progress
         const budgetsWithProgress: BudgetWithProgress[] = await Promise.all(
           budgetsData.map(async (budget: Budget) => {
-            // Calculate spent amount for this budget's category and time period
+            // Calculate spent amount for this budget's categories and time period
             const now = new Date()
-            const currentYear = now.getFullYear()
-            const currentMonth = now.getMonth() + 1
-            const startMonth = budget.startMonth || `${currentYear}-${currentMonth.toString().padStart(2, '0')}`
-            const endMonth = budget.endMonth || startMonth
+            const budgetStart = new Date(budget.startDate)
+            const budgetEnd = budget.endDate ? new Date(budget.endDate) : new Date(budgetStart.getFullYear(), budgetStart.getMonth() + 1, 0)
 
-            // Get transactions for this category in the budget period
+            // Get transactions for these categories in the budget period
             let spentAmount = 0
-            if (budget.categoryId) {
-              const spentResponse = await fetch(`/api/transactions?categoryId=${budget.categoryId}&startDate=${startMonth}-01&endDate=${endMonth}-31`)
-              if (spentResponse.ok) {
-                const transactions = await spentResponse.json()
-                spentAmount = transactions.reduce((sum: number, t: { amount: string }) => sum + Math.abs(parseFloat(t.amount)), 0)
+            if (budget.categoryIds.length > 0) {
+              for (const categoryId of budget.categoryIds) {
+                const spentResponse = await fetch(`/api/transactions?categoryId=${categoryId}&startDate=${budgetStart.toISOString().split('T')[0]}&endDate=${budgetEnd.toISOString().split('T')[0]}`)
+                if (spentResponse.ok) {
+                  const transactions = await spentResponse.json()
+                  spentAmount += transactions.reduce((sum: number, t: { amount: string }) => sum + Math.abs(parseFloat(t.amount)), 0)
+                }
               }
             }
 
-            // Convert amount from minor units (cents) to dollars
-            const budgetAmount = budget.amountMinor / 100
+            // Convert amount from decimal string to number
+            const budgetAmount = parseFloat(budget.amount)
             const remaining = Math.max(0, budgetAmount - spentAmount)
             const progressPercentage = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : 0
             
-            // Calculate days left in current month
-            const endDate = new Date(currentYear, currentMonth, 0) // Last day of current month
-            const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+            // Calculate days left in budget period
+            const daysLeft = Math.max(0, Math.ceil((budgetEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
 
             // Determine status
             let status: 'on-track' | 'warning' | 'over-budget'
@@ -177,8 +210,9 @@ export default function BudgetsPage() {
               status = 'on-track'
             }
 
-            // Find category details
-            const category = categories.find(c => c.id === budget.categoryId)
+            // Find primary category details (first category in the list)
+            const primaryCategoryId = budget.categoryIds[0]
+            const category = categoriesData.find((c: Category) => c.id === primaryCategoryId)
 
             return {
               ...budget,
@@ -197,12 +231,9 @@ export default function BudgetsPage() {
         
         setBudgets(budgetsWithProgress)
         setCategories(categoriesData)
-        setAccounts(accountsData)
       } catch (err) {
         console.error('Error fetching data:', err)
         setError('Failed to load budgets. Please try again.')
-      } finally {
-        setLoading(false)
       }
     }
 
@@ -211,6 +242,11 @@ export default function BudgetsPage() {
 
   // Handle creating new budget
   const handleCreateBudget = async () => {
+    if (!newBudget.name || !newBudget.amount || !selectedCategory) {
+      setError('Please fill in all required fields')
+      return
+    }
+
     try {
       const response = await fetch('/api/budgets', {
         method: 'POST',
@@ -218,8 +254,14 @@ export default function BudgetsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...newBudget,
+          name: newBudget.name,
+          description: newBudget.description,
           amount: parseFloat(newBudget.amount),
+          period: newBudget.period,
+          startDate: newBudget.startDate,
+          endDate: newBudget.endDate || null,
+          categoryIds: selectedCategory ? [selectedCategory] : [],
+          accountIds: newBudget.accountIds
         })
       })
 
@@ -232,6 +274,7 @@ export default function BudgetsPage() {
       // Add to local state with initial progress calculation
       const budgetWithProgress: BudgetWithProgress = {
         ...createdBudget,
+        amount: parseFloat(createdBudget.amount),
         spent: 0,
         remaining: parseFloat(createdBudget.amount),
         progressPercentage: 0,
@@ -241,6 +284,7 @@ export default function BudgetsPage() {
       
       setBudgets(prev => [budgetWithProgress, ...prev])
       setIsCreateBudgetOpen(false)
+      setSelectedCategory('')
       setNewBudget({
         name: '',
         description: '',
@@ -261,6 +305,9 @@ export default function BudgetsPage() {
   const totalSpent = budgets.reduce((sum, budget) => sum + budget.spent, 0)
   const overBudgetCount = budgets.filter(budget => budget.status === 'over-budget').length
   const onTrackCount = budgets.filter(budget => budget.status === 'on-track').length
+
+  // Fix: Handle NaN calculation
+  const overallProgressPercentage = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0
 
   return (
     <div className="space-y-6">
@@ -292,18 +339,23 @@ export default function BudgetsPage() {
                 <Input
                   id="budget-name"
                   placeholder="e.g., Monthly Groceries"
+                  value={newBudget.name}
+                  onChange={(e) => setNewBudget(prev => ({ ...prev, name: e.target.value }))}
                 />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="category">Category</Label>
-                <Select>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.id}>
-                        {category.icon} {category.name}
+                        <div className="flex items-center space-x-2">
+                          {category.icon && getCategoryIcon(category.icon)}
+                          <span>{category.name}</span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -316,11 +368,16 @@ export default function BudgetsPage() {
                   type="number"
                   step="0.01"
                   placeholder="0.00"
+                  value={newBudget.amount}
+                  onChange={(e) => setNewBudget(prev => ({ ...prev, amount: e.target.value }))}
                 />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="period">Period</Label>
-                <Select defaultValue="monthly">
+                <Select 
+                  value={newBudget.period} 
+                  onValueChange={(value) => setNewBudget(prev => ({ ...prev, period: value }))}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -332,18 +389,40 @@ export default function BudgetsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="description">Description (Optional)</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Add a description for this budget..."
+                  value={newBudget.description}
+                  onChange={(e) => setNewBudget(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
               <div className="flex items-center space-x-2">
-                <input type="checkbox" id="rollover" className="rounded" />
-                <Label htmlFor="rollover" className="text-sm">
+                <input 
+                  type="checkbox" 
+                  id="rollover" 
+                  className="rounded" 
+                  title="Roll over unused budget to next period"
+                  aria-describedby="rollover-label"
+                />
+                <Label htmlFor="rollover" id="rollover-label" className="text-sm">
                   Roll over unused budget to next period
                 </Label>
               </div>
             </div>
+            
+            {error && (
+              <div className="text-red-600 text-sm mb-4">
+                {error}
+              </div>
+            )}
+            
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateBudgetOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => setIsCreateBudgetOpen(false)}>
+              <Button onClick={handleCreateBudget}>
                 Create Budget
               </Button>
             </DialogFooter>
@@ -378,7 +457,7 @@ export default function BudgetsPage() {
               ${totalSpent.toLocaleString('en-AU')}
             </div>
             <p className="text-xs text-muted-foreground">
-              {((totalSpent / totalBudget) * 100).toFixed(1)}% of budget used
+              {totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : '0.0'}% of budget used
             </p>
           </CardContent>
         </Card>
@@ -427,17 +506,17 @@ export default function BudgetsPage() {
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Overall Progress</span>
               <span className="text-2xl font-bold">
-                {((totalSpent / totalBudget) * 100).toFixed(1)}%
+                {overallProgressPercentage.toFixed(1)}%
               </span>
             </div>
             <Progress 
-              value={(totalSpent / totalBudget) * 100} 
+              value={overallProgressPercentage} 
               className="h-3"
             />
             <div className="grid gap-4 md:grid-cols-2">
               <div className="text-center p-4 bg-muted/50 rounded-lg">
                 <div className="text-xl font-bold">
-                  ${(totalBudget - totalSpent).toLocaleString('en-AU')}
+                  ${Math.max(0, totalBudget - totalSpent).toLocaleString('en-AU')}
                 </div>
                 <p className="text-sm text-muted-foreground">Remaining Budget</p>
               </div>
@@ -473,10 +552,7 @@ export default function BudgetsPage() {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center space-x-3">
-                        <div 
-                          className="w-4 h-4 rounded-full" 
-                          style={{ backgroundColor: budget.categoryColor || '#6b7280' }}
-                        />
+                        <div className="w-4 h-4 rounded-full bg-gray-500" />
                         <div>
                           <h3 className="text-lg font-semibold">{budget.name}</h3>
                           <p className="text-sm text-muted-foreground">

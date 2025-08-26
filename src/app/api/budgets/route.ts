@@ -37,6 +37,14 @@ export async function POST(request: NextRequest) {
       accountIds 
     } = body
 
+    // Validate required fields
+    if (!name || !amount || amount <= 0) {
+      return NextResponse.json(
+        { error: 'Name and amount are required, amount must be positive' }, 
+        { status: 400 }
+      )
+    }
+
     const budget = await createBudget({
       userId: user.id,
       name,

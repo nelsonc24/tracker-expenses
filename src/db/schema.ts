@@ -98,6 +98,43 @@ export const budgets = pgTable('budgets', {
   startDateIdx: index('budgets_start_date_idx').on(table.startDate),
 }))
 
+// Bills table
+export const bills = pgTable('bills', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
+  categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
+  currency: text('currency').default('AUD').notNull(),
+  frequency: text('frequency').notNull(), // 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'
+  dueDay: integer('due_day'), // Day of month for monthly bills (1-31)
+  dueDate: timestamp('due_date'), // Next due date
+  lastPaidDate: timestamp('last_paid_date'),
+  lastPaidAmount: decimal('last_paid_amount', { precision: 15, scale: 2 }),
+  reminderDays: integer('reminder_days').default(3), // Days before due date to remind
+  isActive: boolean('is_active').default(true).notNull(),
+  isAutoPay: boolean('is_auto_pay').default(false).notNull(),
+  notes: text('notes'),
+  tags: jsonb('tags').$type<string[]>().default([]),
+  metadata: jsonb('metadata').$type<{
+    color?: string
+    estimatedAmount?: number
+    averageAmount?: number
+    paymentMethod?: string
+    website?: string
+  }>(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('bills_user_id_idx').on(table.userId),
+  accountIdIdx: index('bills_account_id_idx').on(table.accountId),
+  dueDateIdx: index('bills_due_date_idx').on(table.dueDate),
+  activeIdx: index('bills_active_idx').on(table.isActive),
+  frequencyIdx: index('bills_frequency_idx').on(table.frequency),
+}))
+
 // Transactions table
 export const transactions = pgTable('transactions', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -125,6 +162,8 @@ export const transactions = pgTable('transactions', {
   originalData: jsonb('original_data').$type<Record<string, string | number | boolean | null>>(), // Raw import data
   duplicateCheckHash: text('duplicate_check_hash'), // For duplicate detection
   reconciled: boolean('reconciled').default(false).notNull(),
+  isBill: boolean('is_bill').default(false).notNull(),
+  billId: uuid('bill_id').references(() => bills.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -136,6 +175,8 @@ export const transactions = pgTable('transactions', {
   merchantIdx: index('transactions_merchant_idx').on(table.merchant),
   statusIdx: index('transactions_status_idx').on(table.status),
   duplicateHashIdx: index('transactions_duplicate_hash_idx').on(table.duplicateCheckHash),
+  isBillIdx: index('transactions_is_bill_idx').on(table.isBill),
+  billIdIdx: index('transactions_bill_id_idx').on(table.billId),
 }))
 
 // Import sessions table (for CSV uploads)
@@ -231,3 +272,8 @@ export const insertRecurringTransactionSchema = createInsertSchema(recurringTran
 export const selectRecurringTransactionSchema = createSelectSchema(recurringTransactions)
 export type InsertRecurringTransaction = z.infer<typeof insertRecurringTransactionSchema>
 export type SelectRecurringTransaction = z.infer<typeof selectRecurringTransactionSchema>
+
+export const insertBillSchema = createInsertSchema(bills)
+export const selectBillSchema = createSelectSchema(bills)
+export type InsertBill = z.infer<typeof insertBillSchema>
+export type SelectBill = z.infer<typeof selectBillSchema>

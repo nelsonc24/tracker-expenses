@@ -16,6 +16,8 @@ const updateTransactionSchema = z.object({
   reference: z.string().optional(),
   notes: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  isBill: z.boolean().optional(),
+  billId: z.string().uuid().optional(),
 })
 
 export async function PUT(
@@ -95,7 +97,7 @@ export async function PUT(
     }
 
     // Build update object
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       updatedAt: new Date()
     }
 
@@ -126,6 +128,12 @@ export async function PUT(
     if (validatedData.tags !== undefined) {
       updateData.tags = validatedData.tags
     }
+    if (validatedData.isBill !== undefined) {
+      updateData.isBill = validatedData.isBill
+    }
+    if (validatedData.billId !== undefined) {
+      updateData.billId = validatedData.billId
+    }
 
     // Update the transaction
     await db
@@ -152,6 +160,8 @@ export async function PUT(
         notes: transactions.notes,
         tags: transactions.tags,
         type: transactions.type,
+        isBill: transactions.isBill,
+        billId: transactions.billId,
         categoryName: categories.name,
         accountName: accounts.name,
       })

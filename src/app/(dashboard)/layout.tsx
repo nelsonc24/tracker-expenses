@@ -1,4 +1,3 @@
-import { ClerkProvider } from '@clerk/nextjs'
 import { redirect } from 'next/navigation'
 import { currentUser } from '@clerk/nextjs/server'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -15,7 +14,8 @@ import {
   TrendingUp,
   FolderOpen,
   Calendar,
-  LineChart
+  LineChart,
+  Receipt
 } from 'lucide-react'
 
 export default async function DashboardLayout({
@@ -35,6 +35,7 @@ export default async function DashboardLayout({
     { name: 'Accounts', href: '/accounts', icon: CreditCard },
     { name: 'Categories', href: '/categories', icon: FolderOpen },
     { name: 'Budgets', href: '/budgets', icon: Target },
+    { name: 'Bills', href: '/bills', icon: Receipt },
     { name: 'Recurring', href: '/recurring', icon: Calendar },
     { name: 'Analytics', href: '/analytics', icon: TrendingUp },
     { name: 'Advanced Analytics', href: '/advanced-analytics', icon: LineChart },
