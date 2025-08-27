@@ -15,7 +15,7 @@ const markAsBillSchema = z.object({
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -25,12 +25,13 @@ export async function POST(
 
     const body = await request.json()
     const validatedData = markAsBillSchema.parse(body)
+    const { id } = await params
 
     // Get the transaction
     const transaction = await db
       .select()
       .from(transactions)
-      .where(and(eq(transactions.id, params.id), eq(transactions.userId, userId)))
+      .where(and(eq(transactions.id, id), eq(transactions.userId, userId)))
       .limit(1)
 
     if (transaction.length === 0) {
@@ -99,7 +100,7 @@ export async function POST(
         billId: newBill[0].id,
         updatedAt: new Date(),
       })
-      .where(and(eq(transactions.id, params.id), eq(transactions.userId, userId)))
+      .where(and(eq(transactions.id, id), eq(transactions.userId, userId)))
 
     return NextResponse.json({ bill: newBill[0] }, { status: 201 })
   } catch (error) {

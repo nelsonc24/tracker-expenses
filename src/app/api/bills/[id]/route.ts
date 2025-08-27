@@ -31,7 +31,7 @@ const updateBillSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -39,10 +39,12 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
+
     const bill = await db
       .select()
       .from(bills)
-      .where(and(eq(bills.id, params.id), eq(bills.userId, userId)))
+      .where(and(eq(bills.id, id), eq(bills.userId, userId)))
       .limit(1)
 
     if (bill.length === 0) {
@@ -61,7 +63,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -71,12 +73,13 @@ export async function PUT(
 
     const body = await request.json()
     const validatedData = updateBillSchema.parse(body)
+    const { id } = await params
 
     // Check if bill exists and belongs to user
     const existingBill = await db
       .select()
       .from(bills)
-      .where(and(eq(bills.id, params.id), eq(bills.userId, userId)))
+      .where(and(eq(bills.id, id), eq(bills.userId, userId)))
       .limit(1)
 
     if (existingBill.length === 0) {
@@ -100,7 +103,7 @@ export async function PUT(
         ...updateFields,
         updatedAt: new Date(),
       })
-      .where(and(eq(bills.id, params.id), eq(bills.userId, userId)))
+      .where(and(eq(bills.id, id), eq(bills.userId, userId)))
       .returning()
 
     return NextResponse.json({ bill: updatedBill[0] })
@@ -121,7 +124,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -129,11 +132,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
+
     // Check if bill exists and belongs to user
     const existingBill = await db
       .select()
       .from(bills)
-      .where(and(eq(bills.id, params.id), eq(bills.userId, userId)))
+      .where(and(eq(bills.id, id), eq(bills.userId, userId)))
       .limit(1)
 
     if (existingBill.length === 0) {
@@ -142,7 +147,7 @@ export async function DELETE(
 
     await db
       .delete(bills)
-      .where(and(eq(bills.id, params.id), eq(bills.userId, userId)))
+      .where(and(eq(bills.id, id), eq(bills.userId, userId)))
 
     return NextResponse.json({ message: 'Bill deleted successfully' })
   } catch (error) {
