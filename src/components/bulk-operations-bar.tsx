@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,6 +57,12 @@ interface BulkOperationsProps {
     name: string
     institution?: string
   }>
+  activities?: Array<{
+    id: string
+    name: string
+    description?: string
+    color?: string
+  }>
   transactions?: Array<{
     id: string
     amount: number
@@ -73,11 +78,12 @@ type BulkOperation =
   | 'update_account'
   | 'update_notes'
   | 'duplicate'
+  | 'assign_activity'
 
 interface BulkOperationConfig {
   name: string
   description: string
-  icon: any
+  icon: React.ComponentType<{ className?: string }>
   destructive: boolean
   requiresConfirmation: boolean
 }
@@ -117,6 +123,13 @@ const operationConfigs: Record<BulkOperation, BulkOperationConfig> = {
     icon: Copy,
     destructive: false,
     requiresConfirmation: false
+  },
+  assign_activity: {
+    name: 'Assign Activity',
+    description: 'Assign selected transactions to an activity',
+    icon: Tag,
+    destructive: false,
+    requiresConfirmation: false
   }
 }
 
@@ -126,6 +139,7 @@ export function BulkOperationsBar({
   onOperationComplete,
   categories,
   accounts,
+  activities = [],
   transactions = []
 }: BulkOperationsProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -136,6 +150,7 @@ export function BulkOperationsBar({
   // Form states for different operations
   const [categoryId, setCategoryId] = useState('')
   const [accountId, setAccountId] = useState('')
+  const [activityId, setActivityId] = useState('')
   const [notes, setNotes] = useState('')
   const [appendNotes, setAppendNotes] = useState(false)
   const [duplicateModifications, setDuplicateModifications] = useState({
@@ -186,7 +201,7 @@ export function BulkOperationsBar({
     return null
   }
 
-  const performBulkOperation = async (operation: BulkOperation, payload: any) => {
+  const performBulkOperation = async (operation: BulkOperation, payload: Record<string, unknown>) => {
     setIsLoading(true)
     try {
       const response = await fetch('/api/transactions/bulk', {
@@ -248,6 +263,7 @@ export function BulkOperationsBar({
   const resetFormStates = () => {
     setCategoryId('')
     setAccountId('')
+    setActivityId('')
     setNotes('')
     setAppendNotes(false)
     setDuplicateModifications({
@@ -281,7 +297,7 @@ export function BulkOperationsBar({
   const handleDialogSubmit = () => {
     if (!selectedOperation) return
 
-    let payload: any = {}
+    let payload: Record<string, unknown> = {}
 
     switch (selectedOperation) {
       case 'categorize':
@@ -300,6 +316,14 @@ export function BulkOperationsBar({
         payload = { accountId }
         break
 
+      case 'assign_activity':
+        if (!activityId) {
+          toast.error('Please select an activity')
+          return
+        }
+        payload = { activityId }
+        break
+
       case 'update_notes':
         payload = { 
           notes: { userNote: notes },
@@ -308,7 +332,7 @@ export function BulkOperationsBar({
         break
 
       case 'duplicate':
-        const modifications: any = {}
+        const modifications: Record<string, unknown> = {}
         if (duplicateModifications.descriptionRaw) {
           modifications.descriptionRaw = duplicateModifications.descriptionRaw
         }
@@ -333,8 +357,6 @@ export function BulkOperationsBar({
 
   const renderDialogContent = () => {
     if (!selectedOperation) return null
-
-    const config = operationConfigs[selectedOperation]
 
     switch (selectedOperation) {
       case 'categorize':
@@ -383,6 +405,34 @@ export function BulkOperationsBar({
                         {account.institution && (
                           <span className="text-xs text-muted-foreground">
                             {account.institution}
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )
+
+      case 'assign_activity':
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="activity-select">Activity</Label>
+              <Select value={activityId} onValueChange={setActivityId}>
+                <SelectTrigger id="activity-select">
+                  <SelectValue placeholder="Select an activity" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activities.map(activity => (
+                    <SelectItem key={activity.id} value={activity.id}>
+                      <div className="flex flex-col">
+                        <span>{activity.name}</span>
+                        {activity.description && (
+                          <span className="text-xs text-muted-foreground">
+                            {activity.description}
                           </span>
                         )}
                       </div>

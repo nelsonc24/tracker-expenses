@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/db'
-import { transactions, categories, accounts } from '@/db/schema'
+import { transactions, categories, accounts, activities, transactionActivities } from '@/db/schema'
 import { and, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 
@@ -23,11 +23,18 @@ const bulkUpdateAccountSchema = z.object({
   accountId: z.string(),
 })
 
+const bulkAssignActivitySchema = z.object({
+  operation: z.literal('assign_activity'),
+  transactionIds: z.array(z.string()).min(1, 'At least one transaction ID is required'),
+  activityId: z.string(),
+})
+
 // Union schema for all operations
 const bulkOperationSchema = z.union([
   bulkDeleteSchema,
   bulkCategorizeSchema,
   bulkUpdateAccountSchema,
+  bulkAssignActivitySchema,
 ])
 
 export async function POST(request: NextRequest) {
@@ -41,7 +48,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = bulkOperationSchema.parse(body)
 
-    let result: any
+    let result: {
+      success: boolean
+      message: string
+      affectedCount: number
+      operation: string
+      categoryName?: string
+      accountName?: string
+      activityName?: string
+    }
 
     switch (validatedData.operation) {
       case 'delete':
@@ -155,6 +170,71 @@ export async function POST(request: NextRequest) {
           affectedCount: validatedData.transactionIds.length,
           operation: 'update_account',
           accountName: account[0].name
+        }
+        break
+
+      case 'assign_activity':
+        // Verify activity exists and belongs to user
+        const activity = await db
+          .select({ id: activities.id, name: activities.name })
+          .from(activities)
+          .where(
+            and(
+              eq(activities.id, validatedData.activityId),
+              eq(activities.userId, userId)
+            )
+          )
+          .limit(1)
+
+        if (activity.length === 0) {
+          return NextResponse.json(
+            { 
+              error: 'Activity not found or does not belong to user',
+              operation: {
+                type: 'not_found',
+                message: 'The selected activity could not be found. Please refresh and try again.'
+              }
+            },
+            { status: 404 }
+          )
+        }
+
+        // First, remove any existing activity assignments for these transactions
+        // We need to check that the transactions belong to the user
+        const userTransactionIds = await db
+          .select({ id: transactions.id })
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.userId, userId),
+              inArray(transactions.id, validatedData.transactionIds)
+            )
+          )
+
+        const validTransactionIds = userTransactionIds.map(t => t.id)
+
+        await db
+          .delete(transactionActivities)
+          .where(
+            inArray(transactionActivities.transactionId, validTransactionIds)
+          )
+
+        // Then, create new activity assignments
+        const activityAssignments = validTransactionIds.map(transactionId => ({
+          transactionId,
+          activityId: validatedData.activityId,
+          assignedAt: new Date(),
+          assignedBy: 'user' as const
+        }))
+
+        await db.insert(transactionActivities).values(activityAssignments)
+
+        result = {
+          success: true,
+          message: `Successfully assigned activity "${activity[0].name}" to ${validTransactionIds.length} transactions`,
+          affectedCount: validTransactionIds.length,
+          operation: 'assign_activity',
+          activityName: activity[0].name
         }
         break
 

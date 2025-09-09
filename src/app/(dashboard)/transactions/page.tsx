@@ -34,10 +34,18 @@ interface Category {
   icon?: string
 }
 
+interface Activity {
+  id: string
+  name: string
+  description?: string
+  color?: string
+}
+
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -49,10 +57,11 @@ export default function TransactionsPage() {
         
         // Fetch all data in parallel - request all transactions (limit=10000 to get all)
         // Force reload to see all imported transactions
-        const [transactionsResponse, accountsResponse, categoriesResponse] = await Promise.all([
+        const [transactionsResponse, accountsResponse, categoriesResponse, activitiesResponse] = await Promise.all([
           fetch('/api/transactions?limit=10000'),
           fetch('/api/accounts'),
-          fetch('/api/categories')
+          fetch('/api/categories'),
+          fetch('/api/activities')
         ])
 
         if (transactionsResponse.ok) {
@@ -69,6 +78,11 @@ export default function TransactionsPage() {
         if (categoriesResponse.ok) {
           const categoriesData = await categoriesResponse.json()
           setCategories(categoriesData)
+        }
+
+        if (activitiesResponse.ok) {
+          const activitiesData = await activitiesResponse.json()
+          setActivities(activitiesData)
         }
       } catch (error) {
         console.error('Error fetching data:', error)
@@ -139,6 +153,7 @@ export default function TransactionsPage() {
       transactions={transactions}
       accounts={accounts}
       categories={categories}
+      activities={activities}
       loading={loading}
       onTransactionUpdate={handleTransactionUpdate}
       onTransactionDelete={handleTransactionDelete}

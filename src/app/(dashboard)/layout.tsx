@@ -15,7 +15,8 @@ import {
   FolderOpen,
   Calendar,
   LineChart,
-  Receipt
+  Receipt,
+  Activity
 } from 'lucide-react'
 
 export default async function DashboardLayout({
@@ -34,6 +35,7 @@ export default async function DashboardLayout({
     { name: 'Transactions', href: '/transactions', icon: BarChart3 },
     { name: 'Accounts', href: '/accounts', icon: CreditCard },
     { name: 'Categories', href: '/categories', icon: FolderOpen },
+    { name: 'Activities', href: '/activities', icon: Activity },
     { name: 'Budgets', href: '/budgets', icon: Target },
     { name: 'Bills', href: '/bills', icon: Receipt },
     { name: 'Recurring', href: '/recurring', icon: Calendar },

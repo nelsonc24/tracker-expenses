@@ -433,6 +433,7 @@ export default function AdvancedAnalyticsPage() {
             <TabsList>
               <TabsTrigger value="variance">Budget Variance</TabsTrigger>
               <TabsTrigger value="performance">Performance Analysis</TabsTrigger>
+              <TabsTrigger value="activities">Activity Analytics</TabsTrigger>
               <TabsTrigger value="projections">Projections</TabsTrigger>
               <TabsTrigger value="predictive">Predictive Analytics</TabsTrigger>
             </TabsList>
@@ -599,6 +600,96 @@ export default function AdvancedAnalyticsPage() {
                       </div>
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="activities" className="space-y-6">
+              <div className="grid gap-6 md:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Target className="h-5 w-5" />
+                      Activity Spending Overview
+                    </CardTitle>
+                    <CardDescription>
+                      Top spending activities in the current period
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {loading ? (
+                        [...Array(5)].map((_, i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-4 w-20" />
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center text-muted-foreground py-8">
+                          <Target className="h-8 w-8 mx-auto mb-2" />
+                          <p>Activity analytics coming soon</p>
+                          <p className="text-sm">Enhanced insights for activity-based spending</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      Activity Budget Alerts
+                    </CardTitle>
+                    <CardDescription>
+                      Activities approaching or exceeding budget limits
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {loading ? (
+                        [...Array(3)].map((_, i) => (
+                          <div key={i} className="space-y-2">
+                            <div className="flex justify-between">
+                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-4 w-16" />
+                            </div>
+                            <Skeleton className="h-2 w-full" />
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center text-muted-foreground py-8">
+                          <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                          <p>No budget alerts</p>
+                          <p className="text-sm">Set activity budgets to monitor spending</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Activity Spending Trends</CardTitle>
+                  <CardDescription>
+                    Monthly spending patterns across your top activities
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <Skeleton className="h-64 w-full" />
+                  ) : (
+                    <div className="text-center text-muted-foreground py-16">
+                      <BarChart3 className="h-12 w-12 mx-auto mb-4" />
+                      <p className="text-lg font-medium">Activity Trends Chart</p>
+                      <p className="text-sm">Interactive charts showing spending trends by activity</p>
+                      <Button variant="outline" className="mt-4">
+                        View Detailed Activity Analytics
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

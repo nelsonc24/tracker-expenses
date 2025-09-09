@@ -29,6 +29,13 @@
       "when": 1756194113497,
       "tag": "0003_mysterious_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1757411978743,
+      "tag": "0004_add_activities_tables",
+      "breakpoints": true
     }
   ]
 }

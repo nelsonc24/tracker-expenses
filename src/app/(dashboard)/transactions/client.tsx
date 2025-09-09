@@ -58,7 +58,8 @@ import {
   Plus,
   Eye,
   Copy,
-  FileText
+  FileText,
+  Activity
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { BulkOperationsBar } from '@/components/bulk-operations-bar'
@@ -244,6 +245,14 @@ type Transaction = {
   tags: string[]
   notes: string
   balance: number
+  activities?: Activity[]
+}
+
+type Activity = {
+  id: string
+  name: string
+  description?: string
+  color?: string
 }
 type SortField = 'date' | 'amount' | 'description' | 'category'
 type SortDirection = 'asc' | 'desc'
@@ -278,6 +287,12 @@ interface TransactionsPageClientProps {
     color?: string
     icon?: string
   }>
+  activities: Array<{
+    id: string
+    name: string
+    description?: string
+    color?: string
+  }>
   loading: boolean
   onTransactionUpdate: (transaction: any) => void
   onTransactionDelete: (id: string) => void
@@ -288,6 +303,7 @@ export function TransactionsPageClient({
   transactions: propTransactions,
   accounts: propAccounts,
   categories: propCategories,
+  activities: propActivities,
   loading,
   onTransactionUpdate,
   onTransactionDelete,
@@ -333,8 +349,11 @@ export function TransactionsPageClient({
       setTransactions([])
     }
   }, [propTransactions])
-  // const [categoryFilter, setCategoryFilter] = useState('All Categories')
-  // const [accountFilter, setAccountFilter] = useState('All Accounts')  
+  
+  // Filter states
+  const [categoryFilter, setCategoryFilter] = useState('All Categories')
+  const [accountFilter, setAccountFilter] = useState('All Accounts')  
+  const [activityFilter, setActivityFilter] = useState('All Activities')
   // const [dateRange, setDateRange] = useState('all')
   const [sortField, setSortField] = useState<SortField>('date')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
@@ -346,6 +365,8 @@ export function TransactionsPageClient({
   const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null)
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
   const [categoryEditingTransaction, setCategoryEditingTransaction] = useState<Transaction | null>(null)
+  const [isActivityAssignDialogOpen, setIsActivityAssignDialogOpen] = useState(false)
+  const [activityAssignTransaction, setActivityAssignTransaction] = useState<Transaction | null>(null)
   
   // Advanced search state
   const [activeFilters, setActiveFilters] = useState<any>(null)
@@ -444,6 +465,32 @@ export function TransactionsPageClient({
         return true
       }
 
+      // Basic filter dropdowns (when not using advanced search)
+      // Category filter
+      if (categoryFilter !== 'All Categories' && transaction.category !== categoryFilter) {
+        return false
+      }
+
+      // Account filter
+      if (accountFilter !== 'All Accounts' && transaction.account !== accountFilter) {
+        return false
+      }
+
+      // Activity filter
+      if (activityFilter !== 'All Activities') {
+        if (activityFilter === 'No Activity') {
+          // Show transactions without any activity assigned
+          if (transaction.activities && transaction.activities.length > 0) {
+            return false
+          }
+        } else {
+          // Show transactions assigned to the selected activity
+          if (!transaction.activities || !transaction.activities.some(activity => activity.name === activityFilter)) {
+            return false
+          }
+        }
+      }
+
       return true
     })
 
@@ -471,7 +518,7 @@ export function TransactionsPageClient({
     })
 
     return filtered
-  }, [transactions, sortField, sortDirection, activeFilters])
+  }, [transactions, sortField, sortDirection, activeFilters, categoryFilter, accountFilter, activityFilter])
 
   // Pagination
   const totalPages = Math.ceil(filteredTransactions.length / responsivePageSize)
@@ -689,6 +736,28 @@ export function TransactionsPageClient({
         account: editingTransaction.account
       }
       
+      // Handle activity assignments if activities have changed
+      if (editingTransaction.activities && editingTransaction.activities.length > 0) {
+        try {
+          const activityAssignResponse = await fetch('/api/activities/assign', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              transactionIds: [editingTransaction.id],
+              activityId: editingTransaction.activities[0].id
+            })
+          })
+          
+          if (!activityAssignResponse.ok) {
+            console.warn('Failed to assign activity to transaction')
+          }
+        } catch (error) {
+          console.warn('Error assigning activity:', error)
+        }
+      }
+      
       // Update local state
       setTransactions(prev => prev.map(t => 
         t.id === updatedTransaction.id ? updatedTransaction : t
@@ -719,6 +788,12 @@ export function TransactionsPageClient({
   const handleCategoryClick = (transaction: Transaction) => {
     setCategoryEditingTransaction({ ...transaction })
     setIsCategoryDialogOpen(true)
+  }
+
+  // Handle activity assignment click for quick activity assignment
+  const handleActivityAssignClick = (transaction: Transaction) => {
+    setActivityAssignTransaction({ ...transaction })
+    setIsActivityAssignDialogOpen(true)
   }
 
   // Save category change
@@ -800,6 +875,53 @@ export function TransactionsPageClient({
     } catch (error) {
       console.error('Error updating transaction category:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to update category')
+    }
+  }
+
+  // Save activity assignment
+  const handleSaveActivityAssignment = async (activityId: string) => {
+    if (!activityAssignTransaction) return
+    
+    try {
+      const response = await fetch('/api/activities/assign', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          transactionIds: [activityAssignTransaction.id],
+          activityId: activityId
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to assign activity to transaction')
+      }
+
+      // Update the transaction locally to show the activity assignment
+      const selectedActivity = propActivities.find(a => a.id === activityId)
+      const updatedTransaction = {
+        ...activityAssignTransaction,
+        activities: selectedActivity ? [selectedActivity] : []
+      }
+      
+      // Update local state
+      setTransactions(prev => prev.map(t => 
+        t.id === updatedTransaction.id ? updatedTransaction : t
+      ))
+      
+      // Call the callback to update parent state
+      if (onTransactionUpdate) {
+        onTransactionUpdate(updatedTransaction)
+      }
+
+      toast.success('Activity assigned successfully')
+      setIsActivityAssignDialogOpen(false)
+      setActivityAssignTransaction(null)
+      
+    } catch (error) {
+      console.error('Error assigning activity:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to assign activity')
     }
   }
 
@@ -1025,6 +1147,75 @@ export function TransactionsPageClient({
         </Card>
       </div>
 
+      {/* Quick Filters */}
+      <div className="flex flex-wrap gap-4 items-center">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Category</Label>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All Categories">All Categories</SelectItem>
+              {propCategories.map(category => (
+                <SelectItem key={category.id} value={category.name}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Account</Label>
+          <Select value={accountFilter} onValueChange={setAccountFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All Accounts">All Accounts</SelectItem>
+              {propAccounts.map(account => (
+                <SelectItem key={account.id} value={account.name}>
+                  {account.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Activity</Label>
+          <Select value={activityFilter} onValueChange={setActivityFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All Activities">All Activities</SelectItem>
+              <SelectItem value="No Activity">No Activity</SelectItem>
+              {propActivities.map(activity => (
+                <SelectItem key={activity.id} value={activity.name}>
+                  {activity.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-sm font-medium opacity-0">Clear</Label>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setCategoryFilter('All Categories')
+              setAccountFilter('All Accounts')
+              setActivityFilter('All Activities')
+            }}
+          >
+            Clear Filters
+          </Button>
+        </div>
+      </div>
+
       {/* Advanced Search */}
       <AdvancedSearch
         onSearch={handleAdvancedSearch}
@@ -1186,6 +1377,10 @@ export function TransactionsPageClient({
                             <Edit className="h-4 w-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleActivityAssignClick(transaction)}>
+                            <Activity className="h-4 w-4 mr-2" />
+                            Assign Activity
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDuplicateTransaction(transaction)}>
                             <Copy className="h-4 w-4 mr-2" />
                             Duplicate
@@ -1332,6 +1527,36 @@ export function TransactionsPageClient({
                     {propCategories.map(category => (
                       <SelectItem key={category.id} value={category.name}>
                         {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-activities">Activities</Label>
+                <Select 
+                  value={editingTransaction.activities?.[0]?.id || ""} 
+                  onValueChange={(value) => {
+                    if (value) {
+                      const selectedActivity = propActivities.find(a => a.id === value)
+                      setEditingTransaction(prev => 
+                        prev ? { ...prev, activities: selectedActivity ? [selectedActivity] : [] } : null
+                      )
+                    } else {
+                      setEditingTransaction(prev => 
+                        prev ? { ...prev, activities: [] } : null
+                      )
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an activity (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No activity</SelectItem>
+                    {propActivities.map(activity => (
+                      <SelectItem key={activity.id} value={activity.id}>
+                        {activity.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1513,6 +1738,61 @@ export function TransactionsPageClient({
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCategoryDialogOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Activity Assignment Dialog */}
+      <Dialog open={isActivityAssignDialogOpen} onOpenChange={setIsActivityAssignDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Activity</DialogTitle>
+            <DialogDescription>
+              Assign this transaction to an activity.
+            </DialogDescription>
+          </DialogHeader>
+          {activityAssignTransaction && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Transaction</Label>
+                <p className="text-sm text-muted-foreground">{activityAssignTransaction.description}</p>
+                <p className="text-sm text-muted-foreground">
+                  {formatDate(activityAssignTransaction.date)} • 
+                  {activityAssignTransaction.amount >= 0 ? '+' : '-'}$
+                  {Math.abs(activityAssignTransaction.amount).toLocaleString('en-AU', { 
+                    minimumFractionDigits: 2 
+                  })}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="activity-select">Select Activity</Label>
+                <Select 
+                  defaultValue={activityAssignTransaction.activities?.[0]?.id || ""}
+                  onValueChange={(value) => {
+                    if (value) {
+                      handleSaveActivityAssignment(value)
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose an activity..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No activity</SelectItem>
+                    {propActivities.map(activity => (
+                      <SelectItem key={activity.id} value={activity.id}>
+                        {activity.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsActivityAssignDialogOpen(false)}>
               Cancel
             </Button>
           </DialogFooter>

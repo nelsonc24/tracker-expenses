@@ -10,7 +10,15 @@ Provide project context and coding guidelines that AI should follow when generat
 - Keep security in mind and validate all user inputs.
 - Use the provided utility functions for common tasks (e.g., date formatting, database operations).
 - When creating test scripts or utility scripts, place them in a `scripts/` folder instead of the project root.
-- If you need to run the app manually, use `bun run dev` to start the development server and make sure to kill the port before starting a new instance using `lsof -ti:3001 | xargs kill -9` to free up port 3001.
+- **Use pnpm as the preferred package manager** whenever possible for consistency and performance:
+  - Use `pnpm install` instead of `npm install` or `yarn install`
+  - Use `pnpm add [package]` for adding dependencies
+  - Use `pnpm remove [package]` for removing dependencies
+  - Use `pnpm run [script]` for running package scripts
+- **Always kill the development port before starting the app** to avoid port conflicts:
+  - Before running `pnpm run dev`, first kill any existing processes on port 3001: `lsof -ti:3001 | xargs kill -9`
+  - Then start the development server: `pnpm run dev`
+  - Full command sequence: `lsof -ti:3001 | xargs kill -9 && pnpm run dev`
 - **Use shadcn-ui components as much as possible** for UI consistency and best practices:
   - Prefer shadcn-ui components over custom implementations when available
   - Install new shadcn-ui components using `bunx shadcn@latest add [component-name]`

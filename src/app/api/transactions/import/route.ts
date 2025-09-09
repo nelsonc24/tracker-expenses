@@ -234,7 +234,7 @@ async function getOrCreateDefaultCategory(userId: string) {
       name: 'General',
       color: '#6B7280',
       icon: '💳',
-      isSystem: false
+      isDefault: true
     }).returning()
     
     return (insertedCategories as any[])[0]

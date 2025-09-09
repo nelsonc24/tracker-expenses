@@ -52,7 +52,7 @@ export const accounts = pgTable('accounts', {
 }))
 
 // Categories table
-export const categories: any = pgTable('categories', {
+export const categories = pgTable('categories', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   name: text('name').notNull(),
@@ -60,7 +60,7 @@ export const categories: any = pgTable('categories', {
   color: text('color').default('#6b7280').notNull(),
   icon: text('icon').default('folder').notNull(),
   customIconUrl: text('custom_icon_url'),
-  parentId: uuid('parent_id').references(() => categories.id, { onDelete: 'set null' }),
+  parentId: uuid('parent_id'),
   isDefault: boolean('is_default').default(false).notNull(),
   sortOrder: integer('sort_order').default(0).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -237,6 +237,69 @@ export const recurringTransactions = pgTable('recurring_transactions', {
   activeIdx: index('recurring_transactions_active_idx').on(table.isActive),
 }))
 
+// Activities table - for tracking spending commitments like dance club, gym, hobbies, etc.
+export const activities = pgTable('activities', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  category: text('category').notNull(), // 'hobby', 'fitness', 'education', 'professional', 'lifestyle', 'project', 'membership'
+  budgetAmount: decimal('budget_amount', { precision: 15, scale: 2 }),
+  budgetPeriod: text('budget_period').default('yearly').notNull(), // 'monthly', 'yearly', 'lifetime'
+  startDate: timestamp('start_date').defaultNow().notNull(),
+  endDate: timestamp('end_date'),
+  isActive: boolean('is_active').default(true).notNull(),
+  color: text('color').default('#6b7280').notNull(),
+  icon: text('icon').default('activity').notNull(),
+  commitmentType: text('commitment_type'), // 'membership', 'subscription', 'course', 'project', 'hobby'
+  frequency: text('frequency'), // 'daily', 'weekly', 'monthly', 'occasional'
+  location: text('location'),
+  notes: text('notes'),
+  metadata: jsonb('metadata').$type<{
+    tags?: string[]
+    reminders?: boolean
+    autoAssign?: boolean
+    autoAssignRules?: Array<{ field: string, value: string, operator: string }>
+  }>().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('activities_user_id_idx').on(table.userId),
+  nameIdx: index('activities_name_idx').on(table.name),
+  categoryIdx: index('activities_category_idx').on(table.category),
+  activeIdx: index('activities_active_idx').on(table.isActive),
+  userNameIdx: index('activities_user_name_idx').on(table.userId, table.name),
+}))
+
+// Junction table for many-to-many relationship between transactions and activities
+export const transactionActivities = pgTable('transaction_activities', {
+  transactionId: uuid('transaction_id').references(() => transactions.id, { onDelete: 'cascade' }).notNull(),
+  activityId: uuid('activity_id').references(() => activities.id, { onDelete: 'cascade' }).notNull(),
+  assignedAt: timestamp('assigned_at').defaultNow().notNull(),
+  assignedBy: text('assigned_by').default('user').notNull(), // 'user', 'rule', 'auto'
+}, (table) => ({
+  pk: index('transaction_activities_pk').on(table.transactionId, table.activityId),
+  transactionIdx: index('transaction_activities_transaction_idx').on(table.transactionId),
+  activityIdx: index('transaction_activities_activity_idx').on(table.activityId),
+}))
+
+// Activity budgets and spending tracking
+export const activityBudgets = pgTable('activity_budgets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  activityId: uuid('activity_id').references(() => activities.id, { onDelete: 'cascade' }).notNull(),
+  periodStart: timestamp('period_start').notNull(),
+  periodEnd: timestamp('period_end').notNull(),
+  budgetAmount: decimal('budget_amount', { precision: 15, scale: 2 }).notNull(),
+  spentAmount: decimal('spent_amount', { precision: 15, scale: 2 }).default('0.00').notNull(),
+  transactionCount: integer('transaction_count').default(0).notNull(),
+  lastUpdated: timestamp('last_updated').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  activityIdIdx: index('activity_budgets_activity_id_idx').on(table.activityId),
+  periodIdx: index('activity_budgets_period_idx').on(table.periodStart, table.periodEnd),
+  uniquePeriod: index('activity_budgets_unique_period_idx').on(table.activityId, table.periodStart, table.periodEnd),
+}))
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users)
 export const selectUserSchema = createSelectSchema(users)
@@ -277,3 +340,18 @@ export const insertBillSchema = createInsertSchema(bills)
 export const selectBillSchema = createSelectSchema(bills)
 export type InsertBill = z.infer<typeof insertBillSchema>
 export type SelectBill = z.infer<typeof selectBillSchema>
+
+export const insertActivitySchema = createInsertSchema(activities)
+export const selectActivitySchema = createSelectSchema(activities)
+export type InsertActivity = z.infer<typeof insertActivitySchema>
+export type SelectActivity = z.infer<typeof selectActivitySchema>
+
+export const insertTransactionActivitySchema = createInsertSchema(transactionActivities)
+export const selectTransactionActivitySchema = createSelectSchema(transactionActivities)
+export type InsertTransactionActivity = z.infer<typeof insertTransactionActivitySchema>
+export type SelectTransactionActivity = z.infer<typeof selectTransactionActivitySchema>
+
+export const insertActivityBudgetSchema = createInsertSchema(activityBudgets)
+export const selectActivityBudgetSchema = createSelectSchema(activityBudgets)
+export type InsertActivityBudget = z.infer<typeof insertActivityBudgetSchema>
+export type SelectActivityBudget = z.infer<typeof selectActivityBudgetSchema>
