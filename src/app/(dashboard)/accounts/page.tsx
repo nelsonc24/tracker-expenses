@@ -97,12 +97,12 @@ export default async function AccountsPage() {
   const netWorth = totalBalance - totalDebt
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold">Accounts</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Accounts</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
             Manage your connected bank accounts and monitor balances
           </p>
         </div>
@@ -110,14 +110,14 @@ export default async function AccountsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Balance</CardTitle>
+            <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-lg sm:text-2xl font-bold text-green-600">
               ${totalBalance.toLocaleString('en-AU', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -128,11 +128,11 @@ export default async function AccountsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Debt</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Debt</CardTitle>
+            <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-lg sm:text-2xl font-bold text-red-600">
               ${totalDebt.toLocaleString('en-AU', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -141,14 +141,14 @@ export default async function AccountsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="sm:col-span-2 lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Worth</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Net Worth</CardTitle>
+            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className={cn(
-              "text-2xl font-bold",
+              "text-lg sm:text-2xl font-bold",
               netWorth >= 0 ? "text-green-600" : "text-red-600"
             )}>
               ${netWorth.toLocaleString('en-AU', { minimumFractionDigits: 2 })}
@@ -170,27 +170,29 @@ export default async function AccountsPage() {
 
           return (
             <Card key={account.id} className="transition-all hover:shadow-md">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                  <div className="flex items-center space-x-3 sm:space-x-4">
                     <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center text-2xl">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-muted rounded-full flex items-center justify-center text-lg sm:text-2xl">
                         {institutionLogos[account.institution as keyof typeof institutionLogos] || '🏦'}
                       </div>
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <h3 className="text-lg font-semibold truncate">{account.name}</h3>
-                        <Badge variant="secondary" className={typeInfo.color}>
-                          {typeInfo.label}
-                        </Badge>
-                        <Badge variant="secondary" className={statusInfo.color}>
-                          <StatusIcon className="w-3 h-3 mr-1" />
-                          {statusInfo.label}
-                        </Badge>
+                      <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
+                        <h3 className="text-base sm:text-lg font-semibold truncate">{account.name}</h3>
+                        <div className="flex flex-wrap gap-1 sm:gap-2">
+                          <Badge variant="secondary" className={cn(typeInfo.color, "text-xs")}>
+                            {typeInfo.label}
+                          </Badge>
+                          <Badge variant="secondary" className={cn(statusInfo.color, "text-xs")}>
+                            <StatusIcon className="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
+                            {statusInfo.label}
+                          </Badge>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs sm:text-sm text-muted-foreground truncate">
                         {account.institution} • {account.accountNumber || 'N/A'}
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -199,10 +201,10 @@ export default async function AccountsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
+                  <div className="flex items-center justify-between sm:justify-end space-x-4">
+                    <div className="text-left sm:text-right">
                       <div className={cn(
-                        "text-xl font-bold",
+                        "text-lg sm:text-xl font-bold",
                         account.accountType === 'credit' 
                           ? balance < 0 ? "text-red-600" : "text-green-600"
                           : "text-foreground"
@@ -211,7 +213,7 @@ export default async function AccountsPage() {
                         ${Math.abs(balance).toLocaleString('en-AU', { minimumFractionDigits: 2 })}
                       </div>
                       {account.accountType === 'credit' && (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-muted-foreground">
                           Credit Account
                         </p>
                       )}
@@ -242,28 +244,28 @@ export default async function AccountsPage() {
             </div>
             <Progress value={accounts.length > 0 ? 100 : 0} className="h-2" />
             
-            <div className="grid gap-4 md:grid-cols-3 mt-6">
-              <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+              <div className="text-center p-3 sm:p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                <div className="text-xl sm:text-2xl font-bold text-blue-600">
                   {accounts.filter(a => a.accountType === 'checking').length}
                 </div>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
+                <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300">
                   Checking Accounts
                 </p>
               </div>
-              <div className="text-center p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
+              <div className="text-center p-3 sm:p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                <div className="text-xl sm:text-2xl font-bold text-green-600">
                   {accounts.filter(a => a.accountType === 'savings').length}
                 </div>
-                <p className="text-sm text-green-700 dark:text-green-300">
+                <p className="text-xs sm:text-sm text-green-700 dark:text-green-300">
                   Savings Accounts
                 </p>
               </div>
-              <div className="text-center p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">
+              <div className="text-center p-3 sm:p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                <div className="text-xl sm:text-2xl font-bold text-red-600">
                   {accounts.filter(a => a.accountType === 'credit').length}
                 </div>
-                <p className="text-sm text-red-700 dark:text-red-300">
+                <p className="text-xs sm:text-sm text-red-700 dark:text-red-300">
                   Credit Accounts
                 </p>
               </div>

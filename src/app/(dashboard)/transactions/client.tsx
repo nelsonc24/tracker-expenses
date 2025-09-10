@@ -69,7 +69,6 @@ import { KeyboardShortcutsHelp } from '@/components/keyboard-shortcuts-help'
 import { TransactionTemplates } from '@/components/transaction-templates'
 import { MobileTransactionCard } from '@/components/mobile-transaction-card'
 import { ActivityAssignmentDialog } from '@/components/activities/activity-assignment-dialog'
-import { MobileNavigation } from '@/components/mobile-navigation'
 import { MobileActionBar } from '@/components/mobile-action-bar'
 import { TransactionBreakdownDialog } from '@/components/transaction-breakdown-dialog'
 import { useKeyboardShortcuts, KeyboardShortcut, SHORTCUT_CATEGORIES } from '@/hooks/use-keyboard-shortcuts'
@@ -1081,51 +1080,46 @@ export function TransactionsPageClient({
   const netAmount = totalIncome - totalExpenses
 
   return (
-    <div className="space-y-6">
-      {/* Mobile Navigation */}
-      <MobileNavigation currentPath="/transactions" />
-
-      {/* Header - Hide on mobile, show on desktop */}
-      <div className={cn(
-        "flex items-center justify-between",
-        isMobile && "hidden"
-      )}>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold">Transactions</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Transactions</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
             View and manage all your financial transactions
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button onClick={handleImport}>
-            <Upload className="h-4 w-4 mr-2" />
-            Import CSV
-          </Button>
-          <TransactionTemplates
-            categories={propCategories.map(c => c.name)}
-            accounts={propAccounts.map(a => a.name)}
-            onApplyTemplate={handleApplyTemplate}
-          />
-          <KeyboardShortcutsHelp shortcuts={keyboardShortcuts} />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+          <div className="flex space-x-2">
+            <Button variant="outline" onClick={handleExport} className="flex-1 sm:flex-none">
+              <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              <span className="hidden sm:inline">Export</span>
+            </Button>
+            <Button onClick={handleImport} className="flex-1 sm:flex-none">
+              <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              <span className="hidden sm:inline">Import</span>
+            </Button>
+          </div>
+          <div className="hidden sm:flex sm:space-x-2">
+            <TransactionTemplates
+              categories={propCategories.map(c => c.name)}
+              accounts={propAccounts.map(a => a.name)}
+              onApplyTemplate={handleApplyTemplate}
+            />
+            <KeyboardShortcutsHelp shortcuts={keyboardShortcuts} />
+          </div>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className={cn(
-        "grid gap-4",
-        isMobile ? "grid-cols-1" : "md:grid-cols-3"
-      )}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Income</CardTitle>
+            <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-lg sm:text-2xl font-bold text-green-600">
               ${totalIncome.toLocaleString('en-AU', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -1136,11 +1130,11 @@ export function TransactionsPageClient({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-            <DollarSign className="h-4 w-4 text-red-500" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Expenses</CardTitle>
+            <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-lg sm:text-2xl font-bold text-red-600">
               ${totalExpenses.toLocaleString('en-AU', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -1149,14 +1143,14 @@ export function TransactionsPageClient({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="sm:col-span-2 lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Amount</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Net Amount</CardTitle>
+            <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className={cn(
-              "text-2xl font-bold",
+              "text-lg sm:text-2xl font-bold",
               netAmount >= 0 ? "text-green-600" : "text-red-600"
             )}>
               ${Math.abs(netAmount).toLocaleString('en-AU', { minimumFractionDigits: 2 })}
@@ -1169,11 +1163,11 @@ export function TransactionsPageClient({
       </div>
 
       {/* Quick Filters */}
-      <div className="flex flex-wrap gap-4 items-center">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Category</Label>
+          <Label className="text-xs sm:text-sm font-medium">Category</Label>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1188,9 +1182,9 @@ export function TransactionsPageClient({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Account</Label>
+          <Label className="text-xs sm:text-sm font-medium">Account</Label>
           <Select value={accountFilter} onValueChange={setAccountFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1205,9 +1199,9 @@ export function TransactionsPageClient({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Activity</Label>
+          <Label className="text-xs sm:text-sm font-medium">Activity</Label>
           <Select value={activityFilter} onValueChange={setActivityFilter}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1223,9 +1217,10 @@ export function TransactionsPageClient({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-sm font-medium opacity-0">Clear</Label>
+          <Label className="text-xs sm:text-sm font-medium opacity-0">Clear</Label>
           <Button 
             variant="outline" 
+            className="w-full"
             onClick={() => {
               setCategoryFilter('All Categories')
               setAccountFilter('All Accounts')

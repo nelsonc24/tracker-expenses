@@ -117,40 +117,40 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground mt-2">
+        <h1 className="text-2xl sm:text-3xl font-bold">Settings</h1>
+        <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
           Manage your account preferences and application settings
         </p>
       </div>
 
-      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="data">Data</TabsTrigger>
+      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4 sm:space-y-6">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5">
+          <TabsTrigger value="general" className="text-xs sm:text-sm">General</TabsTrigger>
+          <TabsTrigger value="notifications" className="text-xs sm:text-sm">Notify</TabsTrigger>
+          <TabsTrigger value="categories" className="text-xs sm:text-sm">Categories</TabsTrigger>
+          <TabsTrigger value="security" className="text-xs sm:text-sm hidden sm:block">Security</TabsTrigger>
+          <TabsTrigger value="data" className="text-xs sm:text-sm">Data</TabsTrigger>
         </TabsList>
 
         {/* General Settings */}
-        <TabsContent value="general" className="space-y-6">
+        <TabsContent value="general" className="space-y-4 sm:space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <User className="h-5 w-5" />
+              <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
+                <User className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span>Profile Information</span>
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-sm">
                 Manage your personal information and preferences
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
+            <CardContent className="space-y-4 sm:space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
+                  <Label htmlFor="firstName" className="text-sm">First Name</Label>
                   <Input 
                     id="firstName" 
                     defaultValue={user?.firstName || ''} 
@@ -158,7 +158,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="lastName" className="text-sm">Last Name</Label>
                   <Input 
                     id="lastName" 
                     defaultValue={user?.lastName || ''} 
@@ -167,7 +167,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email" className="text-sm">Email Address</Label>
                 <Input 
                   id="email" 
                   type="email" 
@@ -178,25 +178,25 @@ export default function SettingsPage() {
                   Email address is managed by your authentication provider
                 </p>
               </div>
-              <Button>Save Profile</Button>
+              <Button className="w-full sm:w-auto">Save Profile</Button>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Palette className="h-5 w-5" />
+              <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
+                <Palette className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span>Appearance</span>
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-sm">
                 Customize the look and feel of your application
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
+            <CardContent className="space-y-4 sm:space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
                 <div className="space-y-0.5">
-                  <Label>Theme</Label>
-                  <p className="text-sm text-muted-foreground">
+                  <Label className="text-sm">Theme</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Choose your preferred color theme
                   </p>
                 </div>

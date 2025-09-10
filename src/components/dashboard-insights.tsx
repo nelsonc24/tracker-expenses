@@ -38,19 +38,20 @@ export function InsightCard({
   return (
     <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <CardTitle className="text-xs sm:text-sm font-medium truncate">{title}</CardTitle>
         {icon}
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+      <CardContent className="pb-3">
+        <div className="text-lg sm:text-2xl font-bold break-all">{value}</div>
         {change && (
-          <div className="flex items-center space-x-2 text-xs">
+          <div className="flex items-center space-x-1 sm:space-x-2 text-xs">
             {change.type === 'increase' ? (
-              <TrendingUp className="h-3 w-3 text-green-500" />
+              <TrendingUp className="h-3 w-3 text-green-500 flex-shrink-0" />
             ) : (
-              <TrendingDown className="h-3 w-3 text-red-500" />
+              <TrendingDown className="h-3 w-3 text-red-500 flex-shrink-0" />
             )}
             <span className={cn(
+              "truncate",
               change.type === 'increase' ? 'text-green-500' : 'text-red-500'
             )}>
               {Math.abs(change.value).toFixed(1)}% from {change.period}
@@ -58,7 +59,7 @@ export function InsightCard({
           </div>
         )}
         {description && (
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
             {description}
           </p>
         )}

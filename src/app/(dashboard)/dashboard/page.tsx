@@ -205,29 +205,31 @@ export default async function DashboardPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Welcome back, {user?.firstName}!</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Welcome back, {user?.firstName}!</h1>
+          <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-base">
             Here&apos;s your financial overview for today
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+            <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Export</span>
+            <span className="sm:hidden">Export</span>
           </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Transaction
+          <Button size="sm" className="text-xs sm:text-sm">
+            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Add Transaction</span>
+            <span className="sm:hidden">Add</span>
           </Button>
         </div>
       </div>
 
       {/* Overview Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 lg:grid-cols-5">
         <InsightCard
           title="Total Balance"
           value={`$${dashboardData.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -236,7 +238,7 @@ export default async function DashboardPage() {
             type: monthlyChange >= 0 ? 'increase' : 'decrease', 
             period: 'last month' 
           }}
-          icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+          icon={<DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
           description={`Across ${dashboardData.accounts.length} connected accounts`}
         />
         <InsightCard
@@ -247,7 +249,7 @@ export default async function DashboardPage() {
             type: monthlyChange >= 0 ? 'increase' : 'decrease', 
             period: 'last month' 
           }}
-          icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+          icon={<TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
           description="Total expenses"
         />
         <InsightCard
@@ -264,7 +266,7 @@ export default async function DashboardPage() {
             type: 'decrease', 
             period: 'due now' 
           } : undefined}
-          icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+          icon={<Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
           description={`$${dashboardData.recurringSummary.monthlyTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} monthly total`}
         />
         <InsightCard
@@ -275,25 +277,25 @@ export default async function DashboardPage() {
             type: dashboardData.thisMonthSummary.netAmount >= 0 ? 'increase' : 'decrease', 
             period: 'expense ratio' 
           } : undefined}
-          icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
+          icon={<CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
           description="This month's net amount"
         />
       </div>
 
       {/* Charts and Analytics */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="insights">Insights</TabsTrigger>
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="overview" className="flex-1 sm:flex-none text-xs sm:text-sm">Overview</TabsTrigger>
+          <TabsTrigger value="analytics" className="flex-1 sm:flex-none text-xs sm:text-sm">Analytics</TabsTrigger>
+          <TabsTrigger value="insights" className="flex-1 sm:flex-none text-xs sm:text-sm">Insights</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+        <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
             <Card>
-              <CardHeader>
-                <CardTitle>Spending Trend</CardTitle>
-                <CardDescription>Daily spending over the last week</CardDescription>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Spending Trend</CardTitle>
+                <CardDescription className="text-sm">Daily spending over the last week</CardDescription>
               </CardHeader>
               <CardContent>
                 <SpendingTrendChart data={dashboardData.trendData} />

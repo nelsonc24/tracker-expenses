@@ -202,18 +202,18 @@ export default function AnalyticsPage() {
   const { summary, monthlyData, categoryData, topMerchants, weeklySpending } = analyticsData
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Analytics</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Analytics</h1>
+          <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-base">
             Deep insights into your spending patterns and financial trends
           </p>
         </div>
         <div className="flex items-center space-x-2">
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-24 sm:w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -226,9 +226,10 @@ export default function AnalyticsPage() {
           </Select>
           <ExportDialog 
             trigger={
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export Report
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Export Report</span>
+                <span className="sm:hidden">Export</span>
               </Button>
             }
           />
@@ -236,14 +237,14 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid gap-6 md:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Income</CardTitle>
+            <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+          <CardContent className="pb-3">
+            <div className="text-lg sm:text-2xl font-bold text-green-600">
               ${summary.totalIncome.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -254,11 +255,11 @@ export default function AnalyticsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Expenses</CardTitle>
+            <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+          <CardContent className="pb-3">
+            <div className="text-lg sm:text-2xl font-bold text-red-600">
               ${summary.totalExpenses.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -269,16 +270,16 @@ export default function AnalyticsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Amount</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">Net Amount</CardTitle>
             {summary.netAmount >= 0 ? (
-              <ArrowUpRight className="h-4 w-4 text-green-600" />
+              <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
             ) : (
-              <ArrowDownRight className="h-4 w-4 text-red-600" />
+              <ArrowDownRight className="h-3 w-3 sm:h-4 sm:w-4 text-red-600" />
             )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-3">
             <div className={cn(
-              "text-2xl font-bold",
+              "text-lg sm:text-2xl font-bold",
               summary.netAmount >= 0 ? "text-green-600" : "text-red-600"
             )}>
               ${summary.netAmount.toLocaleString()}
@@ -291,12 +292,12 @@ export default function AnalyticsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Savings Rate</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Savings Rate</CardTitle>
+            <Target className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-3">
             <div className={cn(
-              "text-2xl font-bold",
+              "text-lg sm:text-2xl font-bold",
               summary.savingsRate >= 20 ? "text-green-600" : 
               summary.savingsRate >= 10 ? "text-yellow-600" : "text-red-600"
             )}>

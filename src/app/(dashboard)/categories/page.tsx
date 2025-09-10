@@ -483,20 +483,20 @@ export default function CategoriesPage() {
   const filteredCategories = getFilteredCategories()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold">Categories</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold">Categories</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Organize your transactions with custom categories
           </p>
         </div>
         
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={resetForm} className="w-full sm:w-auto">
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
               Add Category
             </Button>
           </DialogTrigger>
@@ -613,14 +613,14 @@ export default function CategoriesPage() {
 
       {/* Filters and Search */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
               <Input
                 placeholder="Search categories..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-sm"
+                className="w-full sm:max-w-sm"
               />
             </div>
             <div className="flex items-center space-x-2">
@@ -628,8 +628,14 @@ export default function CategoriesPage() {
                 variant={showSystemCategories ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowSystemCategories(!showSystemCategories)}
+                className="text-xs sm:text-sm"
               >
-                {showSystemCategories ? "Hide" : "Show"} System Categories
+                <span className="hidden sm:inline">
+                  {showSystemCategories ? "Hide" : "Show"} System Categories
+                </span>
+                <span className="sm:hidden">
+                  {showSystemCategories ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                </span>
               </Button>
             </div>
           </div>

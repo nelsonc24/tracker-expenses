@@ -1,23 +1,9 @@
 import { redirect } from 'next/navigation'
 import { currentUser } from '@clerk/nextjs/server'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { UserButton } from '@clerk/nextjs'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { 
-  Home, 
-  BarChart3, 
-  CreditCard, 
-  Settings, 
-  Upload,
-  Target,
-  TrendingUp,
-  FolderOpen,
-  Calendar,
-  LineChart,
-  Receipt,
-  Activity
-} from 'lucide-react'
+import { AppSidebar } from '@/components/app-sidebar'
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { cookies } from 'next/headers'
 
 export default async function DashboardLayout({
   children,
@@ -30,93 +16,24 @@ export default async function DashboardLayout({
     redirect('/sign-in')
   }
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: Home },
-    { name: 'Transactions', href: '/transactions', icon: BarChart3 },
-    { name: 'Accounts', href: '/accounts', icon: CreditCard },
-    { name: 'Categories', href: '/categories', icon: FolderOpen },
-    { name: 'Activities', href: '/activities', icon: Activity },
-    { name: 'Budgets', href: '/budgets', icon: Target },
-    { name: 'Bills', href: '/bills', icon: Receipt },
-    { name: 'Recurring', href: '/recurring', icon: Calendar },
-    { name: 'Analytics', href: '/analytics', icon: TrendingUp },
-    { name: 'Advanced Analytics', href: '/advanced-analytics', icon: LineChart },
-    { name: 'Import', href: '/import', icon: Upload },
-    { name: 'Settings', href: '/settings', icon: Settings },
-  ]
+  // Get the sidebar state from cookies
+  const cookieStore = await cookies()
+  const defaultOpen = cookieStore.get("sidebar_state")?.value === "true"
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Sidebar */}
-      <div className="fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border">
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center h-16 px-6 border-b border-border">
-            <Link href="/dashboard" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <BarChart3 className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold">ExpenseTracker</span>
-            </Link>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-2">
-            {navigation.map((item) => (
-              <Link key={item.name} href={item.href}>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                >
-                  <item.icon className="w-5 h-5 mr-3" />
-                  {item.name}
-                </Button>
-              </Link>
-            ))}
-          </nav>
-
-          {/* User section */}
-          <div className="p-4 border-t border-border">
-            <div className="flex items-center space-x-3">
-              <UserButton 
-                appearance={{
-                  elements: {
-                    avatarBox: "w-10 h-10"
-                  }
-                }}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {user.firstName} {user.lastName}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {user.emailAddresses[0]?.emailAddress}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="pl-64">
-        {/* Top bar */}
-        <header className="bg-card border-b border-border px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              {/* Breadcrumb or page title can go here */}
-            </div>
-            <div className="flex items-center space-x-4">
-              <ThemeToggle />
-            </div>
+    <SidebarProvider defaultOpen={defaultOpen}>
+      <AppSidebar />
+      <main className="flex flex-1 flex-col transition-all duration-300 ease-in-out">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-background">
+          <SidebarTrigger className="-ml-1" />
+          <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
           </div>
         </header>
-
-        {/* Page content */}
-        <main className="p-6">
+        <div className="flex-1 p-6">
           {children}
-        </main>
-      </div>
-    </div>
+        </div>
+      </main>
+    </SidebarProvider>
   )
 }
