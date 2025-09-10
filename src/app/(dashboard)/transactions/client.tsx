@@ -59,7 +59,8 @@ import {
   Eye,
   Copy,
   FileText,
-  Activity
+  Activity,
+  BarChart3
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { BulkOperationsBar } from '@/components/bulk-operations-bar'
@@ -67,8 +68,10 @@ import { AdvancedSearch } from '@/components/advanced-search'
 import { KeyboardShortcutsHelp } from '@/components/keyboard-shortcuts-help'
 import { TransactionTemplates } from '@/components/transaction-templates'
 import { MobileTransactionCard } from '@/components/mobile-transaction-card'
+import { ActivityAssignmentDialog } from '@/components/activities/activity-assignment-dialog'
 import { MobileNavigation } from '@/components/mobile-navigation'
 import { MobileActionBar } from '@/components/mobile-action-bar'
+import { TransactionBreakdownDialog } from '@/components/transaction-breakdown-dialog'
 import { useKeyboardShortcuts, KeyboardShortcut, SHORTCUT_CATEGORIES } from '@/hooks/use-keyboard-shortcuts'
 import { useResponsive, useMobileOptimizations } from '@/hooks/use-responsive'
 import { TransactionTemplate } from '@/lib/validations/templates'
@@ -312,6 +315,7 @@ export function TransactionsPageClient({
   const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
+  const [showActivityAssignmentDialog, setShowActivityAssignmentDialog] = useState(false)
   
     // Update local state when propTransactions changes
   useEffect(() => {
@@ -367,6 +371,9 @@ export function TransactionsPageClient({
   const [categoryEditingTransaction, setCategoryEditingTransaction] = useState<Transaction | null>(null)
   const [isActivityAssignDialogOpen, setIsActivityAssignDialogOpen] = useState(false)
   const [activityAssignTransaction, setActivityAssignTransaction] = useState<Transaction | null>(null)
+  const [isBreakdownDialogOpen, setIsBreakdownDialogOpen] = useState(false)
+  const [breakdownTransaction, setBreakdownTransaction] = useState<Transaction | null>(null)
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
   
   // Advanced search state
   const [activeFilters, setActiveFilters] = useState<any>(null)
@@ -794,6 +801,20 @@ export function TransactionsPageClient({
   const handleActivityAssignClick = (transaction: Transaction) => {
     setActivityAssignTransaction({ ...transaction })
     setIsActivityAssignDialogOpen(true)
+  }
+
+  // Handle breakdown click to open breakdown dialog
+  const handleBreakdownClick = (transaction: Transaction) => {
+    // Find the activity associated with this transaction
+    const transactionActivity = propActivities.find(activity => 
+      // This assumes there's some way to associate activities with transactions
+      // You might need to adjust this logic based on your data structure
+      true // For now, we'll just use the first activity or let user select
+    )
+    
+    setBreakdownTransaction(transaction)
+    setSelectedActivity(transactionActivity || (propActivities.length > 0 ? propActivities[0] : null))
+    setIsBreakdownDialogOpen(true)
   }
 
   // Save category change
@@ -1381,6 +1402,10 @@ export function TransactionsPageClient({
                             <Activity className="h-4 w-4 mr-2" />
                             Assign Activity
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleBreakdownClick(transaction)}>
+                            <BarChart3 className="h-4 w-4 mr-2" />
+                            Breakdown Expenses
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDuplicateTransaction(transaction)}>
                             <Copy className="h-4 w-4 mr-2" />
                             Duplicate
@@ -1798,6 +1823,25 @@ export function TransactionsPageClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Transaction Breakdown Dialog */}
+      <TransactionBreakdownDialog
+        open={isBreakdownDialogOpen}
+        onOpenChange={setIsBreakdownDialogOpen}
+        transaction={breakdownTransaction ? {
+          id: breakdownTransaction.id,
+          amount: breakdownTransaction.amount.toString(),
+          description: breakdownTransaction.description,
+          date: breakdownTransaction.date
+        } : null}
+        activity={selectedActivity}
+        onSuccess={() => {
+          // Optionally refresh transactions or show success message
+          setIsBreakdownDialogOpen(false)
+          setBreakdownTransaction(null)
+          setSelectedActivity(null)
+        }}
+      />
 
       {/* Mobile Action Bar */}
       <MobileActionBar

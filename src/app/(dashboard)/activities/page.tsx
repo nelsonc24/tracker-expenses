@@ -9,6 +9,8 @@ import { Progress } from '@/components/ui/progress'
 import { AddActivityDialog } from '@/components/activities/add-activity-dialog'
 import { EditActivityDialog } from '@/components/activities/edit-activity-dialog'
 import { ActivityAnalyticsDialog } from '@/components/activities/activity-analytics-dialog'
+import { ActivityBudgetDialog } from '@/components/activities/activity-budget-dialog'
+import { ActivityTemplates } from '@/components/activities/activity-templates'
 import type { SelectActivity } from '@/db/schema'
 
 interface ActivityWithAnalytics extends SelectActivity {
@@ -23,6 +25,7 @@ export default function ActivitiesPage() {
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [editingActivity, setEditingActivity] = useState<SelectActivity | null>(null)
   const [analyticsActivity, setAnalyticsActivity] = useState<SelectActivity | null>(null)
+  const [budgetActivity, setBudgetActivity] = useState<SelectActivity | null>(null)
 
   useEffect(() => {
     fetchActivities()
@@ -132,6 +135,7 @@ export default function ActivitiesPage() {
           </p>
         </div>
         <div className="flex gap-3">
+          <ActivityTemplates onActivityCreated={handleActivityCreated} />
           <Button 
             variant="outline" 
             onClick={() => window.location.href = '/activities/analytics'}
@@ -181,7 +185,16 @@ export default function ActivitiesPage() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => setBudgetActivity(activity)}
+                      title="Manage Budget"
+                    >
+                      <Target className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => setAnalyticsActivity(activity)}
+                      title="View Analytics"
                     >
                       <TrendingUp className="h-4 w-4" />
                     </Button>
@@ -189,6 +202,7 @@ export default function ActivitiesPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => setEditingActivity(activity)}
+                      title="Edit Activity"
                     >
                       Edit
                     </Button>
@@ -301,6 +315,18 @@ export default function ActivitiesPage() {
           activity={analyticsActivity}
           open={!!analyticsActivity}
           onOpenChange={() => setAnalyticsActivity(null)}
+        />
+      )}
+
+      {budgetActivity && (
+        <ActivityBudgetDialog
+          activity={budgetActivity}
+          open={!!budgetActivity}
+          onOpenChange={() => setBudgetActivity(null)}
+          onSuccess={() => {
+            setBudgetActivity(null)
+            fetchActivities() // Refresh to show updated budget info
+          }}
         />
       )}
     </div>

@@ -300,6 +300,30 @@ export const activityBudgets = pgTable('activity_budgets', {
   uniquePeriod: index('activity_budgets_unique_period_idx').on(table.activityId, table.periodStart, table.periodEnd),
 }))
 
+// Activity line items for detailed expense breakdown within transactions
+export const activityLineItems = pgTable('activity_line_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  transactionId: uuid('transaction_id').references(() => transactions.id, { onDelete: 'cascade' }).notNull(),
+  activityId: uuid('activity_id').references(() => activities.id, { onDelete: 'cascade' }).notNull(),
+  description: text('description').notNull(), // "Dance shoes", "Costume", "Master class"
+  amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
+  subcategory: text('subcategory'), // "equipment", "apparel", "training", "competition", "membership"
+  notes: text('notes'),
+  metadata: jsonb('metadata').$type<{
+    tags?: string[]
+    vendor?: string
+    receiptUrl?: string
+    taxDeductible?: boolean
+  }>().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  transactionIdIdx: index('activity_line_items_transaction_id_idx').on(table.transactionId),
+  activityIdIdx: index('activity_line_items_activity_id_idx').on(table.activityId),
+  subcategoryIdx: index('activity_line_items_subcategory_idx').on(table.subcategory),
+  transactionActivityIdx: index('activity_line_items_transaction_activity_idx').on(table.transactionId, table.activityId),
+}))
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users)
 export const selectUserSchema = createSelectSchema(users)
@@ -355,3 +379,8 @@ export const insertActivityBudgetSchema = createInsertSchema(activityBudgets)
 export const selectActivityBudgetSchema = createSelectSchema(activityBudgets)
 export type InsertActivityBudget = z.infer<typeof insertActivityBudgetSchema>
 export type SelectActivityBudget = z.infer<typeof selectActivityBudgetSchema>
+
+export const insertActivityLineItemSchema = createInsertSchema(activityLineItems)
+export const selectActivityLineItemSchema = createSelectSchema(activityLineItems)
+export type InsertActivityLineItem = z.infer<typeof insertActivityLineItemSchema>
+export type SelectActivityLineItem = z.infer<typeof selectActivityLineItemSchema>

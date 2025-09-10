@@ -40,3 +40,21 @@ export function formatDateLong(date: string | Date): string {
     return 'Invalid Date'
   }
 }
+
+// Currency formatting function
+export function formatCurrency(amount: number | string): string {
+  try {
+    const num = typeof amount === 'string' ? parseFloat(amount) : amount
+    if (isNaN(num)) {
+      return '$0.00'
+    }
+    return new Intl.NumberFormat('en-AU', {
+      style: 'currency',
+      currency: 'AUD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(num)
+  } catch (error) {
+    return '$0.00'
+  }
+}

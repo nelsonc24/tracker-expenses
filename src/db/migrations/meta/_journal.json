@@ -36,6 +36,13 @@
       "when": 1757411978743,
       "tag": "0004_add_activities_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1757496041457,
+      "tag": "0005_legal_hiroim",
+      "breakpoints": true
     }
   ]
 }
