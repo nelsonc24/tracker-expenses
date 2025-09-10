@@ -40,12 +40,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    console.log('Received activity data:', body)
     
     // Validate the request body
-    const validatedData = insertActivitySchema.parse({
+    const processedBody = {
       ...body,
       userId,
-    })
+      // Convert budgetAmount to string if it's a number for Drizzle decimal handling
+      budgetAmount: body.budgetAmount ? body.budgetAmount.toString() : null,
+      // Convert startDate string to Date object if provided
+      startDate: body.startDate ? new Date(body.startDate) : new Date(),
+    }
+    
+    const validatedData = insertActivitySchema.parse(processedBody)
+    console.log('Validated activity data:', validatedData)
 
     // Check if activity name already exists for this user
     const existingActivity = await db

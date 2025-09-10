@@ -49,14 +49,20 @@ export function AddActivityDialog({ open, onOpenChange, onSuccess }: AddActivity
     
     try {
       const payload = {
-        ...formData,
-        budgetAmount: formData.budgetAmount ? parseFloat(formData.budgetAmount) : null,
-        commitmentType: formData.commitmentType || null,
-        frequency: formData.frequency || null,
-        location: formData.location || null,
-        description: formData.description || null,
-        notes: formData.notes || null,
+        name: formData.name.trim(),
+        description: formData.description.trim() || null,
+        category: formData.category,
+        commitmentType: formData.commitmentType.trim() || null,
+        frequency: formData.frequency.trim() || null,
+        location: formData.location.trim() || null,
+        budgetAmount: formData.budgetAmount ? formData.budgetAmount : null,
+        budgetPeriod: formData.budgetPeriod,
+        notes: formData.notes.trim() || null,
+        isActive: formData.isActive,
+        startDate: new Date().toISOString(),
       }
+
+      console.log('Sending activity payload:', payload)
 
       const response = await fetch('/api/activities', {
         method: 'POST',
@@ -82,7 +88,12 @@ export function AddActivityDialog({ open, onOpenChange, onSuccess }: AddActivity
         onSuccess()
       } else {
         const errorData = await response.json()
-        console.error('Failed to create activity:', errorData)
+        console.error('Failed to create activity:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        })
+        // You could also show a toast or alert here
       }
     } catch (error) {
       console.error('Error creating activity:', error)
