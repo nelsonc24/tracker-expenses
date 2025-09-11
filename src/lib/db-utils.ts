@@ -30,14 +30,14 @@ export async function getCurrentUser(): Promise<SelectUser | null> {
 }
 
 export async function createOrUpdateUser(userData: {
-  id: string
+  id: string // Clerk user ID
   email: string
   firstName?: string
   lastName?: string
   imageUrl?: string
 }): Promise<SelectUser | null> {
   try {
-    // Check if user exists by the provided ID instead of using auth()
+    // Check if user exists by the provided Clerk ID
     const existingUsers = await db
       .select()
       .from(users)
@@ -51,18 +51,25 @@ export async function createOrUpdateUser(userData: {
       const result = await db
         .update(users)
         .set({
-          ...userData,
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          imageUrl: userData.imageUrl,
           updatedAt: new Date(),
         })
         .where(eq(users.id, userData.id))
         .returning()
       return (result as SelectUser[])?.[0] || null
     } else {
-      // Create new user
+      // Create new user with Clerk ID
       const result = await db
         .insert(users)
         .values({
-          ...userData,
+          id: userData.id, // Use Clerk ID directly
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          imageUrl: userData.imageUrl,
           createdAt: new Date(),
           updatedAt: new Date(),
         })

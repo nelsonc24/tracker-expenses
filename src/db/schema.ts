@@ -1,11 +1,11 @@
-import { pgTable, text, timestamp, decimal, integer, boolean, uuid, jsonb, index } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, decimal, integer, boolean, uuid, jsonb, index, unique } from 'drizzle-orm/pg-core'
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 import { z } from 'zod'
 
-// Users table (for Clerk integration)
+// Users table - matches actual database structure
 export const users = pgTable('users', {
-  id: text('id').primaryKey(), // Clerk user ID
-  email: text('email').notNull().unique(),
+  id: text('id').primaryKey(), // Clerk user ID as text
+  email: text('email').notNull(),
   firstName: text('first_name'),
   lastName: text('last_name'),
   imageUrl: text('image_url'),
@@ -22,7 +22,9 @@ export const users = pgTable('users', {
     notifications: true,
     timezone: 'Australia/Sydney'
   })
-})
+}, (table) => [
+  unique('users_email_unique').on(table.email),
+])
 
 // Accounts table
 export const accounts = pgTable('accounts', {
