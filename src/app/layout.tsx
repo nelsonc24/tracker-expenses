@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ClerkProvider } from '@clerk/nextjs';
 import { Toaster } from "sonner";
+import * as Sentry from "@sentry/nextjs";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,11 +16,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Expenses Tracker - Smart Personal Finance Management",
-  description: "Track your spending, set budgets, and gain insights into your financial health with our modern expense tracking app.",
-  keywords: ["expense tracker", "budgeting", "personal finance", "money management", "Australia"],
-};
+export function generateMetadata(): Metadata {
+  return {
+    title: "Expenses Tracker - Smart Personal Finance Management",
+    description: "Track your spending, set budgets, and gain insights into your financial health with our modern expense tracking app.",
+    keywords: ["expense tracker", "budgeting", "personal finance", "money management", "Australia"],
+    other: {
+      ...Sentry.getTraceData(),
+    },
+  };
+}
 
 export default function RootLayout({
   children,
