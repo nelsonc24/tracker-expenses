@@ -1555,9 +1555,9 @@ export function TransactionsPageClient({
               <div className="space-y-2">
                 <Label htmlFor="edit-activities">Activities</Label>
                 <Select 
-                  value={editingTransaction.activities?.[0]?.id || ""} 
+                  value={editingTransaction.activities?.[0]?.id || "none"} 
                   onValueChange={(value) => {
-                    if (value) {
+                    if (value && value !== "none") {
                       const selectedActivity = propActivities.find(a => a.id === value)
                       setEditingTransaction(prev => 
                         prev ? { ...prev, activities: selectedActivity ? [selectedActivity] : [] } : null
@@ -1573,7 +1573,7 @@ export function TransactionsPageClient({
                     <SelectValue placeholder="Select an activity (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No activity</SelectItem>
+                    <SelectItem value="none">No activity</SelectItem>
                     {propActivities.map(activity => (
                       <SelectItem key={activity.id} value={activity.id}>
                         {activity.name}
@@ -1789,9 +1789,9 @@ export function TransactionsPageClient({
               <div className="space-y-2">
                 <Label htmlFor="activity-select">Select Activity</Label>
                 <Select 
-                  defaultValue={activityAssignTransaction.activities?.[0]?.id || ""}
+                  defaultValue={activityAssignTransaction.activities?.[0]?.id || "none"}
                   onValueChange={(value) => {
-                    if (value) {
+                    if (value && value !== "none") {
                       handleSaveActivityAssignment(value)
                     }
                   }}
@@ -1800,7 +1800,7 @@ export function TransactionsPageClient({
                     <SelectValue placeholder="Choose an activity..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No activity</SelectItem>
+                    <SelectItem value="none">No activity</SelectItem>
                     {propActivities.map(activity => (
                       <SelectItem key={activity.id} value={activity.id}>
                         {activity.name}

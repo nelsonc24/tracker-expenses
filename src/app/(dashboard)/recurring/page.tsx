@@ -505,14 +505,14 @@ export default function RecurringTransactionsPage() {
 
                 <div>
                   <Label htmlFor="category">Category (Optional)</Label>
-                  <Select value={formData.categoryId} onValueChange={(value) => 
-                    setFormData({ ...formData, categoryId: value })
+                  <Select value={formData.categoryId || "none"} onValueChange={(value) => 
+                    setFormData({ ...formData, categoryId: value === "none" ? "" : value })
                   }>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No category</SelectItem>
+                      <SelectItem value="none">No category</SelectItem>
                       {categories.map(category => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
@@ -800,14 +800,14 @@ export default function RecurringTransactionsPage() {
 
             <div>
               <Label htmlFor="edit-category">Category (Optional)</Label>
-              <Select value={formData.categoryId} onValueChange={(value) => 
-                setFormData({ ...formData, categoryId: value })
+              <Select value={formData.categoryId || "none"} onValueChange={(value) => 
+                setFormData({ ...formData, categoryId: value === "none" ? "" : value })
               }>
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No category</SelectItem>
+                  <SelectItem value="none">No category</SelectItem>
                   {categories.map(category => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}

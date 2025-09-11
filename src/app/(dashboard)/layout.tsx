@@ -16,9 +16,10 @@ export default async function DashboardLayout({
     redirect('/sign-in')
   }
 
-  // Get the sidebar state from cookies
+  // Get the sidebar state from cookies, default to expanded if no cookie exists
   const cookieStore = await cookies()
-  const defaultOpen = cookieStore.get("sidebar_state")?.value === "true"
+  const sidebarState = cookieStore.get("sidebar_state")?.value
+  const defaultOpen = sidebarState === "false" ? false : true
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>

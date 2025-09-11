@@ -212,7 +212,7 @@ export function AddBillDialog({ open, onOpenChange, onSuccess }: AddBillDialogPr
               </SelectTrigger>
               <SelectContent>
                 {accounts.length === 0 && !dataLoading ? (
-                  <SelectItem value="" disabled>No accounts found</SelectItem>
+                  <SelectItem value="no-accounts" disabled>No accounts found</SelectItem>
                 ) : (
                   accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
@@ -238,7 +238,7 @@ export function AddBillDialog({ open, onOpenChange, onSuccess }: AddBillDialogPr
               </SelectTrigger>
               <SelectContent>
                 {categories.length === 0 && !dataLoading ? (
-                  <SelectItem value="" disabled>No categories found</SelectItem>
+                  <SelectItem value="no-categories" disabled>No categories found</SelectItem>
                 ) : (
                   categories.map((category) => (
                     <SelectItem key={category.id} value={category.id}>

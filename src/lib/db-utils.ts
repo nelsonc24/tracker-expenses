@@ -37,9 +37,17 @@ export async function createOrUpdateUser(userData: {
   imageUrl?: string
 }): Promise<SelectUser | null> {
   try {
-    const existingUser = await getCurrentUser()
+    // Check if user exists by the provided ID instead of using auth()
+    const existingUsers = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userData.id))
+      .limit(1)
+    
+    const existingUser = existingUsers[0]
     
     if (existingUser) {
+      // Update existing user
       const result = await db
         .update(users)
         .set({
@@ -50,6 +58,7 @@ export async function createOrUpdateUser(userData: {
         .returning()
       return (result as SelectUser[])?.[0] || null
     } else {
+      // Create new user
       const result = await db
         .insert(users)
         .values({
