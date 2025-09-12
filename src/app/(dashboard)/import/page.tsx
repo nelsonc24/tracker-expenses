@@ -20,28 +20,7 @@ import {
   Building2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-// Sample UBank CSV data format based on your provided sample
-const sampleCSVData = [
-  {
-    "Transaction Date": "2024-01-15",
-    "Effective Date": "2024-01-15", 
-    "Description": "WOOLWORTHS 1234 SYDNEY NSW",
-    "Transaction Type": "Purchase",
-    "Debit Amount": "85.50",
-    "Credit Amount": "",
-    "Balance": "1,234.56"
-  },
-  {
-    "Transaction Date": "2024-01-14",
-    "Effective Date": "2024-01-14",
-    "Description": "SALARY CREDIT - COMPANY XYZ",
-    "Transaction Type": "Credit",
-    "Debit Amount": "",
-    "Credit Amount": "3,500.00",
-    "Balance": "3,320.06"
-  }
-]
+import { bankFormats, validateTransactionRow, ProcessedTransaction, type BankFormat } from '@/lib/csv-processing'
 
 const bankTemplates = [
   {
@@ -51,8 +30,8 @@ const bankTemplates = [
   },
   {
     name: "CommBank",
-    format: "Date, Description, Amount, Balance",
-    sample: "15/01/2024,WOOLWORTHS 1234,-85.50,1234.56"
+    format: "Date, Amount, Description, Balance (no headers)",
+    sample: '12/09/2025,"-508.02","Direct Debit 372582 Nissan Financial","+586.72"'
   },
   {
     name: "ANZ", 
@@ -66,6 +45,52 @@ const bankTemplates = [
   }
 ]
 
+// Helper function to detect bank format from CSV content
+function detectBankFormat(csvContent: string): BankFormat {
+  const lines = csvContent.split('\n').filter(line => line.trim())
+  const firstLine = lines[0]
+  
+  // Check for Commonwealth Bank format (no headers, specific structure)
+  if (!firstLine.includes('Date') && !firstLine.includes('Description')) {
+    const fields = parseCSVLine(firstLine)
+    // Commonwealth Bank: Date, Amount, Description, Balance
+    if (fields.length >= 4 && fields[0].match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+      return bankFormats.commonwealth
+    }
+  }
+  
+  // Check for UBank format (specific header pattern)
+  if (firstLine.includes('Date and time') || firstLine.includes('Payment type')) {
+    return bankFormats.custom // Use custom for UBank as it's not in the standard formats
+  }
+  
+  // Default to Commonwealth for now if unclear
+  return bankFormats.commonwealth
+}
+
+// Helper function to parse CSV line handling quoted fields
+const parseCSVLine = (line: string): string[] => {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    
+    if (char === '"') {
+      inQuotes = !inQuotes
+    } else if (char === ',' && !inQuotes) {
+      result.push(current)
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  
+  result.push(current) // Add the last field
+  return result
+}
+
 interface ImportStep {
   step: number
   title: string
@@ -78,16 +103,16 @@ export default function ImportPage() {
   const [dragOver, setDragOver] = useState(false)
   const [importStatus, setImportStatus] = useState<'idle' | 'uploading' | 'processing' | 'completed' | 'error'>('idle')
   const [progress, setProgress] = useState(0)
-  const [parsedTransactions, setParsedTransactions] = useState<any[]>([])
+  const [parsedTransactions, setParsedTransactions] = useState<ProcessedTransaction[]>([])
   const [isImporting, setIsImporting] = useState(false)
   const [activeTab, setActiveTab] = useState("upload")
   const [importResult, setImportResult] = useState<{
     importedCount: number
     skippedCount: number
     totalProcessed: number
-    duplicateTransactions: any[]
+    duplicateTransactions: ProcessedTransaction[]
   } | null>(null)
-  const [accounts, setAccounts] = useState<any[]>([])
+  const [accounts, setAccounts] = useState<{id: string, name: string, type: string, institution?: string, accountType?: string}[]>([])
   const [selectedAccountId, setSelectedAccountId] = useState<string>('')
   const [loadingAccounts, setLoadingAccounts] = useState(false)
   
@@ -149,47 +174,19 @@ export default function ImportPage() {
         
         setProgress(50)
         
-        // Skip header row and parse CSV data
-        const dataLines = lines.slice(1)
-        const parsedData = dataLines.map(line => {
-          // Parse CSV line (handle commas in quoted fields)
+        // Detect bank format
+        const bankFormat = detectBankFormat(text)
+        
+        // Skip header rows if specified in format
+        const dataLines = bankFormat.skipRows ? lines.slice(bankFormat.skipRows) : lines
+        
+        // Process each line using the detected format
+        const processedTransactions = dataLines.map((line, index) => {
           const fields = parseCSVLine(line)
-          
-          // Map actual UBank CSV format to our expected format
-          // UBank format: Date and time, Description, Debit, Credit, From account, To account, Payment type, Category, Receipt number, Transaction ID
-          const dateTime = fields[0]?.replace(/"/g, '').trim() || ''
-          const description = fields[1]?.replace(/"/g, '').trim() || ''
-          const debit = fields[2]?.replace(/[$",]/g, '').trim() || '' // Remove commas too
-          const credit = fields[3]?.replace(/[$",]/g, '').trim() || '' // Remove commas too
-          const paymentType = fields[6]?.replace(/"/g, '').trim() || ''
-          const receiptNumber = fields[8]?.replace(/"/g, '').trim() || ''  // Extract Receipt number
-          const transactionId = fields[9]?.replace(/"/g, '').trim() || ''  // Extract Transaction ID
-          
-          // Convert UBank date format (HH:MM DD-MM-YY) to standard date
-          const convertDate = (dateTimeStr: string) => {
-            if (!dateTimeStr) return ''
-            const parts = dateTimeStr.split(' ')
-            if (parts.length !== 2) return dateTimeStr
-            
-            const [time, date] = parts
-            const [day, month, year] = date.split('-')
-            return `20${year}-${month}-${day}` // Convert to YYYY-MM-DD format
-          }
-          
-          return {
-            "Transaction Date": convertDate(dateTime),
-            "Effective Date": convertDate(dateTime),
-            "Description": description,
-            "Transaction Type": paymentType || (debit ? 'Debit' : 'Credit'),
-            "Debit Amount": debit,
-            "Credit Amount": credit,
-            "Balance": '', // UBank doesn't provide running balance in this export
-            "Receipt Number": receiptNumber, // Store the bank's Receipt Number
-            "Transaction ID": transactionId // Store the bank's Transaction ID
-          }
+          return validateTransactionRow(fields, bankFormat, index)
         }).filter(transaction => 
-          // Filter out empty rows
-          transaction["Transaction Date"] && transaction.Description
+          // Filter out completely invalid transactions
+          transaction.status !== 'error' || transaction.date
         )
         
         setProgress(75)
@@ -197,7 +194,7 @@ export default function ImportPage() {
         setTimeout(() => {
           setProgress(100)
           setImportStatus('completed')
-          setParsedTransactions(parsedData)
+          setParsedTransactions(processedTransactions)
         }, 500)
         
       } catch (error) {
@@ -264,32 +261,18 @@ export default function ImportPage() {
     setIsImporting(true)
     
     try {
-      // Transform the sample CSV data to match the API expected format
-      const transactionsToImport = parsedTransactions.map(transaction => {
-        // Helper function to safely parse currency amounts
-        const parseAmount = (amountStr: string): number => {
-          if (!amountStr) return 0
-          // Remove any currency symbols, commas, and spaces, then parse
-          const cleaned = amountStr.replace(/[$,\s]/g, '').trim()
-          const parsed = parseFloat(cleaned)
-          return isNaN(parsed) ? 0 : parsed
-        }
-
-        return {
-          date: transaction["Transaction Date"],
-          description: transaction.Description,
-          amount: transaction["Debit Amount"] 
-            ? -parseAmount(transaction["Debit Amount"]) 
-            : parseAmount(transaction["Credit Amount"] || "0"),
-          category: transaction["Transaction Type"] === "Purchase" ? "Shopping" : 
-                   transaction["Transaction Type"] === "Credit" ? "Income" : "Other",
-          account: selectedAccountId, // Use selected account ID instead of hardcoded string
-          reference: transaction["Transaction ID"] || transaction["Transaction Type"], // Use Transaction ID as reference
-          receiptNumber: transaction["Receipt Number"], // Send Receipt Number for reconciliation
-          transactionId: transaction["Transaction ID"], // Send Transaction ID separately for database storage
-          balance: transaction.Balance ? parseAmount(transaction.Balance) : null
-        }
-      })
+      // Transform the processed transactions to match the API expected format
+      const transactionsToImport = parsedTransactions
+        .filter(transaction => transaction.status === 'valid')
+        .map(transaction => ({
+          date: transaction.date,
+          description: transaction.description,
+          amount: transaction.amount,
+          category: transaction.category,
+          account: selectedAccountId,
+          reference: transaction.reference || transaction.merchant,
+          balance: transaction.balance || null
+        }))
 
       const response = await fetch('/api/transactions/import', {
         method: 'POST',
@@ -299,7 +282,7 @@ export default function ImportPage() {
         body: JSON.stringify({
           transactions: transactionsToImport,
           uploadId: `upload_${Date.now()}`,
-          accountId: selectedAccountId // Send account ID separately for better processing
+          accountId: selectedAccountId
         })
       })
 
@@ -719,13 +702,18 @@ export default function ImportPage() {
                 {parsedTransactions.map((transaction, index) => (
                   <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex-1">
-                      <p className="font-medium">{transaction.Description}</p>
+                      <p className="font-medium">{transaction.description}</p>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span>{transaction["Transaction Date"]}</span>
-                        <Badge variant="outline">{transaction["Transaction Type"]}</Badge>
-                        {transaction["Transaction ID"] && (
+                        <span>{transaction.date}</span>
+                        <Badge variant="outline">{transaction.category}</Badge>
+                        {transaction.status === 'error' && (
+                          <Badge variant="destructive" className="text-xs">
+                            Error: {transaction.errors[0]?.message}
+                          </Badge>
+                        )}
+                        {transaction.reference && (
                           <span className="text-xs bg-muted px-2 py-1 rounded">
-                            ID: {transaction["Transaction ID"]}
+                            {transaction.reference}
                           </span>
                         )}
                       </div>
@@ -733,14 +721,16 @@ export default function ImportPage() {
                     <div className="text-right">
                       <p className={cn(
                         "font-medium",
-                        transaction["Debit Amount"] ? "text-red-500" : "text-green-500"
+                        transaction.amount < 0 ? "text-red-500" : "text-green-500"
                       )}>
-                        {transaction["Debit Amount"] ? `-$${transaction["Debit Amount"]}` : 
-                         transaction["Credit Amount"] ? `+$${transaction["Credit Amount"]}` : '$0.00'}
+                        {transaction.amount < 0 ? `-$${Math.abs(transaction.amount).toFixed(2)}` : 
+                         `+$${transaction.amount.toFixed(2)}`}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        Balance: ${transaction.Balance}
-                      </p>
+                      {transaction.balance && (
+                        <p className="text-sm text-muted-foreground">
+                          Balance: ${transaction.balance.toFixed(2)}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}

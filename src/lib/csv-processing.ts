@@ -17,16 +17,15 @@ export interface BankFormat {
 export const bankFormats: Record<string, BankFormat> = {
   commonwealth: {
     name: 'Commonwealth Bank',
-    columns: ['date', 'description', 'debit', 'credit', 'balance'],
+    columns: ['date', 'amount', 'description', 'balance'],
     dateFormat: 'DD/MM/YYYY',
-    example: 'Date,Description,Debit Amount,Credit Amount,Balance',
+    example: '12/09/2025,"-508.02","Direct Debit 372582 Nissan Financial","+586.72"',
     amountColumns: {
-      debit: 'Debit Amount',
-      credit: 'Credit Amount'
+      amount: 'amount'
     },
-    descriptionColumn: 'Description',
-    balanceColumn: 'Balance',
-    skipRows: 1
+    descriptionColumn: 'description',
+    balanceColumn: 'balance',
+    skipRows: 0 // No header row
   },
   westpac: {
     name: 'Westpac',
@@ -77,7 +76,7 @@ export const bankFormats: Record<string, BankFormat> = {
 export interface ValidationError {
   field: string
   message: string
-  value?: any
+  value?: unknown
 }
 
 export interface ProcessedTransaction {
@@ -92,7 +91,7 @@ export interface ProcessedTransaction {
   balance?: number
   status: 'valid' | 'error' | 'warning'
   errors: ValidationError[]
-  rawData: any
+  rawData: Record<string, string> | string[]
 }
 
 // Date parsing utilities
@@ -138,7 +137,7 @@ export function parseDate(dateStr: string, format: string): Date | null {
 }
 
 // Amount parsing utilities
-export function parseAmount(row: any, format: BankFormat): { amount: number; errors: ValidationError[] } {
+export function parseAmount(row: Record<string, string>, format: BankFormat): { amount: number; errors: ValidationError[] } {
   const errors: ValidationError[] = []
   let amount = 0
   
@@ -160,14 +159,15 @@ export function parseAmount(row: any, format: BankFormat): { amount: number; err
         amount = (creditVal || 0) - (debitVal || 0)
       }
     } else if (amountCol) {
-      // Handle single amount column
-      const amountVal = parseFloat(cleanAmount(row[amountCol] || '0'))
+      // Handle single amount column (can be positive or negative)
+      const amountStr = row[amountCol] || '0'
+      const amountVal = parseFloat(cleanAmount(amountStr))
       
       if (isNaN(amountVal)) {
         errors.push({
           field: 'amount',
           message: 'Invalid amount value',
-          value: row[amountCol]
+          value: amountStr
         })
       } else {
         amount = amountVal
@@ -189,14 +189,14 @@ export function parseAmount(row: any, format: BankFormat): { amount: number; err
   return { amount, errors }
 }
 
-// Clean amount string (remove currency symbols, commas, etc.)
+// Clean amount string (remove currency symbols, commas, quotes, etc.)
 function cleanAmount(amountStr: string): string {
   if (typeof amountStr !== 'string') {
     return String(amountStr || '0')
   }
   
   return amountStr
-    .replace(/[$,\s]/g, '') // Remove dollar signs, commas, spaces
+    .replace(/[$,\s"]/g, '') // Remove dollar signs, commas, spaces, quotes
     .replace(/[()]/g, '') // Remove parentheses (sometimes used for negative amounts)
     .trim()
 }
@@ -227,7 +227,6 @@ export function extractMerchant(description: string): string {
 // Categorize transaction based on description and merchant
 export function categorizeTransaction(description: string, merchant: string, amount: number): string {
   const desc = description.toLowerCase()
-  const merch = merchant.toLowerCase()
   
   // Food & Dining
   if (desc.match(/(restaurant|cafe|coffee|pizza|mcdonald|kfc|subway|domino|uber eats|deliveroo|menulog)/)) {
@@ -278,15 +277,29 @@ export function categorizeTransaction(description: string, merchant: string, amo
 
 // Validate a single transaction row
 export function validateTransactionRow(
-  row: any, 
+  row: Record<string, string> | string[], 
   format: BankFormat, 
   rowIndex: number
 ): ProcessedTransaction {
   const errors: ValidationError[] = []
   const id = `tx_${Date.now()}_${rowIndex}`
   
+  // Convert array to object for Commonwealth Bank format (no headers)
+  let rowData: Record<string, string>
+  if (Array.isArray(row)) {
+    // For Commonwealth Bank CSV without headers
+    rowData = {
+      date: row[0] || '',
+      amount: row[1] || '',
+      description: row[2] || '',
+      balance: row[3] || ''
+    }
+  } else {
+    rowData = row
+  }
+  
   // Validate and parse date
-  const dateStr = row[format.columns.find(col => col.includes('date')) || 'Date'] || ''
+  const dateStr = rowData[format.columns.find(col => col.includes('date')) || 'date'] || ''
   const parsedDate = parseDate(dateStr, format.dateFormat)
   
   if (!parsedDate) {
@@ -298,12 +311,13 @@ export function validateTransactionRow(
   }
   
   // Validate and parse amount
-  const { amount, errors: amountErrors } = parseAmount(row, format)
+  const { amount, errors: amountErrors } = parseAmount(rowData, format)
   errors.push(...amountErrors)
   
   // Validate description
-  const description = row[format.descriptionColumn] || ''
-  if (!description.trim()) {
+  const description = rowData[format.descriptionColumn] || ''
+  const cleanedDescription = description.replace(/^["']|["']$/g, '') // Remove surrounding quotes
+  if (!cleanedDescription.trim()) {
     errors.push({
       field: 'description',
       message: 'Transaction description is required',
@@ -313,30 +327,30 @@ export function validateTransactionRow(
   
   // Parse balance if available
   let balance: number | undefined
-  if (format.balanceColumn && row[format.balanceColumn]) {
-    const balanceVal = parseFloat(cleanAmount(row[format.balanceColumn]))
+  if (format.balanceColumn && rowData[format.balanceColumn]) {
+    const balanceVal = parseFloat(cleanAmount(rowData[format.balanceColumn]))
     if (!isNaN(balanceVal)) {
       balance = balanceVal
     }
   }
   
   // Extract merchant and categorize
-  const merchant = extractMerchant(description)
-  const category = categorizeTransaction(description, merchant, amount)
+  const merchant = extractMerchant(cleanedDescription)
+  const category = categorizeTransaction(cleanedDescription, merchant, amount)
   
   const transaction: ProcessedTransaction = {
     id,
     date: parsedDate ? parsedDate.toISOString().split('T')[0] : dateStr,
-    description: description.trim(),
+    description: cleanedDescription.trim(),
     amount,
     category,
     account: 'Imported Account', // Default, can be customized
     merchant,
-    reference: row.reference || row.Reference || '',
+    reference: (rowData as Record<string, string>).reference || (rowData as Record<string, string>).Reference || '',
     balance,
     status: errors.length > 0 ? 'error' : 'valid',
     errors,
-    rawData: row
+    rawData: rowData
   }
   
   return transaction
