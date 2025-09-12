@@ -1,22 +1,13 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { 
-  Plus, 
   CreditCard, 
-  Building2, 
   Wifi, 
   WifiOff,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  RefreshCw,
   TrendingUp,
-  TrendingDown,
   DollarSign,
-  Calendar
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { 
@@ -27,6 +18,8 @@ import {
 import { redirect } from 'next/navigation'
 import { AccountActions } from '@/components/accounts/account-actions'
 import { AddAccountDialog } from '@/components/accounts/add-account-dialog'
+import { SafePageWrapper } from '@/components/safe-page-wrapper'
+import { BrowserExtensionWarning } from '@/components/browser-extension-warning'
 
 const institutionLogos = {
   'Commonwealth Bank': '🟡',
@@ -97,17 +90,18 @@ export default async function AccountsPage() {
   const netWorth = totalBalance - totalDebt
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Accounts</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
-            Manage your connected bank accounts and monitor balances
-          </p>
+    <SafePageWrapper>
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold">Accounts</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
+              Manage your connected bank accounts and monitor balances
+            </p>
+          </div>
+          <AddAccountDialog />
         </div>
-        <AddAccountDialog />
-      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -273,6 +267,8 @@ export default async function AccountsPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+      <BrowserExtensionWarning />
+    </SafePageWrapper>
   )
 }

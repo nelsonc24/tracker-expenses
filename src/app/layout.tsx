@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ClerkProvider } from '@clerk/nextjs';
 import { Toaster } from "sonner";
+import { GlobalErrorHandler } from "@/components/global-error-handler";
 import * as Sentry from "@sentry/nextjs";
 
 const geistSans = Geist({
@@ -23,6 +24,8 @@ export function generateMetadata(): Metadata {
     keywords: ["expense tracker", "budgeting", "personal finance", "money management", "Australia"],
     other: {
       ...Sentry.getTraceData(),
+      // Prevent Google Translate and other extensions from interfering
+      "google": "notranslate",
     },
   };
 }
@@ -35,10 +38,15 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
+        <head>
+          <meta name="google" content="notranslate" />
+          <meta name="translate" content="no" />
+        </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
           <ThemeProvider>
+            <GlobalErrorHandler />
             {children}
             <Toaster />
           </ThemeProvider>
