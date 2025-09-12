@@ -1,11 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Activity, Calendar, DollarSign, TrendingUp, Target } from 'lucide-react'
+import { Plus, Activity, Calendar, DollarSign, TrendingUp, Target, MoreVertical, Edit, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { AddActivityDialog } from '@/components/activities/add-activity-dialog'
 import { EditActivityDialog } from '@/components/activities/edit-activity-dialog'
 import { ActivityAnalyticsDialog } from '@/components/activities/activity-analytics-dialog'
@@ -169,7 +176,7 @@ export default function ActivitiesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6">
           {activities.map((activity) => (
             <Card key={activity.id} className="hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
@@ -177,41 +184,45 @@ export default function ActivitiesPage() {
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className="text-xl sm:text-2xl">{getCategoryIcon(activity.category)}</span>
                     <div className="min-w-0 flex-1">
-                      <CardTitle className="text-base sm:text-lg truncate">{activity.name}</CardTitle>
+                      <CardTitle className="text-base sm:text-lg leading-tight">{activity.name}</CardTitle>
                       <CardDescription className="capitalize text-xs sm:text-sm">
                         {activity.category} • {activity.commitmentType || 'Activity'}
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="flex gap-1 ml-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setBudgetActivity(activity)}
-                      title="Manage Budget"
-                      className="h-8 w-8 p-0"
-                    >
-                      <Target className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setAnalyticsActivity(activity)}
-                      title="View Analytics"
-                      className="h-8 w-8 p-0"
-                    >
-                      <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditingActivity(activity)}
-                      title="Edit Activity"
-                      className="h-8 w-8 p-0"
-                    >
-                      <span className="text-xs">Edit</span>
-                    </Button>
-                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 shrink-0"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => setAnalyticsActivity(activity)}>
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        View Analytics
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBudgetActivity(activity)}>
+                        <Target className="h-4 w-4 mr-2" />
+                        Manage Budget
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setEditingActivity(activity)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Activity
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => handleDeleteActivity(activity.id)}
+                        className="text-red-600 focus:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Activity
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
@@ -268,26 +279,6 @@ export default function ActivitiesPage() {
                       {!activity.isActive && ' (Inactive)'}
                     </span>
                   </div>
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-xs"
-                    onClick={() => setAnalyticsActivity(activity)}
-                  >
-                    <span className="hidden sm:inline">View Analytics</span>
-                    <span className="sm:hidden">Analytics</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteActivity(activity.id)}
-                    className="text-red-600 hover:text-red-700 text-xs px-2"
-                  >
-                    Delete
-                  </Button>
                 </div>
               </CardContent>
             </Card>
