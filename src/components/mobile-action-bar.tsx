@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   Sheet,
   SheetContent,
@@ -12,7 +11,6 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import {
-  Plus,
   Search,
   Filter,
   Download,
@@ -25,7 +23,6 @@ import { cn } from '@/lib/utils'
 
 type MobileActionBarProps = {
   selectedCount: number
-  onQuickAdd: () => void
   onSearch: () => void
   onFilter: () => void
   onExport: () => void
@@ -36,7 +33,6 @@ type MobileActionBarProps = {
 
 export function MobileActionBar({
   selectedCount,
-  onQuickAdd,
   onSearch,
   onFilter,
   onExport,
@@ -44,21 +40,9 @@ export function MobileActionBar({
   onBulkActions,
   className
 }: MobileActionBarProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
 
   return (
     <div className={cn("lg:hidden", className)}>
-      {/* Floating Action Button (Primary) */}
-      <div className="fixed bottom-20 right-4 z-50">
-        <Button
-          size="lg"
-          className="rounded-full h-14 w-14 shadow-lg"
-          onClick={onQuickAdd}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
-      </div>
-
       {/* Quick Actions Bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t lg:hidden">
         {/* Selection indicator when items are selected */}

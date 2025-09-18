@@ -4,6 +4,8 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { AppSidebar } from '@/components/app-sidebar'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { ClientErrorBoundary } from '@/components/error-boundary'
+import { MobileLayoutWrapper } from '@/components/mobile-layout-wrapper'
+import { MobileFloatingActionButton } from '@/components/mobile-floating-action-button'
 import { cookies } from 'next/headers'
 
 export default async function DashboardLayout({
@@ -25,18 +27,34 @@ export default async function DashboardLayout({
   return (
     <ClientErrorBoundary>
       <SidebarProvider defaultOpen={defaultOpen}>
+        {/* Desktop Sidebar */}
         <AppSidebar />
+        
         <main className="flex flex-1 flex-col transition-all duration-300 ease-in-out">
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-background">
+          {/* Mobile Header */}
+          <header className="flex md:hidden h-14 shrink-0 items-center gap-2 border-b px-4 bg-background">
             <SidebarTrigger className="-ml-1" />
             <div className="ml-auto flex items-center gap-2">
               <ThemeToggle />
             </div>
           </header>
-          <div className="flex-1 p-6">
+          
+          {/* Desktop Header */}
+          <header className="hidden md:flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-background">
+            <SidebarTrigger className="-ml-1" />
+            <div className="ml-auto flex items-center gap-2">
+              <ThemeToggle />
+            </div>
+          </header>
+          
+          {/* Content with normal padding for mobile */}
+          <MobileLayoutWrapper className="flex-1 p-4 sm:p-6">
             {children}
-          </div>
+          </MobileLayoutWrapper>
         </main>
+        
+        {/* Mobile Floating Action Button */}
+        <MobileFloatingActionButton />
       </SidebarProvider>
     </ClientErrorBoundary>
   )

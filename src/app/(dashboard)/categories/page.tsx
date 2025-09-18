@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useUser } from '@clerk/nextjs'
+import Image from 'next/image'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { 
   Dialog, 
@@ -31,7 +31,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Separator } from '@/components/ui/separator'
+import { MobileNavigationHeader } from '@/components/mobile-navigation-header'
+import { MobileCategoryCard } from '@/components/mobile-category-card'
+import { MobileCategoryForm } from '@/components/mobile-category-form'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { 
   Plus, 
   MoreHorizontal, 
@@ -69,6 +72,13 @@ interface Category {
   updatedAt: Date
 }
 
+interface CategoryStats {
+  [categoryId: string]: {
+    transactionCount: number
+    totalAmount: number
+  }
+}
+
 interface CategoryWithStats extends Category {
   transactionCount: number
   totalAmount: number
@@ -104,6 +114,7 @@ const colorOptions = [
 
 export default function CategoriesPage() {
   const { user, isLoaded } = useUser()
+  const isMobile = useIsMobile()
   const [categories, setCategories] = useState<CategoryWithStats[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -124,46 +135,7 @@ export default function CategoriesPage() {
     parentId: '',
   })
 
-  useEffect(() => {
-    if (!isLoaded || !user) return
-    fetchCategories()
-  }, [isLoaded, user])
-
-  async function fetchCategories() {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const [categoriesRes, statsRes] = await Promise.all([
-        fetch('/api/categories'),
-        fetch('/api/analytics/categories')
-      ])
-
-      if (!categoriesRes.ok) {
-        throw new Error('Failed to fetch categories')
-      }
-
-      const categoriesData = await categoriesRes.json()
-      
-      // Get category statistics if available
-      let statsData = {}
-      if (statsRes.ok) {
-        statsData = await statsRes.json()
-      }
-
-      // Build category tree with statistics
-      const categoriesWithStats = buildCategoryTree(categoriesData, statsData)
-      setCategories(categoriesWithStats)
-
-    } catch (err) {
-      console.error('Error fetching categories:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch categories')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function buildCategoryTree(categories: Category[], stats: any = {}): CategoryWithStats[] {
+  const buildCategoryTree = useCallback((categories: Category[], stats: CategoryStats = {}): CategoryWithStats[] => {
     const categoryMap = new Map<string, CategoryWithStats>()
     
     // Initialize all categories with stats
@@ -199,7 +171,46 @@ export default function CategoriesPage() {
     
     sortCategories(rootCategories)
     return rootCategories
-  }
+  }, [expandedCategories])
+
+  const fetchCategories = useCallback(async function() {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const [categoriesRes, statsRes] = await Promise.all([
+        fetch('/api/categories'),
+        fetch('/api/analytics/categories')
+      ])
+
+      if (!categoriesRes.ok) {
+        throw new Error('Failed to fetch categories')
+      }
+
+      const categoriesData = await categoriesRes.json()
+      
+      // Get category statistics if available
+      let statsData = {}
+      if (statsRes.ok) {
+        statsData = await statsRes.json()
+      }
+
+      // Build category tree with statistics
+      const categoriesWithStats = buildCategoryTree(categoriesData, statsData)
+      setCategories(categoriesWithStats)
+
+    } catch (err) {
+      console.error('Error fetching categories:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch categories')
+    } finally {
+      setLoading(false)
+    }
+  }, [buildCategoryTree])
+
+  useEffect(() => {
+    if (!isLoaded || !user) return
+    fetchCategories()
+  }, [isLoaded, user, fetchCategories])
 
   async function handleCreateCategory() {
     try {
@@ -332,17 +343,21 @@ export default function CategoriesPage() {
   }
 
   function renderCategoryIcon(iconName: string | null, customIconUrl: string | null, color: string | null) {
+    const bgColor = color || '#6b7280'
+
     // Use custom icon URL if available
     if (customIconUrl) {
       return (
         <div 
           className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: color || '#6b7280' }}
+          style={{ backgroundColor: bgColor }}
         >
-          <img 
+          <Image 
             src={customIconUrl} 
             alt="Category icon" 
-            className="w-4 h-4 object-contain filter brightness-0 invert"
+            width={16}
+            height={16}
+            className="object-contain filter brightness-0 invert"
             onError={(e) => {
               // Fallback to default icon if custom icon fails to load
               const target = e.target as HTMLImageElement;
@@ -361,7 +376,7 @@ export default function CategoriesPage() {
     return (
       <div 
         className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
-        style={{ backgroundColor: color || '#6b7280' }}
+        style={{ backgroundColor: bgColor }}
       >
         <IconComponent className="h-4 w-4" />
       </div>
@@ -484,8 +499,15 @@ export default function CategoriesPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Mobile Navigation Header */}
+      <MobileNavigationHeader 
+        title="Categories"
+        subtitle="Organize your transactions"
+        showSearch
+      />
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+      <div className="hidden md:flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">Categories</h1>
           <p className="text-sm sm:text-base text-muted-foreground">
@@ -590,6 +612,8 @@ export default function CategoriesPage() {
                       )}
                       style={{ backgroundColor: color }}
                       onClick={() => setFormData({ ...formData, color })}
+                      aria-label={`Select color ${color}`}
+                      title={`Select color ${color}`}
                     />
                   ))}
                 </div>
@@ -784,6 +808,8 @@ export default function CategoriesPage() {
                     )}
                     style={{ backgroundColor: color }}
                     onClick={() => setFormData({ ...formData, color })}
+                    aria-label={`Select color ${color}`}
+                    title={`Select color ${color}`}
                   />
                 ))}
               </div>

@@ -171,13 +171,14 @@ export function TransactionBreakdownDialog({
   }
 
   const quickActions = (
-    <div className="flex gap-2 mb-4">
+    <div className="flex flex-col sm:flex-row gap-2 mb-4">
       <Button
         type="button"
         variant="outline"
         size="sm"
         onClick={splitEvenly}
         disabled={lineItems.length === 0}
+        className="w-full sm:w-auto"
       >
         Split Evenly
       </Button>
@@ -187,6 +188,7 @@ export function TransactionBreakdownDialog({
         size="sm"
         onClick={assignRemaining}
         disabled={lineItems.length === 0 || remainingAmount <= 0}
+        className="w-full sm:w-auto"
       >
         Assign Remaining to First Item
       </Button>
@@ -228,30 +230,30 @@ export function TransactionBreakdownDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl h-[95vh] max-h-[95vh] overflow-y-auto sm:w-full sm:max-w-4xl sm:h-auto sm:max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>
-            Transaction Breakdown
+          <div className="space-y-2">
+            <DialogTitle>Transaction Breakdown</DialogTitle>
             {transaction && (
-              <Badge variant="outline" className="ml-2">
+              <Badge variant="outline" className="w-fit">
                 {transaction.description}
               </Badge>
             )}
-          </DialogTitle>
+          </div>
         </DialogHeader>
 
         {isLoading ? (
           <div className="text-center py-8">Loading existing breakdown...</div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 p-4 sm:p-6">
             {/* Transaction Info */}
             {transaction && (
               <Card>
                 <CardContent className="pt-6">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm font-medium">Transaction</Label>
-                      <p className="text-sm text-muted-foreground">{transaction.description}</p>
+                      <p className="text-sm text-muted-foreground break-words">{transaction.description}</p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium">Amount</Label>
@@ -270,9 +272,9 @@ export function TransactionBreakdownDialog({
 
             {/* Line Items */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <h3 className="text-lg font-medium">Line Items</h3>
-                <Button type="button" onClick={addLineItem} size="sm">
+                <Button type="button" onClick={addLineItem} size="sm" className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Line Item
                 </Button>
@@ -289,8 +291,8 @@ export function TransactionBreakdownDialog({
                   {lineItems.map((item, index) => (
                     <Card key={index}>
                       <CardContent className="pt-6">
-                        <div className="grid grid-cols-12 gap-4 items-start">
-                          <div className="col-span-4">
+                        <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-12 sm:gap-4 sm:items-start">
+                          <div className="sm:col-span-4">
                             <Label htmlFor={`description-${index}`}>Description</Label>
                             <Input
                               id={`description-${index}`}
@@ -300,7 +302,7 @@ export function TransactionBreakdownDialog({
                             />
                           </div>
                           
-                          <div className="col-span-2">
+                          <div className="sm:col-span-2">
                             <Label htmlFor={`amount-${index}`}>Amount</Label>
                             <Input
                               id={`amount-${index}`}
@@ -313,7 +315,7 @@ export function TransactionBreakdownDialog({
                             />
                           </div>
                           
-                          <div className="col-span-3">
+                          <div className="sm:col-span-3">
                             <Label htmlFor={`subcategory-${index}`}>Subcategory</Label>
                             <Input
                               id={`subcategory-${index}`}
@@ -323,7 +325,7 @@ export function TransactionBreakdownDialog({
                             />
                           </div>
                           
-                          <div className="col-span-2">
+                          <div className="sm:col-span-2">
                             <Label htmlFor={`notes-${index}`}>Notes</Label>
                             <Textarea
                               id={`notes-${index}`}
@@ -334,14 +336,16 @@ export function TransactionBreakdownDialog({
                             />
                           </div>
                           
-                          <div className="col-span-1 flex justify-end pt-6">
+                          <div className="flex justify-end sm:col-span-1 sm:pt-6">
                             <Button
                               type="button"
                               variant="ghost"
                               size="sm"
                               onClick={() => removeLineItem(index)}
+                              className="w-full sm:w-auto"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4 sm:mr-0 mr-2" />
+                              <span className="sm:hidden">Remove Item</span>
                             </Button>
                           </div>
                         </div>
@@ -353,13 +357,19 @@ export function TransactionBreakdownDialog({
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => onOpenChange(false)}
+                className="w-full sm:w-auto order-2 sm:order-1"
+              >
                 Cancel
               </Button>
               <Button 
                 onClick={handleSubmit} 
                 disabled={!isValid || isSubmitting}
+                className="w-full sm:w-auto order-1 sm:order-2"
               >
                 {isSubmitting ? 'Saving...' : 'Save Breakdown'}
               </Button>

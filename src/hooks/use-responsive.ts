@@ -71,7 +71,7 @@ export function useMobileOptimizations() {
     spacing: isMobile ? 'lg' : 'md',
     
     // Mobile pagination
-    itemsPerPage: isMobile ? 5 : 10,
+    itemsPerPage: isMobile ? 10 : 10,
     
     // Touch gestures
     enableSwipeGestures: isTouch && isMobile,

@@ -38,7 +38,7 @@ export function BrowserExtensionWarning() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-sm">
+    <div className="fixed bottom-4 left-4 z-50 max-w-sm">
       <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20 shadow-lg">
         <InfoIcon className="h-4 w-4 text-blue-600" />
         <div className="flex items-start justify-between">

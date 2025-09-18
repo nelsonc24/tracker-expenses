@@ -67,7 +67,7 @@ import { BulkOperationsBar } from '@/components/bulk-operations-bar'
 import { AdvancedSearch } from '@/components/advanced-search'
 import { KeyboardShortcutsHelp } from '@/components/keyboard-shortcuts-help'
 import { TransactionTemplates } from '@/components/transaction-templates'
-import { MobileTransactionCard } from '@/components/mobile-transaction-card'
+import { ImprovedMobileTransactionCard } from '@/components/improved-mobile-transaction-card'
 import { ActivityAssignmentDialog } from '@/components/activities/activity-assignment-dialog'
 import { MobileActionBar } from '@/components/mobile-action-bar'
 import { TransactionBreakdownDialog } from '@/components/transaction-breakdown-dialog'
@@ -399,10 +399,10 @@ export function TransactionsPageClient({
     }
   }, [activeFilters])  // Mobile responsiveness
   const { isMobile, isTablet, screenSize } = useResponsive()
-  const { itemsPerPage, showSimplifiedUI, enableSwipeGestures } = useMobileOptimizations()
+  const { showSimplifiedUI, enableSwipeGestures } = useMobileOptimizations()
 
-  // Adjust page size based on screen size
-  const responsivePageSize = isMobile ? itemsPerPage : pageSize
+  // Adjust page size based on screen size - use pageSize if explicitly set, otherwise use mobile default
+  const responsivePageSize = pageSize
   // Get unique merchants for search
   const uniqueMerchants = Array.from(new Set(transactions.map(t => t.merchant).filter(Boolean))) as string[]
 
@@ -1043,11 +1043,6 @@ export function TransactionsPageClient({
   }
 
   // Mobile action handlers
-  const handleMobileQuickAdd = () => {
-    console.log('Quick add transaction on mobile')
-    // Open quick add dialog or navigate to add transaction page
-  }
-
   const handleMobileSearch = () => {
     // Focus search input or open search modal
     const searchInput = document.querySelector('input[placeholder*="search" i]') as HTMLInputElement
@@ -1426,9 +1421,9 @@ export function TransactionsPageClient({
 
           {/* Mobile Cards View */}
           {isMobile && (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {paginatedTransactions.map((transaction, index) => (
-                <MobileTransactionCard
+                <ImprovedMobileTransactionCard
                   key={`${transaction.id}-${index}`}
                   transaction={transaction}
                   isSelected={selectedTransactions.includes(transaction.id)}
@@ -1438,6 +1433,8 @@ export function TransactionsPageClient({
                   onDuplicate={() => handleDuplicateTransaction(transaction)}
                   onViewDetails={() => handleViewDetails(transaction)}
                   onCategoryClick={() => handleCategoryClick(transaction)}
+                  onAssignActivity={() => handleActivityAssignClick(transaction)}
+                  onBreakdown={() => handleBreakdownClick(transaction)}
                 />
               ))}
             </div>
@@ -1447,7 +1444,7 @@ export function TransactionsPageClient({
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
               <div className="text-sm text-muted-foreground">
-                Showing {startIndex + 1} to {Math.min(startIndex + pageSize, filteredTransactions.length)} of {filteredTransactions.length} transactions
+                Showing {startIndex + 1} to {Math.min(startIndex + responsivePageSize, filteredTransactions.length)} of {filteredTransactions.length} transactions
               </div>
               <div className="flex items-center space-x-2">
                 <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
@@ -1841,7 +1838,6 @@ export function TransactionsPageClient({
       {/* Mobile Action Bar */}
       <MobileActionBar
         selectedCount={selectedTransactions.length}
-        onQuickAdd={handleMobileQuickAdd}
         onSearch={handleMobileSearch}
         onFilter={handleMobileFilter}
         onExport={handleExport}
