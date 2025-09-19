@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/db'
 import { transactions, activities, transactionActivities, activityBudgets } from '@/db/schema'
-import { and, eq, desc, sum, count, sql, gte, lte } from 'drizzle-orm'
+import { and, eq, sql, gte, lte } from 'drizzle-orm'
 import { z } from 'zod'
 
 const analyticsParamsSchema = z.object({
@@ -14,19 +14,33 @@ const analyticsParamsSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('Analytics API: Starting request')
     const { userId } = await auth()
     
+    console.log('Analytics API: Auth result:', { userId })
+    
     if (!userId) {
+      console.log('Analytics API: No userId found, returning 401')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
+    console.log('Analytics API: Search params:', Object.fromEntries(searchParams))
+    
+    // Transform null values to undefined for Zod parsing
+    const dateFromParam = searchParams.get('dateFrom')
+    const dateToParam = searchParams.get('dateTo') 
+    const activityIdParam = searchParams.get('activityId')
+    const timeframeParam = searchParams.get('timeframe')
+    
     const params = analyticsParamsSchema.parse({
-      dateFrom: searchParams.get('dateFrom'),
-      dateTo: searchParams.get('dateTo'),
-      activityId: searchParams.get('activityId'),
-      timeframe: searchParams.get('timeframe') || 'month',
+      dateFrom: dateFromParam || undefined,
+      dateTo: dateToParam || undefined,
+      activityId: activityIdParam || undefined,
+      timeframe: timeframeParam || 'month',
     })
+    
+    console.log('Analytics API: Parsed params:', params)
 
     // Calculate date range based on timeframe
     const now = new Date()
@@ -54,60 +68,67 @@ export async function GET(request: NextRequest) {
       dateFrom = new Date(params.dateFrom)
     }
 
-    // Base transaction query conditions
-    const baseConditions = [
-      eq(transactions.userId, userId),
-      gte(transactions.transactionDate, dateFrom),
-      lte(transactions.transactionDate, dateTo)
-    ]
+    console.log('Analytics API: Date range calculated:', { dateFrom, dateTo })
 
-    // 1. Activity Spending Overview
+    console.log('Analytics API: Starting activity spending query')
+    
+    // 1. Activity Spending Overview - Simplified approach
     const activitySpending = await db
       .select({
         activityId: activities.id,
         activityName: activities.name,
         activityDescription: activities.description,
-        totalSpent: sum(transactions.amount).mapWith(Number),
-        transactionCount: count(transactions.id),
-        avgTransaction: sql<number>`ROUND(AVG(${transactions.amount}), 2)`.mapWith(Number),
+        totalSpent: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`.mapWith(Number),
+        transactionCount: sql<number>`COUNT(${transactions.id})`.mapWith(Number),
+        avgTransaction: sql<number>`COALESCE(ROUND(AVG(${transactions.amount}), 2), 0)`.mapWith(Number),
       })
       .from(activities)
       .leftJoin(transactionActivities, eq(activities.id, transactionActivities.activityId))
       .leftJoin(transactions, and(
         eq(transactionActivities.transactionId, transactions.id),
-        ...baseConditions
+        eq(transactions.userId, userId),
+        gte(transactions.transactionDate, dateFrom),
+        lte(transactions.transactionDate, dateTo)
       ))
       .where(eq(activities.userId, userId))
       .groupBy(activities.id, activities.name, activities.description)
-      .orderBy(desc(sum(transactions.amount)))
+      .orderBy(sql`COALESCE(SUM(${transactions.amount}), 0) DESC`)
 
-    // 2. Spending Trends (monthly breakdown)
+    console.log('Analytics API: Activity spending query completed, results:', activitySpending.length)
+
+    // 2. Spending Trends (monthly breakdown) - Simplified
+    console.log('Analytics API: Starting monthly trends query')
     const monthlyTrends = await db
       .select({
-        month: sql<string>`DATE_TRUNC('month', ${transactions.transactionDate})::text`,
+        month: sql<string>`to_char(${transactions.transactionDate}, 'YYYY-MM-01')`,
         activityId: activities.id,
         activityName: activities.name,
-        totalSpent: sum(transactions.amount).mapWith(Number),
-        transactionCount: count(transactions.id),
+        totalSpent: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`.mapWith(Number),
+        transactionCount: sql<number>`COUNT(${transactions.id})`.mapWith(Number),
       })
       .from(activities)
       .leftJoin(transactionActivities, eq(activities.id, transactionActivities.activityId))
       .leftJoin(transactions, and(
         eq(transactionActivities.transactionId, transactions.id),
-        ...baseConditions
+        eq(transactions.userId, userId),
+        gte(transactions.transactionDate, dateFrom),
+        lte(transactions.transactionDate, dateTo)
       ))
       .where(eq(activities.userId, userId))
       .groupBy(
-        sql`DATE_TRUNC('month', ${transactions.transactionDate})`,
+        sql`to_char(${transactions.transactionDate}, 'YYYY-MM-01')`,
         activities.id,
         activities.name
       )
       .orderBy(
-        sql`DATE_TRUNC('month', ${transactions.transactionDate})`,
-        desc(sum(transactions.amount))
+        sql`to_char(${transactions.transactionDate}, 'YYYY-MM-01')`,
+        sql`COALESCE(SUM(${transactions.amount}), 0) DESC`
       )
 
-    // 3. Budget vs Actual (if activity has budgets)
+    console.log('Analytics API: Monthly trends query completed, results:', monthlyTrends.length)
+
+    // 3. Budget vs Actual (if activity has budgets) - Simplified
+    console.log('Analytics API: Starting budget comparison query')
     const budgetComparison = await db
       .select({
         activityId: activities.id,
@@ -115,11 +136,11 @@ export async function GET(request: NextRequest) {
         budgetAmount: activityBudgets.budgetAmount,
         periodStart: activityBudgets.periodStart,
         periodEnd: activityBudgets.periodEnd,
-        actualSpent: sum(transactions.amount).mapWith(Number),
+        actualSpent: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`.mapWith(Number),
         budgetUtilization: sql<number>`
           CASE 
             WHEN ${activityBudgets.budgetAmount} > 0 
-            THEN ROUND((SUM(${transactions.amount}) / ${activityBudgets.budgetAmount}) * 100, 2)
+            THEN ROUND((COALESCE(SUM(${transactions.amount}), 0) / ${activityBudgets.budgetAmount}) * 100, 2)
             ELSE 0 
           END
         `.mapWith(Number),
@@ -129,7 +150,9 @@ export async function GET(request: NextRequest) {
       .leftJoin(transactionActivities, eq(activities.id, transactionActivities.activityId))
       .leftJoin(transactions, and(
         eq(transactionActivities.transactionId, transactions.id),
-        ...baseConditions
+        eq(transactions.userId, userId),
+        gte(transactions.transactionDate, dateFrom),
+        lte(transactions.transactionDate, dateTo)
       ))
       .where(
         and(
@@ -145,6 +168,8 @@ export async function GET(request: NextRequest) {
         activityBudgets.periodEnd
       )
 
+    console.log('Analytics API: Budget comparison query completed, results:', budgetComparison.length)
+
     // 4. Activity Insights
     const totalSpentAllActivities = activitySpending.reduce(
       (sum, activity) => sum + (activity.totalSpent || 0), 
@@ -152,14 +177,24 @@ export async function GET(request: NextRequest) {
     )
 
     const activitiesWithSpending = activitySpending.filter(
-      activity => activity.totalSpent > 0
+      activity => (activity.totalSpent || 0) > 0
     ).length
 
-    const highestSpendingActivity = activitySpending[0]
+    const highestSpendingActivity = activitySpending.find(
+      activity => (activity.totalSpent || 0) > 0
+    )
     
     const budgetAlerts = budgetComparison.filter(
-      comparison => comparison.budgetUtilization > 80
+      comparison => (comparison.budgetUtilization || 0) > 80
     )
+
+    console.log('Analytics API: Processing analytics data...', {
+      totalActivities: activitySpending.length,
+      activitiesWithSpending,
+      totalSpentAllActivities,
+      budgetComparisonCount: budgetComparison.length,
+      trendsCount: monthlyTrends.length
+    })
 
     // Format response
     const analytics = {
@@ -203,17 +238,18 @@ export async function GET(request: NextRequest) {
         topActivity: highestSpendingActivity ? {
           name: highestSpendingActivity.activityName,
           spent: (highestSpendingActivity.totalSpent || 0),
-          transactionCount: highestSpendingActivity.transactionCount
+          transactionCount: highestSpendingActivity.transactionCount || 0
         } : null,
         budgetAlerts: budgetAlerts.map(alert => ({
           activityName: alert.activityName,
-          utilization: alert.budgetUtilization,
+          utilization: alert.budgetUtilization || 0,
           budget: alert.budgetAmount ? parseFloat(alert.budgetAmount.toString()) : 0,
           spent: (alert.actualSpent || 0)
         }))
       }
     }
 
+    console.log('Analytics API: Returning successful response')
     return NextResponse.json(analytics)
 
   } catch (error) {

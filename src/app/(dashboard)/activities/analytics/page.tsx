@@ -72,13 +72,20 @@ export default function ActivityAnalyticsPage() {
       setIsLoading(true)
       setError(null)
       
+      console.log('Fetching analytics for timeframe:', timeframe)
       const response = await fetch(`/api/analytics/activities?timeframe=${timeframe}`)
       
+      console.log('Analytics response status:', response.status)
+      console.log('Analytics response headers:', response.headers)
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch analytics')
+        const errorText = await response.text()
+        console.error('Analytics API error response:', errorText)
+        throw new Error(`Failed to fetch analytics: ${response.status} ${response.statusText}`)
       }
       
       const data = await response.json()
+      console.log('Analytics data received:', data)
       setAnalytics(data)
     } catch (err) {
       console.error('Error fetching analytics:', err)
