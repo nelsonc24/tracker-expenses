@@ -137,7 +137,7 @@ export function CategoryBreakdownChart({ data }: { data: CategoryData[] }) {
             label={renderCustomLabel}
             outerRadius={120}
             innerRadius={60}
-            fill="#8884d8"
+            fill="hsl(var(--primary))"
             dataKey="amount"
             onMouseEnter={onPieEnter}
             onMouseLeave={onPieLeave}
@@ -365,7 +365,7 @@ export function InteractivePieChart({
                 cy="50%"
                 innerRadius={innerRadius}
                 outerRadius={outerRadius}
-                fill="#8884d8"
+                fill="hsl(var(--primary))"
                 dataKey="amount"
                 onMouseEnter={onPieEnter}
                 onMouseLeave={onPieLeave}

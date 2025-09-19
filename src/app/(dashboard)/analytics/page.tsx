@@ -497,7 +497,7 @@ export default function AnalyticsPage() {
                         labelLine={false}
                         label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                         outerRadius={80}
-                        fill="#8884d8"
+                        fill="hsl(var(--primary))"
                         dataKey="value"
                       >
                         {categoryData.map((entry, index) => (

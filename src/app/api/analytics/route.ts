@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       .groupBy(sql`to_char(${transactions.transactionDate}, 'YYYY-MM')`)
       .orderBy(sql`to_char(${transactions.transactionDate}, 'YYYY-MM')`)
 
-    // 2. Category spending (expenses only)
+    // 2. Category spending (both income and expenses)
     const categorySpending = await db
       .select({
         categoryId: transactions.categoryId,
@@ -72,8 +72,8 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(transactions.userId, user.id),
-          gte(transactions.transactionDate, startDate),
-          lt(transactions.amount, '0') // Only expenses
+          gte(transactions.transactionDate, startDate)
+          // Removed the filter for expenses only to include both income and expenses
         )
       )
       .groupBy(transactions.categoryId, categories.name, categories.color)

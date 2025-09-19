@@ -614,8 +614,8 @@ export async function getCategorySpending(
 }>> {
   try {
     const conditions = [
-      eq(transactions.userId, userId),
-      lt(transactions.amount, '0') // Only include expenses (negative amounts)
+      eq(transactions.userId, userId)
+      // Include both income and expenses - removed the filter for negative amounts only
     ]
     
     if (startDate) {
