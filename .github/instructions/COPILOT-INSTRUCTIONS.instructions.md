@@ -26,3 +26,12 @@ Provide project context and coding guidelines that AI should follow when generat
   - Leverage existing components like Button, Dialog, Alert Dialog, Input, Select, etc.
   - Reference shadcn-ui documentation at https://ui.shadcn.com/docs/components for implementation examples
   - Maintain consistent design patterns across the application using shadcn-ui primitives
+- **Project Cleanup Routine** - Always perform after successful completion of features and user confirmation:
+  - Remove outdated duplicate files (e.g., page-old.tsx, page-new.tsx, backup files)
+  - Clean up temporary test files from project root and scripts folder (*.test.js, test-*.js, test-*.csv, etc.)
+  - Remove unused imports and dead code
+  - Consolidate similar components or utilities
+  - Move any remaining test/utility scripts to the `scripts/` folder
+  - Verify all file paths and imports are still valid after cleanup
+  - Run `pnpm run build` to ensure the project still builds successfully after cleanup
+  - Confirm cleanup completion with the user before considering the task finished
