@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/db'
 import { users, accounts, categories, transactions, budgets, recurringTransactions } from '@/db/schema'
-import { eq, and, desc, asc, count, sum, gte, lte, lt, like, or, sql } from 'drizzle-orm'
+import { eq, and, desc, asc, count, sum, gte, lte, like, or, sql } from 'drizzle-orm'
 
 // Type helpers for better TypeScript support
 type InsertUser = typeof users.$inferInsert
@@ -614,9 +614,7 @@ export async function getCategorySpending(
 }>> {
   try {
     const conditions = [
-      eq(transactions.userId, userId),
-      // Only include expenses (negative amounts) for spending calculations
-      lt(transactions.amount, '0')
+      eq(transactions.userId, userId)
     ]
     
     if (startDate) {
@@ -632,14 +630,14 @@ export async function getCategorySpending(
         categoryId: transactions.categoryId,
         categoryName: categories.name,
         categoryColor: categories.color,
-        totalAmount: sum(transactions.amount),
+        totalAmount: sql<string>`abs(sum(${transactions.amount}))`,
         transactionCount: count(),
       })
       .from(transactions)
       .leftJoin(categories, eq(transactions.categoryId, categories.id))
       .where(and(...conditions))
       .groupBy(transactions.categoryId, categories.name, categories.color)
-      .orderBy(desc(sum(transactions.amount)))
+      .orderBy(desc(sql`abs(sum(${transactions.amount}))`))
 
     return result as Array<{
       categoryId: string | null

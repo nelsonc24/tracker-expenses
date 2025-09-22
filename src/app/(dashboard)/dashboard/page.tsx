@@ -19,12 +19,12 @@ import {
   SpendingInsightsCard 
 } from '@/components/dashboard-insights'
 import {
-  CategoryBreakdownChart, 
   MonthlyComparisonChart, 
   SpendingTrendChart, 
   BudgetProgressChart,
   InteractivePieChart,
 } from '@/components/charts'
+import { CategoryBreakdownWithFilter } from '@/components/category-breakdown-with-filter'
 import { 
   getCurrentUser,
   createOrUpdateUser,
@@ -64,7 +64,7 @@ async function getDashboardData(userId: string) {
     getUserTransactions(userId, { limit: 10, sortBy: 'date', sortOrder: 'desc' }),
     getTransactionSummary(userId, startOfMonth, endOfMonth),
     getTransactionSummary(userId, startOfLastMonth, endOfLastMonth),
-    getCategorySpending(userId, startOfMonth, endOfMonth),
+    getCategorySpending(userId), // Remove date filtering to show all-time category spending
     getUserTransactions(userId, { 
       startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
       endDate: now,
@@ -97,7 +97,7 @@ async function getDashboardData(userId: string) {
   // Transform category spending for charts
   const categoryData = categorySpending.slice(0, 5).map((cs, index) => ({
     category: cs.categoryName || 'Uncategorized',
-    amount: Math.abs(parseFloat(cs.totalAmount || '0')),
+    amount: parseFloat(cs.totalAmount || '0'), // No need for Math.abs since query already returns absolute values
     color: cs.categoryColor || `hsl(${index * 60}, 70%, 50%)`
   }))
 
@@ -302,15 +302,7 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Category Breakdown</CardTitle>
-                <CardDescription>Where your money is going</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CategoryBreakdownChart data={dashboardData.categoryData} />
-              </CardContent>
-            </Card>
+            <CategoryBreakdownWithFilter initialData={dashboardData.categoryData} />
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
