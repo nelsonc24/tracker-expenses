@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ChartColorProvider } from "@/contexts/chart-color-context";
 import { ClerkProvider } from '@clerk/nextjs';
 import { Toaster } from "sonner";
 import { GlobalErrorHandler } from "@/components/global-error-handler";
@@ -46,9 +47,11 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
           <ThemeProvider>
-            <GlobalErrorHandler />
-            {children}
-            <Toaster />
+            <ChartColorProvider>
+              <GlobalErrorHandler />
+              {children}
+              <Toaster />
+            </ChartColorProvider>
           </ThemeProvider>
         </body>
       </html>

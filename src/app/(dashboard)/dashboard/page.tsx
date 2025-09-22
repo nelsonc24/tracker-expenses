@@ -25,6 +25,7 @@ import {
   InteractivePieChart,
 } from '@/components/charts'
 import { CategoryBreakdownWithFilter } from '@/components/category-breakdown-with-filter'
+import { ChartColorSettings, InlineChartColorSettings } from '@/components/chart-color-settings'
 import { 
   getCurrentUser,
   createOrUpdateUser,
@@ -215,6 +216,7 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <ChartColorSettings />
           <Button variant="outline" size="sm" className="text-xs sm:text-sm">
             <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             <span className="hidden sm:inline">Export</span>
@@ -294,8 +296,13 @@ export default async function DashboardPage() {
           <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Spending Trend</CardTitle>
-                <CardDescription className="text-sm">Daily spending over the last week</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Spending Trend</CardTitle>
+                    <CardDescription className="text-sm">Daily spending over the last week</CardDescription>
+                  </div>
+                  <InlineChartColorSettings />
+                </div>
               </CardHeader>
               <CardContent>
                 <SpendingTrendChart data={dashboardData.trendData} />
@@ -316,8 +323,13 @@ export default async function DashboardPage() {
           <div className="grid gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Monthly Comparison</CardTitle>
-                <CardDescription>Spending comparison over recent months</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Monthly Comparison</CardTitle>
+                    <CardDescription>Spending comparison over recent months</CardDescription>
+                  </div>
+                  <InlineChartColorSettings />
+                </div>
               </CardHeader>
               <CardContent>
                 <MonthlyComparisonChart data={dashboardData.monthlyData} />

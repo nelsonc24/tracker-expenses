@@ -20,6 +20,7 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useChartColors } from '@/contexts/chart-color-context'
 
 interface ChartData {
   name: string
@@ -41,6 +42,8 @@ interface CategoryData {
 
 // Spending Trend Chart
 export function SpendingTrendChart({ data }: { data: TimeSeriesData[] }) {
+  const { currentScheme } = useChartColors()
+  
   return (
     <ResponsiveContainer width="100%" height={300}>
       <AreaChart data={data}>
@@ -66,9 +69,9 @@ export function SpendingTrendChart({ data }: { data: TimeSeriesData[] }) {
         <Area
           type="monotone"
           dataKey="amount"
-          stroke="hsl(var(--primary))"
-          fill="hsl(var(--primary))"
-          fillOpacity={0.2}
+          stroke={currentScheme.spendingTrend.stroke}
+          fill={currentScheme.spendingTrend.fill}
+          fillOpacity={currentScheme.spendingTrend.fillOpacity}
           strokeWidth={2}
         />
       </AreaChart>
@@ -213,6 +216,8 @@ export function CategoryBreakdownChart({ data }: { data: CategoryData[] }) {
 
 // Monthly Comparison Chart
 export function MonthlyComparisonChart({ data }: { data: ChartData[] }) {
+  const { currentScheme } = useChartColors()
+  
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data}>
@@ -237,7 +242,7 @@ export function MonthlyComparisonChart({ data }: { data: ChartData[] }) {
         />
         <Bar
           dataKey="value"
-          fill="hsl(var(--primary))"
+          fill={currentScheme.monthlyComparison.primary}
           radius={[4, 4, 0, 0]}
         />
       </BarChart>
