@@ -4,15 +4,11 @@ import { users, accounts, categories, transactions, budgets, recurringTransactio
 import { eq, and, desc, asc, count, sum, gte, lte, like, or, sql } from 'drizzle-orm'
 
 // Type helpers for better TypeScript support
-type InsertUser = typeof users.$inferInsert
 type SelectUser = typeof users.$inferSelect
-type InsertAccount = typeof accounts.$inferInsert
 type SelectAccount = typeof accounts.$inferSelect
-type InsertCategory = typeof categories.$inferInsert
 type SelectCategory = typeof categories.$inferSelect
 type InsertTransaction = typeof transactions.$inferInsert
 type SelectTransaction = typeof transactions.$inferSelect
-type InsertBudget = typeof budgets.$inferInsert
 type SelectBudget = typeof budgets.$inferSelect
 
 // User utilities
@@ -535,6 +531,50 @@ export async function createBudget(budgetData: {
   } catch (error) {
     console.error('Error creating budget:', error)
     return null
+  }
+}
+
+export async function updateBudget(
+  budgetId: string, 
+  userId: string, 
+  budgetData: {
+    name?: string
+    description?: string
+    amount?: string
+    period?: string
+    startDate?: Date
+    endDate?: Date
+    categoryIds?: string[]
+    accountIds?: string[]
+    isActive?: boolean
+  }
+): Promise<SelectBudget | null> {
+  try {
+    const result = await db
+      .update(budgets)
+      .set({
+        ...budgetData,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(budgets.id, budgetId), eq(budgets.userId, userId)))
+      .returning()
+    return (result as SelectBudget[])?.[0] || null
+  } catch (error) {
+    console.error('Error updating budget:', error)
+    return null
+  }
+}
+
+export async function deleteBudget(budgetId: string, userId: string): Promise<boolean> {
+  try {
+    const result = await db
+      .delete(budgets)
+      .where(and(eq(budgets.id, budgetId), eq(budgets.userId, userId)))
+      .returning()
+    return result.length > 0
+  } catch (error) {
+    console.error('Error deleting budget:', error)
+    return false
   }
 }
 

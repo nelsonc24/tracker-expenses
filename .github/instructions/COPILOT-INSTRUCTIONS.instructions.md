@@ -26,6 +26,12 @@ Provide project context and coding guidelines that AI should follow when generat
   - Leverage existing components like Button, Dialog, Alert Dialog, Input, Select, etc.
   - Reference shadcn-ui documentation at https://ui.shadcn.com/docs/components for implementation examples
   - Maintain consistent design patterns across the application using shadcn-ui primitives
+- **Use shadcn-ui dialogs for all modal interactions** instead of native browser dialogs:
+  - Use `AlertDialog` for confirmations (delete, destructive actions) instead of `window.confirm()`
+  - Use `Dialog` for forms, settings, and content modals instead of `window.alert()`
+  - Always provide proper accessibility with `DialogTitle`, `DialogDescription`, and `DialogTrigger`
+  - Use `AlertDialogAction` and `AlertDialogCancel` for confirmation dialogs
+  - Ensure dialogs are controlled with state management for better UX
 - **Project Cleanup Routine** - Always perform after successful completion of features and user confirmation:
   - Remove outdated duplicate files (e.g., page-old.tsx, page-new.tsx, backup files)
   - Clean up temporary test files from project root and scripts folder (*.test.js, test-*.js, test-*.csv, etc.)

@@ -14,6 +14,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { 
@@ -111,14 +121,31 @@ export default function BudgetsPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isCreateBudgetOpen, setIsCreateBudgetOpen] = useState(false)
+  const [isEditBudgetOpen, setIsEditBudgetOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isViewHistoryOpen, setIsViewHistoryOpen] = useState(false)
+  const [budgetToDelete, setBudgetToDelete] = useState<BudgetWithProgress | null>(null)
+  const [budgetToViewHistory, setBudgetToViewHistory] = useState<BudgetWithProgress | null>(null)
+  const [editingBudget, setEditingBudget] = useState<BudgetWithProgress | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState('current')
   const [selectedCategory, setSelectedCategory] = useState('')
+  const [editSelectedCategory, setEditSelectedCategory] = useState('')
   const [newBudget, setNewBudget] = useState({
     name: '',
     description: '',
     amount: '',
     period: 'monthly',
     startDate: new Date().toISOString().split('T')[0],
+    endDate: '',
+    categoryIds: [] as string[],
+    accountIds: [] as string[]
+  })
+  const [editBudget, setEditBudget] = useState({
+    name: '',
+    description: '',
+    amount: '',
+    period: 'monthly',
+    startDate: '',
     endDate: '',
     categoryIds: [] as string[],
     accountIds: [] as string[]
@@ -301,6 +328,116 @@ export default function BudgetsPage() {
     }
   }
 
+  // Handle opening edit dialog
+  const handleEditBudget = (budget: BudgetWithProgress) => {
+    setEditingBudget(budget)
+    setEditBudget({
+      name: budget.name,
+      description: budget.description || '',
+      amount: budget.amount.toString(),
+      period: budget.period,
+      startDate: new Date(budget.startDate).toISOString().split('T')[0],
+      endDate: budget.endDate ? new Date(budget.endDate).toISOString().split('T')[0] : '',
+      categoryIds: budget.categoryIds,
+      accountIds: budget.accountIds
+    })
+    setEditSelectedCategory(budget.categoryIds[0] || '')
+    setIsEditBudgetOpen(true)
+  }
+
+  // Handle updating budget
+  const handleUpdateBudget = async () => {
+    if (!editingBudget || !editBudget.name || !editBudget.amount || !editSelectedCategory) {
+      setError('Please fill in all required fields')
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/budgets/${editingBudget.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editBudget.name,
+          description: editBudget.description,
+          amount: parseFloat(editBudget.amount),
+          period: editBudget.period,
+          startDate: editBudget.startDate,
+          endDate: editBudget.endDate || null,
+          categoryIds: editSelectedCategory ? [editSelectedCategory] : [],
+          accountIds: editBudget.accountIds
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update budget')
+      }
+
+      const updatedBudget = await response.json()
+      
+      // Update local state
+      setBudgets(prev => prev.map(budget => 
+        budget.id === editingBudget.id 
+          ? {
+              ...budget,
+              ...updatedBudget,
+              amount: parseFloat(updatedBudget.amount),
+              remaining: parseFloat(updatedBudget.amount) - budget.spent,
+              progressPercentage: budget.spent > 0 ? (budget.spent / parseFloat(updatedBudget.amount)) * 100 : 0,
+              status: (budget.spent / parseFloat(updatedBudget.amount)) * 100 > 100 ? 'over-budget' : 
+                      (budget.spent / parseFloat(updatedBudget.amount)) * 100 > 80 ? 'warning' : 'on-track'
+            }
+          : budget
+      ))
+      
+      setIsEditBudgetOpen(false)
+      setEditingBudget(null)
+      setEditSelectedCategory('')
+      setError(null)
+    } catch (err) {
+      console.error('Error updating budget:', err)
+      setError('Failed to update budget. Please try again.')
+    }
+  }
+
+  // Handle opening delete confirmation dialog
+  const handleOpenDeleteDialog = (budget: BudgetWithProgress) => {
+    setBudgetToDelete(budget)
+    setIsDeleteDialogOpen(true)
+  }
+
+  // Handle confirming budget deletion
+  const handleConfirmDelete = async () => {
+    if (!budgetToDelete) return
+
+    try {
+      const response = await fetch(`/api/budgets/${budgetToDelete.id}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete budget')
+      }
+
+      setBudgets(prev => prev.filter(budget => budget.id !== budgetToDelete.id))
+      setError(null)
+      setIsDeleteDialogOpen(false)
+      setBudgetToDelete(null)
+    } catch (err) {
+      console.error('Error deleting budget:', err)
+      setError('Failed to delete budget. Please try again.')
+    }
+  }
+
+  // Handle opening view history dialog
+  const handleOpenViewHistory = (budget: BudgetWithProgress) => {
+    setBudgetToViewHistory(budget)
+    setIsViewHistoryOpen(true)
+  }
+
+  // Remove old handleDeleteBudget function (replaced by handleOpenDeleteDialog and handleConfirmDelete)
+
   const totalBudget = budgets.reduce((sum, budget) => sum + budget.amount, 0)
   const totalSpent = budgets.reduce((sum, budget) => sum + budget.spent, 0)
   const overBudgetCount = budgets.filter(budget => budget.status === 'over-budget').length
@@ -424,6 +561,99 @@ export default function BudgetsPage() {
               </Button>
               <Button onClick={handleCreateBudget}>
                 Create Budget
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Budget Dialog */}
+        <Dialog open={isEditBudgetOpen} onOpenChange={setIsEditBudgetOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Edit Budget</DialogTitle>
+              <DialogDescription>
+                Update your budget settings and spending limits.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-budget-name">Budget Name</Label>
+                <Input
+                  id="edit-budget-name"
+                  placeholder="e.g., Monthly Groceries"
+                  value={editBudget.name}
+                  onChange={(e) => setEditBudget(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-category">Category</Label>
+                <Select value={editSelectedCategory} onValueChange={setEditSelectedCategory}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        <div className="flex items-center space-x-2">
+                          {category.icon && getCategoryIcon(category.icon)}
+                          <span>{category.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-amount">Budget Amount (AUD)</Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={editBudget.amount}
+                  onChange={(e) => setEditBudget(prev => ({ ...prev, amount: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-period">Period</Label>
+                <Select 
+                  value={editBudget.period} 
+                  onValueChange={(value) => setEditBudget(prev => ({ ...prev, period: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                    <SelectItem value="yearly">Yearly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-description">Description (Optional)</Label>
+                <Textarea
+                  id="edit-description"
+                  placeholder="Add a description for this budget..."
+                  value={editBudget.description}
+                  onChange={(e) => setEditBudget(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+            </div>
+            
+            {error && (
+              <div className="text-red-600 text-sm mb-4">
+                {error}
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditBudgetOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateBudget}>
+                Update Budget
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -578,16 +808,19 @@ export default function BudgetsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditBudget(budget)}>
                               <Edit className="h-4 w-4 mr-2" />
                               Edit Budget
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenViewHistory(budget)}>
                               <Calendar className="h-4 w-4 mr-2" />
                               View History
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600">
+                            <DropdownMenuItem 
+                              className="text-red-600" 
+                              onClick={() => handleOpenDeleteDialog(budget)}
+                            >
                               <Trash2 className="h-4 w-4 mr-2" />
                               Delete Budget
                             </DropdownMenuItem>
@@ -701,6 +934,110 @@ export default function BudgetsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Budget Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Budget</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &quot;{budgetToDelete?.name}&quot;? This action cannot be undone and will permanently remove all budget data and history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false)
+              setBudgetToDelete(null)
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete Budget
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* View Budget History Dialog */}
+      <Dialog open={isViewHistoryOpen} onOpenChange={setIsViewHistoryOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Budget History</DialogTitle>
+            <DialogDescription>
+              Historical spending data for &quot;{budgetToViewHistory?.name}&quot;
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {budgetToViewHistory && (
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <h4 className="font-medium mb-2">Current Period</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Budget:</span>
+                        <span className="font-medium">${budgetToViewHistory.amount.toLocaleString('en-AU')}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Spent:</span>
+                        <span className="font-medium">${budgetToViewHistory.spent.toLocaleString('en-AU')}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Remaining:</span>
+                        <span className={`font-medium ${budgetToViewHistory.remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          ${Math.abs(budgetToViewHistory.remaining).toLocaleString('en-AU')}
+                          {budgetToViewHistory.remaining < 0 && ' over'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <h4 className="font-medium mb-2">Status</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Progress:</span>
+                        <span className="font-medium">{budgetToViewHistory.progressPercentage.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Status:</span>
+                        <span className={`font-medium capitalize ${
+                          budgetToViewHistory.status === 'over-budget' ? 'text-red-600' :
+                          budgetToViewHistory.status === 'warning' ? 'text-yellow-600' : 'text-green-600'
+                        }`}>
+                          {budgetToViewHistory.status.replace('-', ' ')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Days Left:</span>
+                        <span className="font-medium">{budgetToViewHistory.daysLeft} days</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="text-center py-8 text-muted-foreground">
+                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Detailed historical data and trends will be available in a future update.</p>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsViewHistoryOpen(false)
+                setBudgetToViewHistory(null)
+              }}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
