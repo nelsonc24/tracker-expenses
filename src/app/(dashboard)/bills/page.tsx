@@ -6,8 +6,11 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { AddBillDialog } from '@/components/add-bill-dialog'
-import { CalendarDays, DollarSign, TrendingUp, AlertCircle, Plus } from 'lucide-react'
+import { EditBillDialog } from '@/components/edit-bill-dialog'
+import { CalendarDays, DollarSign, TrendingUp, AlertCircle, Plus, MoreHorizontal, Edit, Trash2 } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { format } from 'date-fns'
 
 interface Bill {
@@ -15,12 +18,17 @@ interface Bill {
   name: string
   description?: string
   amount: string
-  frequency: string
+  accountId: string
+  categoryId?: string
+  frequency: 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
+  dueDay?: number
   dueDate?: string
   lastPaidDate?: string
   lastPaidAmount?: string
+  reminderDays: number
   isActive: boolean
   isAutoPay: boolean
+  notes?: string
   tags: string[]
 }
 
@@ -62,6 +70,8 @@ export default function BillsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [editingBill, setEditingBill] = useState<Bill | null>(null)
+  const [deletingBill, setDeletingBill] = useState<Bill | null>(null)
   const [initialLoadComplete, setInitialLoadComplete] = useState(false)
 
   const fetchBills = async () => {
@@ -124,6 +134,40 @@ export default function BillsPage() {
       case 'quarterly': return 'bg-orange-100 text-orange-800'
       case 'yearly': return 'bg-red-100 text-red-800'
       default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const handleBillSuccess = useCallback(() => {
+    fetchBills()
+    fetchProjections()
+  }, [fetchProjections])
+
+  const handleEditBill = (bill: Bill) => {
+    setEditingBill(bill)
+  }
+
+  const handleDeleteBill = (bill: Bill) => {
+    setDeletingBill(bill)
+  }
+
+  const confirmDeleteBill = async () => {
+    if (!deletingBill) return
+
+    try {
+      const response = await fetch(`/api/bills/${deletingBill.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete bill')
+      }
+
+      setDeletingBill(null)
+      fetchBills()
+      fetchProjections()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete bill')
     }
   }
 
@@ -353,6 +397,27 @@ export default function BillsPage() {
                         {bill.isAutoPay && (
                           <Badge variant="outline">Auto Pay</Badge>
                         )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditBill(bill)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Bill
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              className="text-red-600" 
+                              onClick={() => handleDeleteBill(bill)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Bill
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </CardHeader>
@@ -404,11 +469,37 @@ export default function BillsPage() {
       <AddBillDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        onSuccess={() => {
-          fetchBills()
-          fetchProjections()
-        }}
+        onSuccess={handleBillSuccess}
       />
+
+      {/* Edit Bill Dialog */}
+      <EditBillDialog
+        bill={editingBill}
+        open={!!editingBill}
+        onOpenChange={(open) => !open && setEditingBill(null)}
+        onSuccess={handleBillSuccess}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingBill} onOpenChange={(open) => !open && setDeletingBill(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Bill</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{deletingBill?.name}&rdquo;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteBill}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete Bill
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
