@@ -21,8 +21,6 @@ import {
 import {
   MonthlyComparisonChart, 
   SpendingTrendChart, 
-  BudgetProgressChart,
-  InteractivePieChart,
 } from '@/components/charts'
 import { CategoryBreakdownWithFilter } from '@/components/category-breakdown-with-filter'
 import { ChartColorSettings, InlineChartColorSettings } from '@/components/chart-color-settings'
@@ -89,11 +87,21 @@ async function getDashboardData(userId: string) {
       }, 0) / budgets.length * 100
     : 0
 
-  // Generate trend data from last 30 days
-  const trendData = last30DaysTransactions.map(({ transaction }) => ({
-    date: transaction.transactionDate.toISOString().split('T')[0],
-    amount: Math.abs(parseFloat(transaction.amount))
-  })).slice(-7) // Last 7 days
+  // Generate trend data from last 30 days - aggregate by date
+  const dailySpending = new Map<string, number>()
+  
+  // Group transactions by date and sum amounts
+  last30DaysTransactions.forEach(({ transaction }) => {
+    const date = transaction.transactionDate.toISOString().split('T')[0]
+    const amount = Math.abs(parseFloat(transaction.amount))
+    dailySpending.set(date, (dailySpending.get(date) || 0) + amount)
+  })
+  
+  // Convert to array and get last 7 days
+  const trendData = Array.from(dailySpending.entries())
+    .map(([date, amount]) => ({ date, amount }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-7) // Last 7 days
 
   // Transform category spending for charts
   const categoryData = categorySpending.slice(0, 5).map((cs, index) => ({
