@@ -20,7 +20,7 @@ import {
   Building2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { bankFormats, validateTransactionRow, ProcessedTransaction, type BankFormat } from '@/lib/csv-processing'
+import { bankFormats, validateTransactionRow, validateParsedTransactions, ProcessedTransaction, type BankFormat } from '@/lib/csv-processing'
 
 const bankTemplates = [
   {
@@ -61,7 +61,7 @@ function detectBankFormat(csvContent: string): BankFormat {
   
   // Check for UBank format (specific header pattern)
   if (firstLine.includes('Date and time') || firstLine.includes('Payment type')) {
-    return bankFormats.custom // Use custom for UBank as it's not in the standard formats
+    return bankFormats.ubank
   }
   
   // Default to Commonwealth for now if unclear
@@ -180,14 +180,59 @@ export default function ImportPage() {
         // Skip header rows if specified in format
         const dataLines = bankFormat.skipRows ? lines.slice(bankFormat.skipRows) : lines
         
+        // Get headers for formats that use them (like UBank)
+        let headers: string[] = []
+        if (bankFormat.skipRows && bankFormat.skipRows > 0) {
+          headers = parseCSVLine(lines[0])
+        }
+        
         // Process each line using the detected format
         const processedTransactions = dataLines.map((line, index) => {
           const fields = parseCSVLine(line)
-          return validateTransactionRow(fields, bankFormat, index)
+          
+          // Convert array to object for formats with headers
+          let rowData: Record<string, string> | string[]
+          if (headers.length > 0) {
+            // Convert fields array to object using headers
+            const rowObject: Record<string, string> = {}
+            headers.forEach((header, i) => {
+              rowObject[header] = fields[i] || ''
+            })
+            rowData = rowObject
+          } else {
+            // Use array format (for Commonwealth Bank)
+            rowData = fields
+          }
+          
+          return validateTransactionRow(rowData, bankFormat, index)
         }).filter(transaction => 
-          // Filter out completely invalid transactions
-          transaction.status !== 'error' || transaction.date
+          // Filter out completely invalid transactions - keep if it has any valid data
+          transaction && (transaction.status !== 'error' || transaction.date || transaction.description)
         )
+        
+        // Validate the overall import quality
+        const validationResult = validateParsedTransactions(processedTransactions)
+        
+        console.log('Processing results:', {
+          totalLines: lines.length,
+          dataLines: dataLines.length,
+          processedTransactions: processedTransactions.length,
+          validationResult,
+          sampleTransaction: processedTransactions[0]
+        })
+        
+        if (!validationResult.isValid) {
+          // Show more detailed error information
+          const errorDetails = [
+            `Found ${processedTransactions.length} processed transactions`,
+            `Valid: ${validationResult.stats.valid}`,
+            `Errors: ${validationResult.stats.errors}`,
+            `Warnings: ${validationResult.stats.warnings}`,
+            ...validationResult.errors
+          ].join('\n')
+          
+          throw new Error(`Import validation failed:\n${errorDetails}`)
+        }
         
         setProgress(75)
         

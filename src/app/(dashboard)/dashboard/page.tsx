@@ -353,7 +353,7 @@ export default async function DashboardPage() {
                         <span className="font-medium">{category.category}</span>
                       </div>
                       <div className="flex items-center space-x-2 text-sm">
-                        <span>${category.amount}</span>
+                        <span>${Math.abs(category.amount).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         <ArrowUpRight className="h-3 w-3 text-green-500" />
                         <span className="text-green-500">+5%</span>
                       </div>

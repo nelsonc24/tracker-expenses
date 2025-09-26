@@ -62,6 +62,18 @@ export const bankFormats: Record<string, BankFormat> = {
     descriptionColumn: 'Description',
     balanceColumn: 'Balance'
   },
+  ubank: {
+    name: 'UBank',
+    columns: ['Date and time', 'Description', 'Debit', 'Credit', 'From account', 'To account', 'Payment type', 'Category', 'Receipt number', 'Transaction ID'],
+    dateFormat: 'HH:MM DD-MM-YY',
+    example: 'Date and time,Description,Debit,Credit,From account,To account,Payment type,Category,Receipt number,Transaction ID',
+    amountColumns: {
+      debit: 'Debit',
+      credit: 'Credit'
+    },
+    descriptionColumn: 'Description',
+    skipRows: 1 // Skip header row
+  },
   custom: {
     name: 'Custom Format',
     columns: [],
@@ -126,6 +138,22 @@ export function parseDate(dateStr: string, format: string): Date | null {
         return new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
       }
       
+      case 'HH:MM DD-MM-YY': {
+        // Handle UBank format like "13:03 26-09-25"
+        const parts = cleaned.split(' ')
+        if (parts.length !== 2) return null
+        
+        const [, datePart] = parts // ignore time, just use date
+        const [day, month, year] = datePart.split('-')
+        
+        if (!day || !month || !year) return null
+        
+        // Convert 2-digit year to 4-digit year
+        const fullYear = parseInt(year) < 50 ? 2000 + parseInt(year) : 1900 + parseInt(year)
+        
+        return new Date(fullYear, parseInt(month) - 1, parseInt(day))
+      }
+      
       default:
         // Try to parse as ISO date or let Date constructor handle it
         return new Date(cleaned)
@@ -145,15 +173,18 @@ export function parseAmount(row: Record<string, string>, format: BankFormat): { 
     const { debit, credit, amount: amountCol } = format.amountColumns
     
     if (debit && credit) {
-      // Handle debit/credit columns
-      const debitVal = parseFloat(cleanAmount(row[debit] || '0'))
-      const creditVal = parseFloat(cleanAmount(row[credit] || '0'))
+      // Handle debit/credit columns - look for exact column names
+      const debitValue = row[debit] || '0'
+      const creditValue = row[credit] || '0'
+      
+      const debitVal = parseFloat(cleanAmount(debitValue))
+      const creditVal = parseFloat(cleanAmount(creditValue))
       
       if (isNaN(debitVal) && isNaN(creditVal)) {
         errors.push({
           field: 'amount',
           message: 'Both debit and credit amounts are invalid',
-          value: { debit: row[debit], credit: row[credit] }
+          value: { debit: debitValue, credit: creditValue }
         })
       } else {
         amount = (creditVal || 0) - (debitVal || 0)
@@ -238,7 +269,7 @@ export function categorizeTransaction(description: string, merchant: string, amo
   }
   
   // Transport
-  if (desc.match(/(uber|taxi|metro|train|bus|petrol|shell|bp|caltex|ampol)/)) {
+  if (desc.match(/(uber|taxi|metro|train|bus|petrol|shell|bp|caltex|ampol|costco)/)) {
     return 'Transport'
   }
   
@@ -299,7 +330,13 @@ export function validateTransactionRow(
   }
   
   // Validate and parse date
-  const dateStr = rowData[format.columns.find(col => col.includes('date')) || 'date'] || ''
+  const dateColumn = format.columns.find(col => 
+    col.toLowerCase().includes('date') || 
+    col === 'Date and time' ||
+    col.includes('date')
+  ) || 'date'
+  
+  const dateStr = rowData[dateColumn] || ''
   const parsedDate = parseDate(dateStr, format.dateFormat)
   
   if (!parsedDate) {
@@ -389,6 +426,74 @@ export function validateCSVFile(file: File): ValidationError[] {
   }
   
   return errors
+}
+
+// Validate parsed transactions before allowing import
+export function validateParsedTransactions(transactions: ProcessedTransaction[]): {
+  isValid: boolean
+  errors: string[]
+  warnings: string[]
+  stats: {
+    total: number
+    valid: number
+    errors: number
+    warnings: number
+  }
+} {
+  const errors: string[] = []
+  const warnings: string[] = []
+  
+  const errorTransactions = transactions.filter(tx => tx.status === 'error')
+  const validTransactions = transactions.filter(tx => tx.status === 'valid')
+  const warningTransactions = transactions.filter(tx => tx.status === 'warning')
+  
+  // Critical validation - if more than 80% of transactions have errors, something is wrong
+  const errorRate = errorTransactions.length / transactions.length
+  if (errorRate > 0.8) {
+    errors.push(`${Math.round(errorRate * 100)}% of transactions have errors. Please check the CSV format.`)
+  }
+  
+  // Check for common error patterns
+  const dateErrors = errorTransactions.filter(tx => 
+    tx.errors.some(e => e.field === 'date')
+  ).length
+  
+  if (dateErrors > 0) {
+    errors.push(`${dateErrors} transactions have date format errors.`)
+  }
+  
+  const amountErrors = errorTransactions.filter(tx => 
+    tx.errors.some(e => e.field === 'amount')
+  ).length
+  
+  if (amountErrors > 0) {
+    errors.push(`${amountErrors} transactions have amount parsing errors.`)
+  }
+  
+  // Warnings for minor issues
+  if (transactions.length === 0) {
+    errors.push('No transactions found in the CSV file.')
+  }
+  
+  if (validTransactions.length === 0 && transactions.length > 0) {
+    errors.push('No valid transactions found. All transactions have errors.')
+  }
+  
+  if (validTransactions.length < transactions.length / 2) {
+    warnings.push(`Only ${validTransactions.length} out of ${transactions.length} transactions are valid.`)
+  }
+  
+  return {
+    isValid: errors.length === 0 && validTransactions.length > 0,
+    errors,
+    warnings,
+    stats: {
+      total: transactions.length,
+      valid: validTransactions.length,
+      errors: errorTransactions.length,
+      warnings: warningTransactions.length
+    }
+  }
 }
 
 // Generate upload summary
