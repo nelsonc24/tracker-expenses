@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,8 @@ import {
   Edit,
   Trash2,
   PiggyBank,
+  List,
+  RefreshCw,
   // Add category icons
   ShoppingCart,
   Car,
@@ -103,6 +105,25 @@ interface Category {
   icon?: string
 }
 
+interface Transaction {
+  id: string
+  description: string
+  amount: number | string
+  category: string
+  categoryId: string | null
+  date: string
+  transactionDate?: string
+  account: string
+  accountId: string | null
+  type?: 'debit' | 'credit' | 'transfer'
+  merchant: string
+  reference: string
+  receiptNumber?: string
+  tags: string[]
+  notes: string
+  balance?: number
+}
+
 interface BudgetWithProgress extends Omit<Budget, 'amount'> {
   amount: number // converted from decimal string
   spent: number
@@ -124,8 +145,12 @@ export default function BudgetsPage() {
   const [isEditBudgetOpen, setIsEditBudgetOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isViewHistoryOpen, setIsViewHistoryOpen] = useState(false)
+  const [isViewTransactionsOpen, setIsViewTransactionsOpen] = useState(false)
   const [budgetToDelete, setBudgetToDelete] = useState<BudgetWithProgress | null>(null)
   const [budgetToViewHistory, setBudgetToViewHistory] = useState<BudgetWithProgress | null>(null)
+  const [budgetToViewTransactions, setBudgetToViewTransactions] = useState<BudgetWithProgress | null>(null)
+  const [budgetTransactions, setBudgetTransactions] = useState<Transaction[]>([])
+  const [loadingTransactions, setLoadingTransactions] = useState(false)
   const [editingBudget, setEditingBudget] = useState<BudgetWithProgress | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState('current')
   const [selectedCategory, setSelectedCategory] = useState('')
@@ -150,6 +175,11 @@ export default function BudgetsPage() {
     categoryIds: [] as string[],
     accountIds: [] as string[]
   })
+
+  // Helper function to get amount as number
+  const getAmountAsNumber = (amount: string | number): number => {
+    return typeof amount === 'string' ? parseFloat(amount) : amount
+  }
 
   // Add icon mapping function
   const getCategoryIcon = (iconName: string) => {
@@ -176,96 +206,154 @@ export default function BudgetsPage() {
     return <IconComponent className="h-4 w-4" />
   }
 
-  // Fetch data on component mount
-  useEffect(() => {
-    if (!isLoaded || !user) return
+  // Fetch data function (separated for reusability)
+  const fetchData = useCallback(async () => {
+    if (!user) return
 
-    async function fetchData() {
-      try {
-        setError(null)
+    try {
+      setError(null)
 
-        // Fetch budgets and categories in parallel
-        const [budgetsRes, categoriesRes] = await Promise.all([
-          fetch('/api/budgets'),
-          fetch('/api/categories')
-        ])
+      // Fetch budgets and categories in parallel
+      const [budgetsRes, categoriesRes] = await Promise.all([
+        fetch('/api/budgets'),
+        fetch('/api/categories')
+      ])
 
-        if (!budgetsRes.ok || !categoriesRes.ok) {
-          throw new Error('Failed to fetch data')
-        }
+      if (!budgetsRes.ok || !categoriesRes.ok) {
+        throw new Error('Failed to fetch data')
+      }
 
-        const [budgetsData, categoriesData] = await Promise.all([
-          budgetsRes.json(),
-          categoriesRes.json()
-        ])
+      const [budgetsData, categoriesData] = await Promise.all([
+        budgetsRes.json(),
+        categoriesRes.json()
+      ])
 
-        // Calculate budget progress
-        const budgetsWithProgress: BudgetWithProgress[] = await Promise.all(
-          budgetsData.map(async (budget: Budget) => {
-            // Calculate spent amount for this budget's categories and time period
-            const now = new Date()
-            const budgetStart = new Date(budget.startDate)
-            const budgetEnd = budget.endDate ? new Date(budget.endDate) : new Date(budgetStart.getFullYear(), budgetStart.getMonth() + 1, 0)
+      // Calculate budget progress
+      const budgetsWithProgress: BudgetWithProgress[] = await Promise.all(
+        budgetsData.map(async (budget: Budget) => {
+          // Calculate spent amount for this budget's categories and time period
+          const now = new Date()
+          const budgetStart = new Date(budget.startDate)
+          const budgetEnd = budget.endDate ? new Date(budget.endDate) : new Date(budgetStart.getFullYear(), budgetStart.getMonth() + 1, 0)
 
-            // Get transactions for these categories in the budget period
-            let spentAmount = 0
-            if (budget.categoryIds.length > 0) {
-              for (const categoryId of budget.categoryIds) {
-                const spentResponse = await fetch(`/api/transactions?categoryId=${categoryId}&startDate=${budgetStart.toISOString().split('T')[0]}&endDate=${budgetEnd.toISOString().split('T')[0]}`)
-                if (spentResponse.ok) {
-                  const transactions = await spentResponse.json()
-                  spentAmount += transactions.reduce((sum: number, t: { amount: string }) => sum + Math.abs(parseFloat(t.amount)), 0)
-                }
+          // Get transactions for these categories in the budget period
+          let spentAmount = 0
+          if (budget.categoryIds.length > 0) {
+            console.log(`\n🔍 === BUDGET DEBUG: ${budget.name} ===`)
+            console.log('📊 Budget categoryIds:', budget.categoryIds)
+            console.log('📅 Budget period:', budgetStart.toISOString().split('T')[0], 'to', budgetEnd.toISOString().split('T')[0])
+            console.log('💰 Budget amount: $' + parseFloat(budget.amount))
+            
+            for (const categoryId of budget.categoryIds) {
+              const apiUrl = `/api/transactions?categoryId=${categoryId}&startDate=${budgetStart.toISOString().split('T')[0]}&endDate=${budgetEnd.toISOString().split('T')[0]}`
+              console.log('🔗 Fetching transactions from:', apiUrl)
+              
+              const spentResponse = await fetch(apiUrl)
+              if (spentResponse.ok) {
+                const transactions = await spentResponse.json()
+                console.log(`📋 Found ${transactions.length} transactions for category ${categoryId}:`, transactions.map((t: Transaction) => ({ id: t.id, description: t.description, amount: t.amount, date: t.date, categoryId: t.categoryId })))
+                
+                const categorySpent = transactions.reduce((sum: number, t: Transaction) => {
+                  const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount
+                  console.log(`  💳 Transaction: ${t.description || 'Unknown'} - Raw amount: ${amount}, Abs amount: ${Math.abs(amount)}`)
+                  // For budgets, we typically want to count expenses (negative amounts) as positive spending
+                  // and ignore income (positive amounts) unless it's specifically an expense transaction
+                  const spendingAmount = amount < 0 ? Math.abs(amount) : amount // Count both negative and positive as spending for now
+                  return sum + spendingAmount
+                }, 0)
+                
+                console.log(`💸 Category ${categoryId} spent: $${categorySpent}`)
+                spentAmount += categorySpent
+              } else {
+                console.error(`❌ Failed to fetch transactions for category ${categoryId}:`, spentResponse.status)
               }
             }
+            console.log(`💰 Total spent for ${budget.name}: $${spentAmount}`)
+            console.log('✅ === END BUDGET DEBUG ===\n')
+          }
 
-            // Convert amount from decimal string to number
-            const budgetAmount = parseFloat(budget.amount)
-            const remaining = Math.max(0, budgetAmount - spentAmount)
-            const progressPercentage = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : 0
-            
-            // Calculate days left in budget period
-            const daysLeft = Math.max(0, Math.ceil((budgetEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+          // Convert amount from decimal string to number
+          const budgetAmount = parseFloat(budget.amount)
+          const remaining = Math.max(0, budgetAmount - spentAmount)
+          const progressPercentage = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : 0
+          
+          // Calculate days left in budget period
+          const daysLeft = Math.max(0, Math.ceil((budgetEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
 
-            // Determine status
-            let status: 'on-track' | 'warning' | 'over-budget'
-            if (progressPercentage > 100) {
-              status = 'over-budget'
-            } else if (progressPercentage > 80) {
-              status = 'warning'
-            } else {
-              status = 'on-track'
-            }
+          // Determine status
+          let status: 'on-track' | 'warning' | 'over-budget'
+          if (progressPercentage > 100) {
+            status = 'over-budget'
+          } else if (progressPercentage > 80) {
+            status = 'warning'
+          } else {
+            status = 'on-track'
+          }
 
-            // Find primary category details (first category in the list)
-            const primaryCategoryId = budget.categoryIds[0]
-            const category = categoriesData.find((c: Category) => c.id === primaryCategoryId)
+          // Find primary category details (first category in the list)
+          const primaryCategoryId = budget.categoryIds[0]
+          const category = categoriesData.find((c: Category) => c.id === primaryCategoryId)
 
-            return {
-              ...budget,
-              amount: budgetAmount,
-              spent: spentAmount,
-              remaining,
-              progressPercentage,
-              status,
-              daysLeft,
-              categoryName: category?.name,
-              categoryColor: category?.color,
-              categoryIcon: category?.icon
-            }
-          })
-        )
-        
-        setBudgets(budgetsWithProgress)
-        setCategories(categoriesData)
-      } catch (err) {
-        console.error('Error fetching data:', err)
-        setError('Failed to load budgets. Please try again.')
+          return {
+            ...budget,
+            amount: budgetAmount,
+            spent: spentAmount,
+            remaining,
+            progressPercentage,
+            status,
+            daysLeft,
+            categoryName: category?.name,
+            categoryColor: category?.color,
+            categoryIcon: category?.icon
+          }
+        })
+      )
+      
+      setBudgets(budgetsWithProgress)
+      setCategories(categoriesData)
+    } catch (err) {
+      console.error('Error fetching data:', err)
+      setError('Failed to load budgets. Please try again.')
+    }
+  }, [user])
+
+  // Fetch data on component mount and when page becomes visible
+  useEffect(() => {
+    if (!isLoaded || !user) return
+    fetchData()
+  }, [user, isLoaded, fetchData])
+
+  // Add event listener for page visibility changes to refresh budgets when user returns to the page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user) {
+        fetchData()
       }
     }
 
-    fetchData()
-  }, [user, isLoaded])
+    const handleWindowFocus = () => {
+      if (user) {
+        fetchData()
+      }
+    }
+
+    // Listen for transaction updates from other parts of the app
+    const handleTransactionUpdate = () => {
+      if (user) {
+        fetchData()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleWindowFocus)
+    window.addEventListener('transactionUpdated', handleTransactionUpdate as EventListener)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleWindowFocus)
+      window.removeEventListener('transactionUpdated', handleTransactionUpdate as EventListener)
+    }
+  }, [user, fetchData])
 
   // Handle creating new budget
   const handleCreateBudget = async () => {
@@ -436,6 +524,40 @@ export default function BudgetsPage() {
     setIsViewHistoryOpen(true)
   }
 
+  // Handle opening view transactions dialog
+  const handleOpenViewTransactions = async (budget: BudgetWithProgress) => {
+    setBudgetToViewTransactions(budget)
+    setIsViewTransactionsOpen(true)
+    setLoadingTransactions(true)
+
+    try {
+      // Fetch transactions for this budget's categories within the budget period
+      const budgetStart = new Date(budget.startDate).toISOString().split('T')[0]
+      const budgetEnd = budget.endDate 
+        ? new Date(budget.endDate).toISOString().split('T')[0] 
+        : new Date(new Date(budget.startDate).getFullYear(), new Date(budget.startDate).getMonth() + 1, 0).toISOString().split('T')[0]
+      
+      const allTransactions = []
+      for (const categoryId of budget.categoryIds) {
+        const response = await fetch(`/api/transactions?categoryId=${categoryId}&startDate=${budgetStart}&endDate=${budgetEnd}&limit=1000`)
+        if (response.ok) {
+          const transactions = await response.json()
+          allTransactions.push(...transactions)
+        }
+      }
+      
+      // Sort by date descending
+      allTransactions.sort((a, b) => new Date(b.transactionDate || b.date).getTime() - new Date(a.transactionDate || a.date).getTime())
+      
+      setBudgetTransactions(allTransactions)
+    } catch (error) {
+      console.error('Error fetching budget transactions:', error)
+      setBudgetTransactions([])
+    } finally {
+      setLoadingTransactions(false)
+    }
+  }
+
   // Remove old handleDeleteBudget function (replaced by handleOpenDeleteDialog and handleConfirmDelete)
 
   const totalBudget = budgets.reduce((sum, budget) => sum + budget.amount, 0)
@@ -456,13 +578,50 @@ export default function BudgetsPage() {
             Set spending limits and track your progress toward financial goals
           </p>
         </div>
-        <Dialog open={isCreateBudgetOpen} onOpenChange={setIsCreateBudgetOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Budget
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={fetchData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button variant="outline" onClick={() => {
+            console.clear();
+            console.log('🔍 MANUAL DEBUG TRIGGER - Refreshing budget data...');
+            fetchData();
+          }}>
+            Debug
+          </Button>
+          <Button variant="outline" onClick={() => {
+            console.log('🔧 FIXING BUDGET DATE RANGES...');
+            // Find budgets with potentially incorrect date ranges
+            const problematicBudgets = budgets.filter(budget => {
+              const startDate = new Date(budget.startDate);
+              const dayOfMonth = startDate.getDate();
+              // If budget starts after day 20 of month, it might be incorrectly set
+              return dayOfMonth > 20 && budget.name.toLowerCase().includes('monthly');
+            });
+            
+            if (problematicBudgets.length > 0) {
+              console.log('Found budgets with potentially incorrect date ranges:', 
+                problematicBudgets.map(b => ({
+                  name: b.name,
+                  currentStart: b.startDate,
+                  suggestedStart: new Date(new Date(b.startDate).getFullYear(), new Date(b.startDate).getMonth(), 1).toISOString().split('T')[0]
+                }))
+              );
+              alert(`Found ${problematicBudgets.length} budget(s) with potentially incorrect date ranges. Check console for details.`);
+            } else {
+              alert('No date range issues detected.');
+            }
+          }}>
+            Fix Dates
+          </Button>
+          <Dialog open={isCreateBudgetOpen} onOpenChange={setIsCreateBudgetOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Budget
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Create New Budget</DialogTitle>
@@ -565,6 +724,8 @@ export default function BudgetsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
+      </div>
 
         {/* Edit Budget Dialog */}
         <Dialog open={isEditBudgetOpen} onOpenChange={setIsEditBudgetOpen}>
@@ -632,6 +793,24 @@ export default function BudgetsPage() {
                 </Select>
               </div>
               <div className="grid gap-2">
+                <Label htmlFor="edit-start-date">Start Date</Label>
+                <Input
+                  id="edit-start-date"
+                  type="date"
+                  value={editBudget.startDate}
+                  onChange={(e) => setEditBudget(prev => ({ ...prev, startDate: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-end-date">End Date (Optional)</Label>
+                <Input
+                  id="edit-end-date"
+                  type="date"
+                  value={editBudget.endDate || ''}
+                  onChange={(e) => setEditBudget(prev => ({ ...prev, endDate: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="edit-description">Description (Optional)</Label>
                 <Textarea
                   id="edit-description"
@@ -658,7 +837,6 @@ export default function BudgetsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
 
       {/* Summary Cards */}
       <div className="grid gap-6 md:grid-cols-4">
@@ -812,6 +990,10 @@ export default function BudgetsPage() {
                               <Edit className="h-4 w-4 mr-2" />
                               Edit Budget
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenViewTransactions(budget)}>
+                              <List className="h-4 w-4 mr-2" />
+                              View Transactions
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleOpenViewHistory(budget)}>
                               <Calendar className="h-4 w-4 mr-2" />
                               View History
@@ -934,6 +1116,93 @@ export default function BudgetsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* View Budget Transactions Dialog */}
+      <Dialog open={isViewTransactionsOpen} onOpenChange={setIsViewTransactionsOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <List className="h-5 w-5" />
+              Transactions for &quot;{budgetToViewTransactions?.name}&quot;
+            </DialogTitle>
+            <DialogDescription>
+              All transactions that contribute to this budget&apos;s spending
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-hidden">
+            {loadingTransactions ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                <span className="ml-2">Loading transactions...</span>
+              </div>
+            ) : budgetTransactions.length > 0 ? (
+              <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                <div className="text-sm text-muted-foreground">
+                  Found {budgetTransactions.length} transaction{budgetTransactions.length !== 1 ? 's' : ''}
+                </div>
+                {budgetTransactions.map((transaction, index) => (
+                  <Card key={`${transaction.id}-${index}`} className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <div className="font-medium">{transaction.description}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {new Date(transaction.transactionDate || transaction.date).toLocaleDateString('en-AU')}
+                              {transaction.merchant && ` • ${transaction.merchant}`}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={cn(
+                              "font-medium",
+                              getAmountAsNumber(transaction.amount) >= 0 ? "text-green-600" : "text-red-600"
+                            )}>
+                              {getAmountAsNumber(transaction.amount) >= 0 ? '+' : '-'}$
+                              {Math.abs(getAmountAsNumber(transaction.amount)).toLocaleString('en-AU', { 
+                                minimumFractionDigits: 2 
+                              })}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {transaction.account}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+                
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center text-sm font-medium">
+                    <span>Total Expenses:</span>
+                    <span className="text-red-600">
+                      -${budgetTransactions
+                        .filter(t => getAmountAsNumber(t.amount) < 0)
+                        .reduce((sum, t) => sum + Math.abs(getAmountAsNumber(t.amount)), 0)
+                        .toLocaleString('en-AU', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <List className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium">No Transactions Found</h3>
+                <p className="text-muted-foreground">
+                  No transactions found for this budget in the current period.
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewTransactionsOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Budget Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

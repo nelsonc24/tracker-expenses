@@ -60,7 +60,8 @@ import {
   Copy,
   FileText,
   Activity,
-  BarChart3
+  BarChart3,
+  Target
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { BulkOperationsBar } from '@/components/bulk-operations-bar'
@@ -295,6 +296,16 @@ interface TransactionsPageClientProps {
     description?: string
     color?: string
   }>
+  budgets: Array<{
+    id: string
+    name: string
+    amount: number
+    categoryIds: string[]
+    period: string
+    startDate: string
+    endDate?: string
+    isActive: boolean
+  }>
   loading: boolean
   onTransactionUpdate: (transaction: any) => void
   onTransactionDelete: (id: string) => void
@@ -306,6 +317,7 @@ export function TransactionsPageClient({
   accounts: propAccounts,
   categories: propCategories,
   activities: propActivities,
+  budgets: propBudgets,
   loading,
   onTransactionUpdate,
   onTransactionDelete,
@@ -364,10 +376,12 @@ export function TransactionsPageClient({
   const [pageSize, setPageSize] = useState(10)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [originalEditingCategory, setOriginalEditingCategory] = useState<string>('')
   const [isViewDetailsDialogOpen, setIsViewDetailsDialogOpen] = useState(false)
   const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null)
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
   const [categoryEditingTransaction, setCategoryEditingTransaction] = useState<Transaction | null>(null)
+  const [previewCategoryName, setPreviewCategoryName] = useState<string>('')
   const [isActivityAssignDialogOpen, setIsActivityAssignDialogOpen] = useState(false)
   const [activityAssignTransaction, setActivityAssignTransaction] = useState<Transaction | null>(null)
   const [isBreakdownDialogOpen, setIsBreakdownDialogOpen] = useState(false)
@@ -695,6 +709,7 @@ export function TransactionsPageClient({
   // Edit transaction
   const handleEditTransaction = (transaction: Transaction) => {
     setEditingTransaction({ ...transaction })
+    setOriginalEditingCategory(transaction.category) // Track original category for budget impact
     setIsEditDialogOpen(true)
   }
 
@@ -774,6 +789,15 @@ export function TransactionsPageClient({
         onTransactionUpdate(updatedTransaction)
       }
 
+      // Dispatch a custom event to notify other components (like budgets) that a transaction was updated
+      window.dispatchEvent(new CustomEvent('transactionUpdated', { 
+        detail: { 
+          transactionId: updatedTransaction.id, 
+          categoryId: selectedCategory?.id,
+          amount: editingTransaction.amount
+        } 
+      }))
+
       toast.success('Transaction updated successfully')
       setIsEditDialogOpen(false)
       setEditingTransaction(null)
@@ -793,6 +817,7 @@ export function TransactionsPageClient({
   // Handle category click for quick category change
   const handleCategoryClick = (transaction: Transaction) => {
     setCategoryEditingTransaction({ ...transaction })
+    setPreviewCategoryName(transaction.category) // Set initial preview to current category
     setIsCategoryDialogOpen(true)
   }
 
@@ -887,6 +912,16 @@ export function TransactionsPageClient({
       if (onTransactionUpdate) {
         onTransactionUpdate(updatedTransaction)
       }
+
+      // Dispatch a custom event to notify other components (like budgets) that a transaction was updated
+      window.dispatchEvent(new CustomEvent('transactionUpdated', { 
+        detail: { 
+          transactionId: updatedTransaction.id, 
+          categoryId: selectedCategory?.id,
+          oldCategoryId: categoryEditingTransaction.categoryId,
+          amount: requestAmount
+        } 
+      }))
 
       toast.success('Category updated successfully')
       setIsCategoryDialogOpen(false)
@@ -989,6 +1024,54 @@ export function TransactionsPageClient({
     router.push('/import')
   }
 
+  // Utility function to check if a transaction is part of an active budget
+  const getTransactionBudgets = (transaction: Transaction) => {
+    if (!transaction.categoryId) return []
+    
+    const currentDate = new Date()
+    return propBudgets.filter(budget => {
+      // Check if budget is active
+      if (!budget.isActive) return false
+      
+      // Check if transaction category is in budget
+      if (!budget.categoryIds.includes(transaction.categoryId!)) return false
+      
+      // Check if transaction date falls within budget period
+      const budgetStart = new Date(budget.startDate)
+      const budgetEnd = budget.endDate ? new Date(budget.endDate) : new Date(budgetStart.getFullYear(), budgetStart.getMonth() + 1, 0)
+      const transactionDate = new Date(transaction.date)
+      
+      return transactionDate >= budgetStart && transactionDate <= budgetEnd
+    })
+  }
+
+  // Helper function to get budget status for display
+  const getBudgetStatus = (budgets: typeof propBudgets) => {
+    if (budgets.length === 0) return null
+    
+    // For simplicity, just return the first budget's info
+    const budget = budgets[0]
+    return {
+      name: budget.name,
+      hasMultiple: budgets.length > 1,
+      period: budget.period
+    }
+  }
+
+  // Helper function to get budget impact for category changes
+  const getBudgetImpact = (transaction: Transaction, fromCategoryId: string | null, toCategoryName: string) => {
+    const toCategoryId = propCategories.find(c => c.name === toCategoryName)?.id
+    
+    const currentBudgets = fromCategoryId ? getTransactionBudgets({ ...transaction, categoryId: fromCategoryId }) : []
+    const futureBudgets = toCategoryId ? getTransactionBudgets({ ...transaction, categoryId: toCategoryId }) : []
+    
+    const removedFrom = currentBudgets.filter(cb => !futureBudgets.some(fb => fb.id === cb.id))
+    const addedTo = futureBudgets.filter(fb => !currentBudgets.some(cb => cb.id === fb.id))
+    const staying = currentBudgets.filter(cb => futureBudgets.some(fb => fb.id === cb.id))
+    
+    return { removedFrom, addedTo, staying, hasImpact: removedFrom.length > 0 || addedTo.length > 0 }
+  }
+
   // Advanced search handlers
   const handleAdvancedSearch = (filters: any) => {
     setActiveFilters(filters)
@@ -1033,6 +1116,16 @@ export function TransactionsPageClient({
         if (onTransactionCreate) {
           onTransactionCreate(transaction)
         }
+
+        // Dispatch a custom event to notify other components (like budgets) that a transaction was created
+        window.dispatchEvent(new CustomEvent('transactionUpdated', { 
+          detail: { 
+            transactionId: transaction.id, 
+            categoryId: transaction.categoryId,
+            amount: transaction.amount,
+            type: 'created'
+          } 
+        }))
       } else {
         throw new Error('Failed to apply template')
       }
@@ -1349,13 +1442,32 @@ export function TransactionsPageClient({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge 
-                        variant="secondary" 
-                        className="cursor-pointer hover:bg-secondary/80 transition-colors"
-                        onClick={() => handleCategoryClick(transaction)}
-                      >
-                        {transaction.category}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant="secondary" 
+                          className="cursor-pointer hover:bg-secondary/80 transition-colors"
+                          onClick={() => handleCategoryClick(transaction)}
+                        >
+                          {transaction.category}
+                        </Badge>
+                        {(() => {
+                          const transactionBudgets = getTransactionBudgets(transaction)
+                          const budgetStatus = getBudgetStatus(transactionBudgets)
+                          return budgetStatus ? (
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs flex items-center gap-1 text-blue-600 border-blue-200"
+                              title={budgetStatus.hasMultiple 
+                                ? `Part of ${transactionBudgets.length} budgets (${transactionBudgets.map(b => b.name).join(', ')})`
+                                : `Part of "${budgetStatus.name}" budget`
+                              }
+                            >
+                              <Target className="h-3 w-3" />
+                              {budgetStatus.hasMultiple ? `${transactionBudgets.length} budgets` : budgetStatus.name}
+                            </Badge>
+                          ) : null
+                        })()}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">{transaction.account}</div>
@@ -1548,6 +1660,54 @@ export function TransactionsPageClient({
                     ))}
                   </SelectContent>
                 </Select>
+                
+                {/* Budget Impact Preview for Edit Dialog */}
+                {editingTransaction.category !== originalEditingCategory && (
+                  <div className="mt-2 p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium">Budget Impact</span>
+                    </div>
+                    {(() => {
+                      const impact = getBudgetImpact(
+                        editingTransaction, 
+                        editingTransaction.categoryId, 
+                        editingTransaction.category
+                      )
+                      
+                      if (!impact.hasImpact) {
+                        return (
+                          <p className="text-xs text-muted-foreground">
+                            No budget impact - transaction will not affect any budgets
+                          </p>
+                        )
+                      }
+                      
+                      return (
+                        <div className="space-y-2 text-xs">
+                          {impact.removedFrom.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-red-600">Removed from:</span>
+                              <span>{impact.removedFrom.map(b => b.name).join(', ')}</span>
+                            </div>
+                          )}
+                          {impact.addedTo.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-green-600">Added to:</span>
+                              <span>{impact.addedTo.map(b => b.name).join(', ')}</span>
+                            </div>
+                          )}
+                          {impact.staying.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-blue-600">Staying in:</span>
+                              <span>{impact.staying.map(b => b.name).join(', ')}</span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-activities">Activities</Label>
@@ -1737,7 +1897,10 @@ export function TransactionsPageClient({
                 <Label htmlFor="category-select">New Category</Label>
                 <Select 
                   defaultValue={categoryEditingTransaction.category}
-                  onValueChange={(value) => handleSaveCategoryChange(value)}
+                  onValueChange={(value) => {
+                    setPreviewCategoryName(value)
+                    handleSaveCategoryChange(value)
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1751,6 +1914,54 @@ export function TransactionsPageClient({
                   </SelectContent>
                 </Select>
               </div>
+              
+              {/* Budget Impact Preview */}
+              {previewCategoryName && previewCategoryName !== categoryEditingTransaction.category && (
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium">Budget Impact</span>
+                  </div>
+                  {(() => {
+                    const impact = getBudgetImpact(
+                      categoryEditingTransaction, 
+                      categoryEditingTransaction.categoryId, 
+                      previewCategoryName
+                    )
+                    
+                    if (!impact.hasImpact) {
+                      return (
+                        <p className="text-xs text-muted-foreground">
+                          No budget impact - transaction will not affect any budgets
+                        </p>
+                      )
+                    }
+                    
+                    return (
+                      <div className="space-y-2 text-xs">
+                        {impact.removedFrom.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-red-600">Removed from:</span>
+                            <span>{impact.removedFrom.map(b => b.name).join(', ')}</span>
+                          </div>
+                        )}
+                        {impact.addedTo.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-green-600">Added to:</span>
+                            <span>{impact.addedTo.map(b => b.name).join(', ')}</span>
+                          </div>
+                        )}
+                        {impact.staying.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-blue-600">Staying in:</span>
+                            <span>{impact.staying.map(b => b.name).join(', ')}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>

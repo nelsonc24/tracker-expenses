@@ -41,11 +41,23 @@ interface Activity {
   color?: string
 }
 
+interface Budget {
+  id: string
+  name: string
+  amount: number
+  categoryIds: string[]
+  period: string
+  startDate: string
+  endDate?: string
+  isActive: boolean
+}
+
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [activities, setActivities] = useState<Activity[]>([])
+  const [budgets, setBudgets] = useState<Budget[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -57,11 +69,12 @@ export default function TransactionsPage() {
         
         // Fetch all data in parallel - request all transactions (limit=10000 to get all)
         // Force reload to see all imported transactions
-        const [transactionsResponse, accountsResponse, categoriesResponse, activitiesResponse] = await Promise.all([
+        const [transactionsResponse, accountsResponse, categoriesResponse, activitiesResponse, budgetsResponse] = await Promise.all([
           fetch('/api/transactions?limit=10000'),
           fetch('/api/accounts'),
           fetch('/api/categories'),
-          fetch('/api/activities')
+          fetch('/api/activities'),
+          fetch('/api/budgets')
         ])
 
         if (transactionsResponse.ok) {
@@ -83,6 +96,11 @@ export default function TransactionsPage() {
         if (activitiesResponse.ok) {
           const activitiesData = await activitiesResponse.json()
           setActivities(activitiesData)
+        }
+
+        if (budgetsResponse.ok) {
+          const budgetsData = await budgetsResponse.json()
+          setBudgets(budgetsData)
         }
       } catch (error) {
         console.error('Error fetching data:', error)
@@ -154,6 +172,7 @@ export default function TransactionsPage() {
       accounts={accounts}
       categories={categories}
       activities={activities}
+      budgets={budgets}
       loading={loading}
       onTransactionUpdate={handleTransactionUpdate}
       onTransactionDelete={handleTransactionDelete}

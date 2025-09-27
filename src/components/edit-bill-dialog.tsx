@@ -55,7 +55,7 @@ export function EditBillDialog({ bill, open, onOpenChange, onSuccess }: EditBill
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [accountId, setAccountId] = useState('')
-  const [categoryId, setCategoryId] = useState('')
+  const [categoryId, setCategoryId] = useState('none')
   const [frequency, setFrequency] = useState<'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'>('monthly')
   const [dueDay, setDueDay] = useState('')
   const [reminderDays, setReminderDays] = useState('3')
@@ -69,7 +69,7 @@ export function EditBillDialog({ bill, open, onOpenChange, onSuccess }: EditBill
       setDescription(bill.description || '')
       setAmount(bill.amount)
       setAccountId(bill.accountId)
-      setCategoryId(bill.categoryId || '')
+      setCategoryId(bill.categoryId || 'none')
       setFrequency(bill.frequency)
       setDueDay(bill.dueDay?.toString() || '')
       setReminderDays(bill.reminderDays.toString())
@@ -129,7 +129,7 @@ export function EditBillDialog({ bill, open, onOpenChange, onSuccess }: EditBill
         description: description || undefined,
         amount,
         accountId,
-        categoryId: categoryId || undefined,
+        categoryId: categoryId && categoryId !== 'none' ? categoryId : undefined,
         frequency,
         reminderDays: parseInt(reminderDays),
         isAutoPay,
@@ -257,7 +257,7 @@ export function EditBillDialog({ bill, open, onOpenChange, onSuccess }: EditBill
                 <SelectValue placeholder={dataLoading ? "Loading categories..." : "Select category"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No category</SelectItem>
+                <SelectItem value="none">No category</SelectItem>
                 {categories.map((category) => (
                   <SelectItem key={category.id} value={category.id}>
                     {category.name}
