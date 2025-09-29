@@ -239,37 +239,22 @@ export default function BudgetsPage() {
           // Get transactions for these categories in the budget period
           let spentAmount = 0
           if (budget.categoryIds.length > 0) {
-            console.log(`\n🔍 === BUDGET DEBUG: ${budget.name} ===`)
-            console.log('📊 Budget categoryIds:', budget.categoryIds)
-            console.log('📅 Budget period:', budgetStart.toISOString().split('T')[0], 'to', budgetEnd.toISOString().split('T')[0])
-            console.log('💰 Budget amount: $' + parseFloat(budget.amount))
-            
             for (const categoryId of budget.categoryIds) {
               const apiUrl = `/api/transactions?categoryId=${categoryId}&startDate=${budgetStart.toISOString().split('T')[0]}&endDate=${budgetEnd.toISOString().split('T')[0]}`
-              console.log('🔗 Fetching transactions from:', apiUrl)
               
               const spentResponse = await fetch(apiUrl)
               if (spentResponse.ok) {
                 const transactions = await spentResponse.json()
-                console.log(`📋 Found ${transactions.length} transactions for category ${categoryId}:`, transactions.map((t: Transaction) => ({ id: t.id, description: t.description, amount: t.amount, date: t.date, categoryId: t.categoryId })))
                 
                 const categorySpent = transactions.reduce((sum: number, t: Transaction) => {
                   const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount
-                  console.log(`  💳 Transaction: ${t.description || 'Unknown'} - Raw amount: ${amount}, Abs amount: ${Math.abs(amount)}`)
-                  // For budgets, we typically want to count expenses (negative amounts) as positive spending
-                  // and ignore income (positive amounts) unless it's specifically an expense transaction
-                  const spendingAmount = amount < 0 ? Math.abs(amount) : amount // Count both negative and positive as spending for now
+                  const spendingAmount = amount < 0 ? Math.abs(amount) : amount
                   return sum + spendingAmount
                 }, 0)
                 
-                console.log(`💸 Category ${categoryId} spent: $${categorySpent}`)
                 spentAmount += categorySpent
-              } else {
-                console.error(`❌ Failed to fetch transactions for category ${categoryId}:`, spentResponse.status)
               }
             }
-            console.log(`💰 Total spent for ${budget.name}: $${spentAmount}`)
-            console.log('✅ === END BUDGET DEBUG ===\n')
           }
 
           // Convert amount from decimal string to number
@@ -582,38 +567,6 @@ export default function BudgetsPage() {
           <Button variant="outline" onClick={fetchData}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
-          </Button>
-          <Button variant="outline" onClick={() => {
-            console.clear();
-            console.log('🔍 MANUAL DEBUG TRIGGER - Refreshing budget data...');
-            fetchData();
-          }}>
-            Debug
-          </Button>
-          <Button variant="outline" onClick={() => {
-            console.log('🔧 FIXING BUDGET DATE RANGES...');
-            // Find budgets with potentially incorrect date ranges
-            const problematicBudgets = budgets.filter(budget => {
-              const startDate = new Date(budget.startDate);
-              const dayOfMonth = startDate.getDate();
-              // If budget starts after day 20 of month, it might be incorrectly set
-              return dayOfMonth > 20 && budget.name.toLowerCase().includes('monthly');
-            });
-            
-            if (problematicBudgets.length > 0) {
-              console.log('Found budgets with potentially incorrect date ranges:', 
-                problematicBudgets.map(b => ({
-                  name: b.name,
-                  currentStart: b.startDate,
-                  suggestedStart: new Date(new Date(b.startDate).getFullYear(), new Date(b.startDate).getMonth(), 1).toISOString().split('T')[0]
-                }))
-              );
-              alert(`Found ${problematicBudgets.length} budget(s) with potentially incorrect date ranges. Check console for details.`);
-            } else {
-              alert('No date range issues detected.');
-            }
-          }}>
-            Fix Dates
           </Button>
           <Dialog open={isCreateBudgetOpen} onOpenChange={setIsCreateBudgetOpen}>
             <DialogTrigger asChild>
