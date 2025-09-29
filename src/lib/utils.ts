@@ -54,7 +54,7 @@ export function formatCurrency(amount: number | string): string {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(num)
-  } catch (error) {
+  } catch {
     return '$0.00'
   }
 }

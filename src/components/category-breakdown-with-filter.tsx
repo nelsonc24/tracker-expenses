@@ -37,7 +37,7 @@ const TIME_PERIODS = [
 
 export function CategoryBreakdownWithFilter({ initialData }: { initialData?: CategoryData[] }) {
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined)
-  const [selectedPeriod, setSelectedPeriod] = useState('all-time')
+  const [selectedPeriod, setSelectedPeriod] = useState('current-month')
   const [data, setData] = useState<CategoryData[]>(initialData || [])
   const [loading, setLoading] = useState(false)
 

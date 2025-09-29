@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -14,13 +14,11 @@ import {
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
-  Legend,
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useChartColors } from '@/contexts/chart-color-context'
+import { formatCurrency } from '@/lib/utils'
+import { PieLabelProps } from 'recharts/types/polar/Pie'
 
 interface ChartData {
   name: string
@@ -52,11 +50,15 @@ export function SpendingTrendChart({ data }: { data: TimeSeriesData[] }) {
           dataKey="date" 
           className="text-muted-foreground"
           fontSize={12}
+          tickFormatter={(date) => {
+            const d = new Date(date)
+            return `${d.getDate()}/${d.getMonth() + 1}`
+          }}
         />
         <YAxis 
           className="text-muted-foreground"
           fontSize={12}
-          tickFormatter={(value) => `$${value}`}
+          tickFormatter={(value) => `${formatCurrency(value)}`}
         />
         <Tooltip
           contentStyle={{
@@ -64,7 +66,7 @@ export function SpendingTrendChart({ data }: { data: TimeSeriesData[] }) {
             border: '1px solid hsl(var(--border))',
             borderRadius: '8px',
           }}
-          formatter={(value) => [`$${value}`, 'Amount']}
+          formatter={(value) => [`${formatCurrency(value as number)}`, 'Amount']}
         />
         <Area
           type="monotone"
@@ -87,13 +89,13 @@ export function CategoryBreakdownChart({ data }: { data: CategoryData[] }) {
   const total = data.reduce((sum, entry) => sum + entry.amount, 0)
   
   // Enhanced data with percentages
-  const chartData = data.map((item, index) => ({
+  const chartData = data.map((item) => ({
     ...item,
     percentage: ((item.amount / total) * 100).toFixed(1),
     fill: item.color,
   }))
 
-  const onPieEnter = (_: any, index: number) => {
+  const onPieEnter = (_: unknown, index: number) => {
     setActiveIndex(index)
   }
 
@@ -101,13 +103,13 @@ export function CategoryBreakdownChart({ data }: { data: CategoryData[] }) {
     setActiveIndex(undefined)
   }
 
-  const renderCustomLabel = (entry: any) => {
+  const renderCustomLabel = (entry: PieLabelProps) => {
     const percentage = parseFloat(entry.percentage)
     // Only show label if percentage is greater than 5%
     return percentage > 5 ? `${percentage}%` : ''
   }
 
-  const renderTooltip = (props: any) => {
+  const renderTooltip = (props: { active?: boolean; payload?: Array<{ payload: CategoryData & { percentage: string } }> }) => {
     if (props.active && props.payload && props.payload.length) {
       const data = props.payload[0].payload
       return (
@@ -230,7 +232,7 @@ export function MonthlyComparisonChart({ data }: { data: ChartData[] }) {
         <YAxis 
           className="text-muted-foreground"
           fontSize={12}
-          tickFormatter={(value) => `$${value}`}
+          tickFormatter={(value) => `${formatCurrency(value)}`}
         />
         <Tooltip
           contentStyle={{
@@ -238,12 +240,13 @@ export function MonthlyComparisonChart({ data }: { data: ChartData[] }) {
             border: '1px solid hsl(var(--border))',
             borderRadius: '8px',
           }}
-          formatter={(value) => [`$${value}`, 'Amount']}
+          formatter={(value) => [`${formatCurrency(value as number)}`, 'Amount']}
         />
         <Bar
           dataKey="value"
           fill={currentScheme.monthlyComparison.primary}
           radius={[4, 4, 0, 0]}
+          fillOpacity={currentScheme.monthlyComparison.fillOpacity}
         />
       </BarChart>
     </ResponsiveContainer>

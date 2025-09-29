@@ -41,6 +41,12 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { 
   Search, 
   Filter, 
@@ -63,7 +69,7 @@ import {
   BarChart3,
   Target
 } from 'lucide-react'
-import { cn, formatDate } from '@/lib/utils'
+import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { BulkOperationsBar } from '@/components/bulk-operations-bar'
 import { AdvancedSearch } from '@/components/advanced-search'
 import { KeyboardShortcutsHelp } from '@/components/keyboard-shortcuts-help'
@@ -1168,7 +1174,8 @@ export function TransactionsPageClient({
   const netAmount = totalIncome - totalExpenses
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <TooltipProvider>
+      <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
         <div>
@@ -1435,7 +1442,14 @@ export function TransactionsPageClient({
                     </TableCell>
                     <TableCell className="min-w-0 max-w-xs">
                       <div className="space-y-1">
-                        <div className="font-medium truncate">{transaction.description}</div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="font-medium truncate cursor-help">{transaction.description}</div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{transaction.description}</p>
+                          </TooltipContent>
+                        </Tooltip>
                         <div className="text-sm text-muted-foreground truncate">
                           {transaction.merchant} • {transaction.reference}
                         </div>
@@ -1470,7 +1484,14 @@ export function TransactionsPageClient({
                       </div>
                     </TableCell>
                     <TableCell className="w-32">
-                      <div className="text-sm truncate">{transaction.account}</div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="text-sm truncate cursor-help">{transaction.account}</div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{transaction.account}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </TableCell>
                     <TableCell className="w-24">
                       <div className="text-sm text-muted-foreground truncate">
@@ -2033,7 +2054,7 @@ export function TransactionsPageClient({
         onOpenChange={setIsBreakdownDialogOpen}
         transaction={breakdownTransaction ? {
           id: breakdownTransaction.id,
-          amount: breakdownTransaction.amount.toString(),
+          amount: formatCurrency(breakdownTransaction.amount),
           description: breakdownTransaction.description,
           date: breakdownTransaction.date
         } : null}
@@ -2056,5 +2077,6 @@ export function TransactionsPageClient({
         onBulkActions={handleMobileBulkActions}
       />
     </div>
+    </TooltipProvider>
   )
 }

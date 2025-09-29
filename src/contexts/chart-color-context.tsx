@@ -14,7 +14,8 @@ export interface ChartColorScheme {
   }
   monthlyComparison: {
     primary: string
-    secondary?: string
+    fillOpacity: number
+    secondary?: string,
   }
   description: string
 }
@@ -30,7 +31,8 @@ export const chartColorSchemes: ChartColorScheme[] = [
       fillOpacity: 0.2
     },
     monthlyComparison: {
-      primary: 'hsl(var(--primary))'
+      primary: 'hsl(var(--primary))',
+      fillOpacity: 0.2
     },
     description: 'Uses the default theme colors'
   },
@@ -43,7 +45,8 @@ export const chartColorSchemes: ChartColorScheme[] = [
       fillOpacity: 0.3
     },
     monthlyComparison: {
-      primary: '#3b82f6'
+      primary: '#3b82f6',
+      fillOpacity: 0.3
     },
     description: 'Bright blue colors for better visibility'
   },
@@ -56,7 +59,8 @@ export const chartColorSchemes: ChartColorScheme[] = [
       fillOpacity: 0.25
     },
     monthlyComparison: {
-      primary: '#10b981'
+      primary: '#10b981',
+      fillOpacity: 0.25
     },
     description: 'Fresh green colors'
   },
@@ -69,7 +73,8 @@ export const chartColorSchemes: ChartColorScheme[] = [
       fillOpacity: 0.3
     },
     monthlyComparison: {
-      primary: '#8b5cf6'
+      primary: '#8b5cf6',
+      fillOpacity: 0.3
     },
     description: 'Rich purple tones'
   },
@@ -82,7 +87,8 @@ export const chartColorSchemes: ChartColorScheme[] = [
       fillOpacity: 0.25
     },
     monthlyComparison: {
-      primary: '#f59e0b'
+      primary: '#f59e0b',
+      fillOpacity: 0.25
     },
     description: 'Warm orange colors'
   },
@@ -95,7 +101,8 @@ export const chartColorSchemes: ChartColorScheme[] = [
       fillOpacity: 0.4
     },
     monthlyComparison: {
-      primary: '#60a5fa'
+      primary: '#60a5fa',
+      fillOpacity: 0.4
     },
     description: 'Specifically designed for dark backgrounds'
   },
@@ -108,7 +115,8 @@ export const chartColorSchemes: ChartColorScheme[] = [
       fillOpacity: 0.35
     },
     monthlyComparison: {
-      primary: '#ef4444'
+      primary: '#ef4444',
+      fillOpacity: 0.35
     },
     description: 'High contrast red for maximum visibility'
   }
