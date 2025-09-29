@@ -1363,7 +1363,7 @@ export function TransactionsPageClient({
           {/* Desktop Table View */}
           {!isMobile && (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-full table-fixed">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
@@ -1372,7 +1372,7 @@ export function TransactionsPageClient({
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="w-24">
                     <Button 
                       variant="ghost" 
                       onClick={() => handleSort('date')}
@@ -1382,7 +1382,7 @@ export function TransactionsPageClient({
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="min-w-0 max-w-xs">
                     <Button 
                       variant="ghost" 
                       onClick={() => handleSort('description')}
@@ -1392,7 +1392,7 @@ export function TransactionsPageClient({
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="w-32">
                     <Button 
                       variant="ghost" 
                       onClick={() => handleSort('category')}
@@ -1402,9 +1402,9 @@ export function TransactionsPageClient({
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
-                  <TableHead>Account</TableHead>
-                  <TableHead>Receipt #</TableHead>
-                  <TableHead className="text-right">
+                  <TableHead className="w-32">Account</TableHead>
+                  <TableHead className="w-24">Receipt #</TableHead>
+                  <TableHead className="w-24 text-right">
                     <Button 
                       variant="ghost" 
                       onClick={() => handleSort('amount')}
@@ -1420,7 +1420,7 @@ export function TransactionsPageClient({
               <TableBody>
                 {paginatedTransactions.map((transaction, index) => (
                   <TableRow key={`${transaction.id}-${index}`}>
-                    <TableCell>
+                    <TableCell className="w-12">
                       <Checkbox
                         checked={selectedTransactions.includes(transaction.id)}
                         onCheckedChange={(checked) => 
@@ -1428,24 +1428,24 @@ export function TransactionsPageClient({
                         }
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="w-24">
                       <div className="font-medium">
                         {formatDate(transaction.date)}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="min-w-0 max-w-xs">
                       <div className="space-y-1">
-                        <div className="font-medium">{transaction.description}</div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="font-medium truncate">{transaction.description}</div>
+                        <div className="text-sm text-muted-foreground truncate">
                           {transaction.merchant} • {transaction.reference}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
+                    <TableCell className="w-32">
+                      <div className="flex flex-col items-start gap-1">
                         <Badge 
                           variant="secondary" 
-                          className="cursor-pointer hover:bg-secondary/80 transition-colors"
+                          className="cursor-pointer hover:bg-secondary/80 transition-colors truncate max-w-full"
                           onClick={() => handleCategoryClick(transaction)}
                         >
                           {transaction.category}
@@ -1456,7 +1456,7 @@ export function TransactionsPageClient({
                           return budgetStatus ? (
                             <Badge 
                               variant="outline" 
-                              className="text-xs flex items-center gap-1 text-blue-600 border-blue-200"
+                              className="text-xs flex items-center gap-1 text-blue-600 border-blue-200 truncate max-w-full"
                               title={budgetStatus.hasMultiple 
                                 ? `Part of ${transactionBudgets.length} budgets (${transactionBudgets.map(b => b.name).join(', ')})`
                                 : `Part of "${budgetStatus.name}" budget`
@@ -1469,15 +1469,15 @@ export function TransactionsPageClient({
                         })()}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="text-sm">{transaction.account}</div>
+                    <TableCell className="w-32">
+                      <div className="text-sm truncate">{transaction.account}</div>
                     </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-muted-foreground">
+                    <TableCell className="w-24">
+                      <div className="text-sm text-muted-foreground truncate">
                         {transaction.receiptNumber || '-'}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="w-24 text-right">
                       <div className={cn(
                         "font-medium",
                         transaction.amount >= 0 ? "text-green-600" : "text-red-600"
@@ -1488,7 +1488,7 @@ export function TransactionsPageClient({
                         })}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="w-12">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">
