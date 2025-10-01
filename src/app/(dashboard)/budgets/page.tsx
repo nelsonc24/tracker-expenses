@@ -148,9 +148,29 @@ interface BudgetWithProgress extends Omit<Budget, 'amount'> {
   categoryIcon?: string
 }
 
+interface BudgetPeriodData {
+  id: string
+  budgetId: string
+  budgetName: string
+  periodLabel: string
+  periodStart: Date | string
+  periodEnd: Date | string
+  allocatedAmount: string
+  rolloverAmount: string
+  totalBudget: string
+  spentAmount: string
+  status: string
+  budgetCategoryIds: string[]
+  categoryName?: string
+  categoryColor?: string
+  categoryIcon?: string
+}
+
 export default function BudgetsPage() {
   const { user, isLoaded } = useUser()
   const [budgets, setBudgets] = useState<BudgetWithProgress[]>([])
+  const [previousBudgets, setPreviousBudgets] = useState<BudgetPeriodData[]>([])
+  const [allBudgetHistory, setAllBudgetHistory] = useState<BudgetPeriodData[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isCreateBudgetOpen, setIsCreateBudgetOpen] = useState(false)
@@ -334,11 +354,76 @@ export default function BudgetsPage() {
     }
   }, [user])
 
+  // Fetch budget periods for previous month and all history
+  const fetchBudgetPeriods = useCallback(async () => {
+    if (!user) return
+
+    try {
+      // Fetch completed periods (last completed period = previous month)
+      const completedRes = await fetch('/api/budget-periods?status=completed')
+      if (completedRes.ok) {
+        const completedData = await completedRes.json()
+        
+        // Get the most recent completed period for each budget (previous month)
+        const budgetMap = new Map<string, typeof completedData[0]>()
+        completedData.forEach((period: typeof completedData[0]) => {
+          if (!budgetMap.has(period.budgetId)) {
+            budgetMap.set(period.budgetId, period)
+          }
+        })
+        
+        // Enrich with category data
+        const enrichedPrevious = Array.from(budgetMap.values()).map((period) => {
+          const categoryId = period.budgetCategoryIds?.[0]
+          const category = categories.find((c: Category) => c.id === categoryId)
+          return {
+            ...period,
+            categoryName: category?.name,
+            categoryColor: category?.color,
+            categoryIcon: category?.icon
+          }
+        })
+        
+        setPreviousBudgets(enrichedPrevious)
+      }
+
+      // Fetch all periods for history view
+      const allRes = await fetch('/api/budget-periods')
+      if (allRes.ok) {
+        const allData = await allRes.json()
+        
+        // Enrich with category data
+        const enrichedAll = allData.map((period: typeof allData[0]) => {
+          const categoryId = period.budgetCategoryIds?.[0]
+          const category = categories.find((c: Category) => c.id === categoryId)
+          return {
+            ...period,
+            categoryName: category?.name,
+            categoryColor: category?.color,
+            categoryIcon: category?.icon
+          }
+        })
+        
+        setAllBudgetHistory(enrichedAll)
+      }
+    } catch (err) {
+      console.error('Error fetching budget periods:', err)
+    }
+  }, [user, categories])
+
   // Fetch data on component mount and when page becomes visible
   useEffect(() => {
     if (!isLoaded || !user) return
     fetchData()
   }, [user, isLoaded, fetchData])
+
+  // Fetch budget periods when categories are loaded or tab changes
+  useEffect(() => {
+    if (!isLoaded || !user || categories.length === 0) return
+    if (selectedPeriod !== 'current') {
+      fetchBudgetPeriods()
+    }
+  }, [user, isLoaded, selectedPeriod, categories, fetchBudgetPeriods])
 
   // Add event listener for page visibility changes to refresh budgets when user returns to the page
   useEffect(() => {
@@ -1190,31 +1275,170 @@ export default function BudgetsPage() {
         </TabsContent>
 
         <TabsContent value="previous">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-12">
-                <PiggyBank className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">Previous Month Data</h3>
-                <p className="text-muted-foreground">
-                  Previous month&apos;s budget performance will be shown here
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {previousBudgets.length > 0 ? (
+            <div className="grid gap-4">
+              {previousBudgets.map((period) => {
+                const allocated = parseFloat(period.allocatedAmount)
+                const spent = parseFloat(period.spentAmount)
+                const progress = allocated > 0 ? (spent / allocated) * 100 : 0
+                const remaining = allocated - spent
+                const isOverBudget = progress > 100
+                const isWarning = progress > 80 && progress <= 100
+
+                return (
+                  <Card key={period.id} className="transition-all hover:shadow-md">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-4 h-4 rounded-full bg-gray-500" />
+                          <div>
+                            <h3 className="text-lg font-semibold">{period.budgetName}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {period.categoryName || 'Uncategorized'} • {period.periodLabel}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-xl font-bold">
+                            ${spent.toLocaleString('en-AU', { minimumFractionDigits: 2 })}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            of ${allocated.toLocaleString('en-AU', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Progress</span>
+                          <span className={cn(
+                            "font-medium",
+                            isOverBudget ? "text-red-600" : isWarning ? "text-yellow-600" : "text-green-600"
+                          )}>
+                            {progress.toFixed(1)}%
+                          </span>
+                        </div>
+                        
+                        <Progress 
+                          value={Math.min(progress, 100)} 
+                          className={cn(
+                            "h-2",
+                            isOverBudget && "bg-red-100 dark:bg-red-950"
+                          )}
+                        />
+
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Result</p>
+                            <p className={cn(
+                              "font-medium",
+                              remaining < 0 ? "text-red-600" : "text-green-600"
+                            )}>
+                              {remaining < 0 ? '-' : '+'}${Math.abs(remaining).toLocaleString('en-AU', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Status</p>
+                            <p className={cn(
+                              "font-medium",
+                              isOverBudget ? "text-red-600" : "text-green-600"
+                            )}>
+                              {isOverBudget ? 'Over Budget' : 'On Track'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12">
+                  <PiggyBank className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">No Previous Month Data</h3>
+                  <p className="text-muted-foreground">
+                    Previous month&apos;s budget performance will appear here once available
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="all">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-12">
-                <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">All Budget History</h3>
-                <p className="text-muted-foreground">
-                  Complete budget history and trends will be shown here
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {allBudgetHistory.length > 0 ? (
+            <div className="space-y-6">
+              {/* Group by budget */}
+              {Array.from(new Set(allBudgetHistory.map(p => p.budgetId))).map(budgetId => {
+                const periods = allBudgetHistory.filter(p => p.budgetId === budgetId)
+                const budgetName = periods[0]?.budgetName || 'Unknown Budget'
+                
+                return (
+                  <Card key={budgetId}>
+                    <CardHeader>
+                      <CardTitle>{budgetName}</CardTitle>
+                      <CardDescription>
+                        {periods.length} period{periods.length !== 1 ? 's' : ''} tracked
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {periods.map((period) => {
+                          const allocated = parseFloat(period.allocatedAmount)
+                          const spent = parseFloat(period.spentAmount)
+                          const progress = allocated > 0 ? (spent / allocated) * 100 : 0
+                          const remaining = allocated - spent
+
+                          return (
+                            <div key={period.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                              <div className="flex-1">
+                                <div className="font-medium">{period.periodLabel}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  ${spent.toFixed(2)} of ${allocated.toFixed(2)}
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-4">
+                                <div className="text-right">
+                                  <div className={cn(
+                                    "text-sm font-medium",
+                                    remaining < 0 ? "text-red-600" : "text-green-600"
+                                  )}>
+                                    {remaining < 0 ? '-' : '+'}${Math.abs(remaining).toFixed(2)}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {progress.toFixed(0)}%
+                                  </div>
+                                </div>
+                                {progress > 100 && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                                {progress <= 100 && progress > 80 && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                                {progress <= 80 && <CheckCircle className="h-4 w-4 text-green-500" />}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12">
+                  <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">No Budget History</h3>
+                  <p className="text-muted-foreground">
+                    Complete budget history and trends will appear here as you track your budgets
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
 
