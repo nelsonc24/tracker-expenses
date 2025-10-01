@@ -89,6 +89,18 @@ interface Budget {
   accountIds: string[]
   alertThreshold: string
   isActive: boolean
+  // Auto-reset and period tracking
+  isRecurring?: boolean
+  currentPeriodStart?: Date | string
+  currentPeriodEnd?: Date | string
+  nextResetDate?: Date | string
+  autoResetEnabled?: boolean
+  resetDay?: number
+  // Rollover settings
+  rolloverUnused?: boolean
+  rolloverStrategy?: string
+  rolloverPercentage?: number
+  rolloverLimit?: string
   metadata?: {
     color?: string
     notifications?: boolean
@@ -245,8 +257,16 @@ export default function BudgetsPage() {
         budgetsData.map(async (budget: Budget) => {
           // Calculate spent amount for this budget's categories and time period
           const now = new Date()
-          const budgetStart = new Date(budget.startDate)
-          const budgetEnd = budget.endDate ? new Date(budget.endDate) : new Date(budgetStart.getFullYear(), budgetStart.getMonth() + 1, 0)
+          
+          // Use current period dates if available, otherwise fall back to original dates
+          const budgetStart = budget.currentPeriodStart 
+            ? new Date(budget.currentPeriodStart)
+            : new Date(budget.startDate)
+          const budgetEnd = budget.currentPeriodEnd
+            ? new Date(budget.currentPeriodEnd)
+            : budget.endDate 
+              ? new Date(budget.endDate) 
+              : new Date(budgetStart.getFullYear(), budgetStart.getMonth() + 1, 0)
 
           // Get transactions for these categories in the budget period
           let spentAmount = 0
