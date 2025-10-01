@@ -80,17 +80,32 @@ export const budgets = pgTable('budgets', {
   description: text('description'),
   amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
   currency: text('currency').default('AUD').notNull(),
-  period: text('period').notNull(), // 'weekly', 'monthly', 'yearly'
+  period: text('period').notNull(), // 'weekly', 'monthly', 'quarterly', 'yearly'
   startDate: timestamp('start_date').notNull(),
   endDate: timestamp('end_date'),
   categoryIds: jsonb('category_ids').$type<string[]>().default([]),
   accountIds: jsonb('account_ids').$type<string[]>().default([]),
   alertThreshold: decimal('alert_threshold', { precision: 5, scale: 2 }).default('80.00'), // percentage
   isActive: boolean('is_active').default(true).notNull(),
+  
+  // Auto-reset and period tracking
+  isRecurring: boolean('is_recurring').default(true).notNull(),
+  currentPeriodStart: timestamp('current_period_start'),
+  currentPeriodEnd: timestamp('current_period_end'),
+  nextResetDate: timestamp('next_reset_date'),
+  autoResetEnabled: boolean('auto_reset_enabled').default(false).notNull(),
+  resetDay: integer('reset_day').default(1), // Day of month/week for reset (1-31)
+  
+  // Rollover settings
+  rolloverUnused: boolean('rollover_unused').default(false).notNull(),
+  rolloverLimit: decimal('rollover_limit', { precision: 15, scale: 2 }),
+  rolloverStrategy: text('rollover_strategy').default('none').notNull(), // 'full', 'partial', 'capped', 'none'
+  rolloverPercentage: integer('rollover_percentage'), // For partial rollover (0-100)
+  
   metadata: jsonb('metadata').$type<{
     color?: string
     notifications?: boolean
-    rollover?: boolean
+    rollover?: boolean // Deprecated - use rolloverUnused
   }>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -98,6 +113,45 @@ export const budgets = pgTable('budgets', {
   userIdIdx: index('budgets_user_id_idx').on(table.userId),
   periodIdx: index('budgets_period_idx').on(table.period),
   startDateIdx: index('budgets_start_date_idx').on(table.startDate),
+  nextResetIdx: index('budgets_next_reset_idx').on(table.nextResetDate),
+}))
+
+// Budget Periods table - tracks historical budget periods
+export const budgetPeriods = pgTable('budget_periods', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  budgetId: uuid('budget_id').references(() => budgets.id, { onDelete: 'cascade' }).notNull(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  
+  periodStart: timestamp('period_start').notNull(),
+  periodEnd: timestamp('period_end').notNull(),
+  
+  // Budget amounts for this period
+  allocatedAmount: decimal('allocated_amount', { precision: 15, scale: 2 }).notNull(),
+  rolloverAmount: decimal('rollover_amount', { precision: 15, scale: 2 }).default('0.00').notNull(),
+  totalBudget: decimal('total_budget', { precision: 15, scale: 2 }).notNull(), // allocated + rollover
+  spentAmount: decimal('spent_amount', { precision: 15, scale: 2 }).default('0.00').notNull(),
+  remainingAmount: decimal('remaining_amount', { precision: 15, scale: 2 }),
+  
+  // Status tracking
+  status: text('status').notNull(), // 'active', 'completed', 'future', 'cancelled'
+  utilizationPercentage: decimal('utilization_percentage', { precision: 5, scale: 2 }),
+  
+  // Performance metrics
+  transactionCount: integer('transaction_count').default(0).notNull(),
+  averageDailySpend: decimal('average_daily_spend', { precision: 15, scale: 2 }),
+  peakSpendingDay: timestamp('peak_spending_day'),
+  
+  // Metadata
+  periodLabel: text('period_label').notNull(), // "October 2025", "Q4 2025", etc.
+  notes: text('notes'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  completedAt: timestamp('completed_at'),
+}, (table) => ({
+  budgetIdIdx: index('budget_periods_budget_id_idx').on(table.budgetId),
+  userIdIdx: index('budget_periods_user_id_idx').on(table.userId),
+  periodIdx: index('budget_periods_period_idx').on(table.periodStart, table.periodEnd),
+  statusIdx: index('budget_periods_status_idx').on(table.status),
 }))
 
 // Bills table

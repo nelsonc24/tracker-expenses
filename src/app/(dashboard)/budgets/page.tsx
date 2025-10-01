@@ -163,7 +163,13 @@ export default function BudgetsPage() {
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     categoryIds: [] as string[],
-    accountIds: [] as string[]
+    accountIds: [] as string[],
+    autoResetEnabled: true,
+    resetDay: 1,
+    rolloverUnused: false,
+    rolloverStrategy: 'none' as 'none' | 'full' | 'partial' | 'capped',
+    rolloverPercentage: 100,
+    rolloverLimit: ''
   })
   const [editBudget, setEditBudget] = useState({
     name: '',
@@ -173,7 +179,13 @@ export default function BudgetsPage() {
     startDate: '',
     endDate: '',
     categoryIds: [] as string[],
-    accountIds: [] as string[]
+    accountIds: [] as string[],
+    autoResetEnabled: true,
+    resetDay: 1,
+    rolloverUnused: false,
+    rolloverStrategy: 'none' as 'none' | 'full' | 'partial' | 'capped',
+    rolloverPercentage: 100,
+    rolloverLimit: ''
   })
 
   // Helper function to get amount as number
@@ -361,7 +373,13 @@ export default function BudgetsPage() {
           startDate: newBudget.startDate,
           endDate: newBudget.endDate || null,
           categoryIds: selectedCategory ? [selectedCategory] : [],
-          accountIds: newBudget.accountIds
+          accountIds: newBudget.accountIds,
+          autoResetEnabled: newBudget.autoResetEnabled,
+          resetDay: newBudget.resetDay,
+          rolloverUnused: newBudget.rolloverUnused,
+          rolloverStrategy: newBudget.rolloverStrategy,
+          rolloverPercentage: newBudget.rolloverPercentage,
+          rolloverLimit: newBudget.rolloverLimit ? parseFloat(newBudget.rolloverLimit) : null
         })
       })
 
@@ -393,7 +411,13 @@ export default function BudgetsPage() {
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
         categoryIds: [],
-        accountIds: []
+        accountIds: [],
+        autoResetEnabled: true,
+        resetDay: 1,
+        rolloverUnused: false,
+        rolloverStrategy: 'none',
+        rolloverPercentage: 100,
+        rolloverLimit: ''
       })
     } catch (err) {
       console.error('Error creating budget:', err)
@@ -412,7 +436,13 @@ export default function BudgetsPage() {
       startDate: new Date(budget.startDate).toISOString().split('T')[0],
       endDate: budget.endDate ? new Date(budget.endDate).toISOString().split('T')[0] : '',
       categoryIds: budget.categoryIds,
-      accountIds: budget.accountIds
+      accountIds: budget.accountIds,
+      autoResetEnabled: (budget as any).autoResetEnabled ?? true,
+      resetDay: (budget as any).resetDay ?? 1,
+      rolloverUnused: (budget as any).rolloverUnused ?? false,
+      rolloverStrategy: (budget as any).rolloverStrategy ?? 'none',
+      rolloverPercentage: (budget as any).rolloverPercentage ?? 100,
+      rolloverLimit: (budget as any).rolloverLimit?.toString() ?? ''
     })
     setEditSelectedCategory(budget.categoryIds[0] || '')
     setIsEditBudgetOpen(true)
@@ -647,17 +677,115 @@ export default function BudgetsPage() {
                   onChange={(e) => setNewBudget(prev => ({ ...prev, description: e.target.value }))}
                 />
               </div>
-              <div className="flex items-center space-x-2">
-                <input 
-                  type="checkbox" 
-                  id="rollover" 
-                  className="rounded" 
-                  title="Roll over unused budget to next period"
-                  aria-describedby="rollover-label"
-                />
-                <Label htmlFor="rollover" id="rollover-label" className="text-sm">
-                  Roll over unused budget to next period
-                </Label>
+              
+              {/* Auto-Reset Settings */}
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium text-sm">Budget Period Settings</h4>
+                
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="auto-reset" 
+                    className="rounded" 
+                    checked={newBudget.autoResetEnabled}
+                    onChange={(e) => setNewBudget(prev => ({ ...prev, autoResetEnabled: e.target.checked }))}
+                  />
+                  <Label htmlFor="auto-reset" className="text-sm font-normal">
+                    Automatically reset for next period
+                  </Label>
+                </div>
+                
+                {newBudget.autoResetEnabled && newBudget.period === 'monthly' && (
+                  <div className="grid gap-2 ml-6">
+                    <Label htmlFor="reset-day" className="text-sm">Reset on day</Label>
+                    <Select 
+                      value={newBudget.resetDay.toString()} 
+                      onValueChange={(value) => setNewBudget(prev => ({ ...prev, resetDay: parseInt(value) }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                          <SelectItem key={day} value={day.toString()}>
+                            {day === 1 ? '1st' : day === 2 ? '2nd' : day === 3 ? '3rd' : `${day}th`} of month
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {/* Rollover Settings */}
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="font-medium text-sm">Rollover Settings</h4>
+                
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="rollover" 
+                    className="rounded" 
+                    checked={newBudget.rolloverUnused}
+                    onChange={(e) => setNewBudget(prev => ({ 
+                      ...prev, 
+                      rolloverUnused: e.target.checked,
+                      rolloverStrategy: e.target.checked ? 'full' : 'none'
+                    }))}
+                  />
+                  <Label htmlFor="rollover" className="text-sm font-normal">
+                    Roll over unused budget to next period
+                  </Label>
+                </div>
+                
+                {newBudget.rolloverUnused && (
+                  <div className="space-y-3 ml-6">
+                    <div className="grid gap-2">
+                      <Label htmlFor="rollover-strategy" className="text-sm">Rollover Strategy</Label>
+                      <Select 
+                        value={newBudget.rolloverStrategy} 
+                        onValueChange={(value: any) => setNewBudget(prev => ({ ...prev, rolloverStrategy: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="full">Full - Carry over all unused budget</SelectItem>
+                          <SelectItem value="partial">Partial - Carry over a percentage</SelectItem>
+                          <SelectItem value="capped">Capped - Up to a maximum amount</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {newBudget.rolloverStrategy === 'partial' && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="rollover-percentage" className="text-sm">Rollover Percentage</Label>
+                        <Input
+                          id="rollover-percentage"
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={newBudget.rolloverPercentage}
+                          onChange={(e) => setNewBudget(prev => ({ ...prev, rolloverPercentage: parseInt(e.target.value) || 0 }))}
+                        />
+                      </div>
+                    )}
+                    
+                    {newBudget.rolloverStrategy === 'capped' && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="rollover-limit" className="text-sm">Maximum Rollover Amount (AUD)</Label>
+                        <Input
+                          id="rollover-limit"
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={newBudget.rolloverLimit}
+                          onChange={(e) => setNewBudget(prev => ({ ...prev, rolloverLimit: e.target.value }))}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             

@@ -34,7 +34,13 @@ export async function POST(request: NextRequest) {
       startDate, 
       endDate, 
       categoryIds, 
-      accountIds 
+      accountIds,
+      autoResetEnabled,
+      resetDay,
+      rolloverUnused,
+      rolloverStrategy,
+      rolloverPercentage,
+      rolloverLimit
     } = body
 
     // Validate required fields
@@ -54,7 +60,13 @@ export async function POST(request: NextRequest) {
       startDate: new Date(startDate),
       endDate: endDate ? new Date(endDate) : undefined,
       categoryIds,
-      accountIds
+      accountIds,
+      autoResetEnabled,
+      resetDay,
+      rolloverUnused,
+      rolloverStrategy,
+      rolloverPercentage,
+      rolloverLimit: rolloverLimit ? rolloverLimit.toString() : undefined
     })
 
     if (!budget) {

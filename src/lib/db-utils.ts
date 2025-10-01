@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/db'
-import { users, accounts, categories, transactions, budgets, recurringTransactions } from '@/db/schema'
-import { eq, and, desc, asc, count, sum, gte, lte, like, or, sql } from 'drizzle-orm'
+import { users, accounts, categories, transactions, budgets, budgetPeriods, recurringTransactions } from '@/db/schema'
+import { eq, and, desc, asc, count, sum, gte, lte, like, or, sql, inArray } from 'drizzle-orm'
 
 // Type helpers for better TypeScript support
 type SelectUser = typeof users.$inferSelect
@@ -10,6 +10,8 @@ type SelectCategory = typeof categories.$inferSelect
 type InsertTransaction = typeof transactions.$inferInsert
 type SelectTransaction = typeof transactions.$inferSelect
 type SelectBudget = typeof budgets.$inferSelect
+type SelectBudgetPeriod = typeof budgetPeriods.$inferSelect
+type InsertBudgetPeriod = typeof budgetPeriods.$inferInsert
 
 // User utilities
 export async function getCurrentUser(): Promise<SelectUser | null> {
@@ -517,17 +519,59 @@ export async function createBudget(budgetData: {
   endDate?: Date
   categoryIds?: string[]
   accountIds?: string[]
+  autoResetEnabled?: boolean
+  resetDay?: number
+  rolloverUnused?: boolean
+  rolloverStrategy?: string
+  rolloverPercentage?: number
+  rolloverLimit?: string
 }): Promise<SelectBudget | null> {
   try {
+    // Calculate initial period dates
+    const currentPeriodStart = budgetData.startDate
+    const currentPeriodEnd = budgetData.endDate || calculateNextResetDate(
+      budgetData.startDate,
+      budgetData.period as 'weekly' | 'monthly' | 'quarterly' | 'yearly',
+      budgetData.resetDay
+    )
+    const nextResetDate = calculateNextResetDate(
+      budgetData.startDate,
+      budgetData.period as 'weekly' | 'monthly' | 'quarterly' | 'yearly',
+      budgetData.resetDay
+    )
+
     const result = await db
       .insert(budgets)
       .values({
         ...budgetData,
+        currentPeriodStart,
+        currentPeriodEnd,
+        nextResetDate,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
       .returning()
-    return (result as SelectBudget[])?.[0] || null
+    
+    const newBudget = (result as SelectBudget[])?.[0] || null
+    
+    // Create initial budget period
+    if (newBudget) {
+      await db.insert(budgetPeriods).values({
+        budgetId: newBudget.id,
+        userId: newBudget.userId,
+        periodStart: currentPeriodStart,
+        periodEnd: currentPeriodEnd,
+        allocatedAmount: budgetData.amount,
+        rolloverAmount: '0.00',
+        totalBudget: budgetData.amount,
+        spentAmount: '0.00',
+        status: 'active',
+        periodLabel: generatePeriodLabel(currentPeriodStart, currentPeriodEnd, budgetData.period),
+        createdAt: new Date()
+      })
+    }
+    
+    return newBudget
   } catch (error) {
     console.error('Error creating budget:', error)
     return null
@@ -857,5 +901,279 @@ export async function clearAllTransactions(userId: string): Promise<number> {
   } catch (error) {
     console.error('Error clearing all transactions:', error)
     throw error
+  }
+}
+
+// ============================================================================
+// Budget Period Management Utilities
+// ============================================================================
+
+/**
+ * Calculate next reset date based on period type and reset day
+ */
+export function calculateNextResetDate(
+  currentDate: Date,
+  period: 'weekly' | 'monthly' | 'quarterly' | 'yearly',
+  resetDay?: number
+): Date {
+  const next = new Date(currentDate)
+  
+  switch (period) {
+    case 'weekly':
+      next.setDate(next.getDate() + 7)
+      break
+    case 'monthly':
+      next.setMonth(next.getMonth() + 1)
+      if (resetDay) {
+        next.setDate(Math.min(resetDay, new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()))
+      }
+      break
+    case 'quarterly':
+      next.setMonth(next.getMonth() + 3)
+      next.setDate(1)
+      break
+    case 'yearly':
+      next.setFullYear(next.getFullYear() + 1)
+      next.setMonth(0)
+      next.setDate(1)
+      break
+  }
+  
+  return next
+}
+
+/**
+ * Generate human-readable period label
+ */
+export function generatePeriodLabel(
+  startDate: Date,
+  endDate: Date,
+  period: string
+): string {
+  const start = new Date(startDate)
+  
+  switch (period) {
+    case 'weekly':
+      return `Week of ${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+    case 'monthly':
+      return start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    case 'quarterly':
+      const quarter = Math.floor(start.getMonth() / 3) + 1
+      return `Q${quarter} ${start.getFullYear()}`
+    case 'yearly':
+      return start.getFullYear().toString()
+    default:
+      return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+  }
+}
+
+/**
+ * Find budgets that need to be reset
+ */
+export async function findBudgetsNeedingReset(): Promise<SelectBudget[]> {
+  const now = new Date()
+  
+  try {
+    const result = await db
+      .select()
+      .from(budgets)
+      .where(
+        and(
+          eq(budgets.isActive, true),
+          eq(budgets.autoResetEnabled, true),
+          lte(budgets.nextResetDate as any, now)
+        )
+      )
+    
+    return result as SelectBudget[]
+  } catch (error) {
+    console.error('Error finding budgets needing reset:', error)
+    return []
+  }
+}
+
+/**
+ * Calculate total spending for a budget in a period
+ */
+export async function calculateBudgetSpending(
+  budgetId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<number> {
+  try {
+    const budget = await db
+      .select()
+      .from(budgets)
+      .where(eq(budgets.id, budgetId))
+      .limit(1)
+    
+    if (budget.length === 0) return 0
+    
+    const categoryIds = budget[0].categoryIds || []
+    if (categoryIds.length === 0) return 0
+    
+    const txns = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.userId, budget[0].userId),
+          sql`${transactions.categoryId} = ANY(${categoryIds})`,
+          gte(transactions.transactionDate, startDate),
+          lte(transactions.transactionDate, endDate)
+        )
+      )
+    
+    return txns.reduce((sum, t) => {
+      const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount
+      return sum + Math.abs(amount)
+    }, 0)
+  } catch (error) {
+    console.error('Error calculating budget spending:', error)
+    return 0
+  }
+}
+
+/**
+ * Reset a budget for a new period
+ */
+export async function resetBudgetPeriod(budget: SelectBudget): Promise<void> {
+  const now = new Date()
+  
+  try {
+    // 1. Get current active period
+    const currentPeriodResult = await db
+      .select()
+      .from(budgetPeriods)
+      .where(
+        and(
+          eq(budgetPeriods.budgetId, budget.id),
+          eq(budgetPeriods.status, 'active')
+        )
+      )
+      .limit(1)
+    
+    if (currentPeriodResult.length === 0) {
+      console.log(`No active period found for budget ${budget.id}, skipping reset`)
+      return
+    }
+    
+    const period = currentPeriodResult[0]
+    
+    // 2. Calculate spending for ending period
+    const spentAmount = await calculateBudgetSpending(
+      budget.id,
+      period.periodStart,
+      period.periodEnd
+    )
+    
+    const totalBudgetNum = parseFloat(period.totalBudget.toString())
+    const remaining = totalBudgetNum - spentAmount
+    
+    // 3. Calculate rollover amount
+    let rolloverAmount = 0
+    if (budget.rolloverUnused && remaining > 0) {
+      switch (budget.rolloverStrategy) {
+        case 'full':
+          rolloverAmount = remaining
+          break
+        case 'partial':
+          rolloverAmount = remaining * ((budget.rolloverPercentage || 0) / 100)
+          break
+        case 'capped':
+          rolloverAmount = Math.min(remaining, parseFloat(budget.rolloverLimit?.toString() || '0'))
+          break
+      }
+    }
+    
+    // 4. Complete current period
+    await db
+      .update(budgetPeriods)
+      .set({
+        status: 'completed',
+        spentAmount: spentAmount.toString(),
+        remainingAmount: remaining.toString(),
+        utilizationPercentage: ((spentAmount / totalBudgetNum) * 100).toFixed(2),
+        completedAt: now
+      })
+      .where(eq(budgetPeriods.id, period.id))
+    
+    // 5. Create new period
+    const newPeriodStart = new Date(budget.nextResetDate as Date)
+    const newPeriodEnd = calculateNextResetDate(newPeriodStart, budget.period as any, budget.resetDay || 1)
+    const newBudgetAmount = parseFloat(budget.amount.toString())
+    
+    await db.insert(budgetPeriods).values({
+      budgetId: budget.id,
+      userId: budget.userId,
+      periodStart: newPeriodStart,
+      periodEnd: newPeriodEnd,
+      allocatedAmount: newBudgetAmount.toString(),
+      rolloverAmount: rolloverAmount.toString(),
+      totalBudget: (newBudgetAmount + rolloverAmount).toString(),
+      spentAmount: '0.00',
+      status: 'active',
+      periodLabel: generatePeriodLabel(newPeriodStart, newPeriodEnd, budget.period),
+      createdAt: now
+    })
+    
+    // 6. Update budget with new dates
+    const nextResetDate = calculateNextResetDate(newPeriodStart, budget.period as any, budget.resetDay || 1)
+    
+    await db
+      .update(budgets)
+      .set({
+        currentPeriodStart: newPeriodStart,
+        currentPeriodEnd: newPeriodEnd,
+        nextResetDate: nextResetDate,
+        updatedAt: now
+      })
+      .where(eq(budgets.id, budget.id))
+    
+    console.log(`Successfully reset budget ${budget.id} for new period starting ${newPeriodStart.toISOString()}`)
+  } catch (error) {
+    console.error(`Error resetting budget ${budget.id}:`, error)
+    throw error
+  }
+}
+
+/**
+ * Get all periods for a budget
+ */
+export async function getBudgetPeriods(budgetId: string): Promise<SelectBudgetPeriod[]> {
+  try {
+    const result = await db
+      .select()
+      .from(budgetPeriods)
+      .where(eq(budgetPeriods.budgetId, budgetId))
+      .orderBy(desc(budgetPeriods.periodStart))
+    
+    return result as SelectBudgetPeriod[]
+  } catch (error) {
+    console.error('Error getting budget periods:', error)
+    return []
+  }
+}
+
+/**
+ * Get current active period for a budget
+ */
+export async function getCurrentBudgetPeriod(budgetId: string): Promise<SelectBudgetPeriod | null> {
+  try {
+    const result = await db
+      .select()
+      .from(budgetPeriods)
+      .where(
+        and(
+          eq(budgetPeriods.budgetId, budgetId),
+          eq(budgetPeriods.status, 'active')
+        )
+      )
+      .limit(1)
+    
+    return (result as SelectBudgetPeriod[])?.[0] || null
+  } catch (error) {
+    console.error('Error getting current budget period:', error)
+    return null
   }
 }
