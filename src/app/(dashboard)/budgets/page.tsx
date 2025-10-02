@@ -47,25 +47,10 @@ import {
   Trash2,
   PiggyBank,
   List,
-  RefreshCw,
-  // Add category icons
-  ShoppingCart,
-  Car,
-  Home,
-  Utensils,
-  Coffee,
-  Gamepad2,
-  Plane,
-  Heart,
-  GraduationCap,
-  Briefcase,
-  CreditCard,
-  Gift,
-  Music,
-  Shirt,
-  Zap
+  RefreshCw
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getCategoryIcon } from '@/lib/category-icons'
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -223,31 +208,6 @@ export default function BudgetsPage() {
   // Helper function to get amount as number
   const getAmountAsNumber = (amount: string | number): number => {
     return typeof amount === 'string' ? parseFloat(amount) : amount
-  }
-
-  // Add icon mapping function
-  const getCategoryIcon = (iconName: string) => {
-    const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-      'shopping-cart': ShoppingCart,
-      'car': Car,
-      'home': Home,
-      'utensils': Utensils,
-      'coffee': Coffee,
-      'gamepad2': Gamepad2,
-      'plane': Plane,
-      'heart': Heart,
-      'graduation-cap': GraduationCap,
-      'briefcase': Briefcase,
-      'credit-card': CreditCard,
-      'gift': Gift,
-      'music': Music,
-      'shirt': Shirt,
-      'zap': Zap,
-      'dollar-sign': DollarSign
-    }
-    
-    const IconComponent = iconMap[iconName] || DollarSign
-    return <IconComponent className="h-4 w-4" />
   }
 
   // Fetch data function (separated for reusability)
@@ -1149,8 +1109,9 @@ export default function BudgetsPage() {
                         <div className="w-4 h-4 rounded-full bg-gray-500" />
                         <div>
                           <h3 className="text-lg font-semibold">{budget.name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {budget.categoryIcon} {budget.categoryName || 'Uncategorized'}
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            {budget.categoryIcon && getCategoryIcon(budget.categoryIcon)}
+                            <span>{budget.categoryName || 'Uncategorized'}</span>
                           </p>
                         </div>
                       </div>

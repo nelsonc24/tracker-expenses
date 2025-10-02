@@ -32,30 +32,18 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MobileNavigationHeader } from '@/components/mobile-navigation-header'
-import { MobileCategoryCard } from '@/components/mobile-category-card'
-import { MobileCategoryForm } from '@/components/mobile-category-form'
-import { useIsMobile } from '@/hooks/use-mobile'
 import { 
   Plus, 
   MoreHorizontal, 
   Edit, 
   Trash2, 
-  FolderPlus,
-  Hash,
-  DollarSign,
-  ShoppingCart,
-  Music,
-  Car,
-  Utensils,
-  ShoppingBag,
-  Zap,
-  Heart,
-  TrendingUp,
-  TrendingDown,
   Eye,
-  EyeOff
+  EyeOff,
+  FolderPlus
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getIconComponent } from '@/lib/category-icons'
+import { IconPicker } from '@/components/icon-picker'
 
 interface Category {
   id: string
@@ -86,25 +74,6 @@ interface CategoryWithStats extends Category {
   isExpanded?: boolean
 }
 
-// Icon mapping for displaying icons
-const iconMapping = {
-  'dollar-sign': DollarSign,
-  'shopping-cart': ShoppingCart,
-  'music': Music,
-  'car': Car,
-  'utensils': Utensils,
-  'shopping-bag': ShoppingBag,
-  'zap': Zap,
-  'heart': Heart,
-  'more-horizontal': MoreHorizontal,
-  'trending-up': TrendingUp,
-  'trending-down': TrendingDown,
-  'hash': Hash,
-  'folder-plus': FolderPlus,
-}
-
-const availableIcons = Object.keys(iconMapping)
-
 const colorOptions = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
   '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
@@ -114,7 +83,6 @@ const colorOptions = [
 
 export default function CategoriesPage() {
   const { user, isLoaded } = useUser()
-  const isMobile = useIsMobile()
   const [categories, setCategories] = useState<CategoryWithStats[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -368,10 +336,8 @@ export default function CategoriesPage() {
       )
     }
 
-    // Fallback to lucide icon
-    const IconComponent = iconName && iconMapping[iconName as keyof typeof iconMapping] 
-      ? iconMapping[iconName as keyof typeof iconMapping] 
-      : Hash
+    // Fallback to lucide icon using shared utility
+    const IconComponent = getIconComponent(iconName)
     
     return (
       <div 
@@ -561,40 +527,14 @@ export default function CategoriesPage() {
               </div>
 
               <div>
-                <Label htmlFor="icon">Icon</Label>
-                <Select value={formData.icon} onValueChange={(value) => 
-                  setFormData({ ...formData, icon: value })
-                }>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableIcons.map(iconName => {
-                      const IconComponent = iconMapping[iconName as keyof typeof iconMapping]
-                      return (
-                        <SelectItem key={iconName} value={iconName}>
-                          <div className="flex items-center space-x-2">
-                            <IconComponent className="h-4 w-4" />
-                            <span className="capitalize">{iconName.replace('-', ' ')}</span>
-                          </div>
-                        </SelectItem>
-                      )
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="customIconUrl">Custom Icon URL (Optional)</Label>
-                <Input
-                  id="customIconUrl"
-                  value={formData.customIconUrl}
-                  onChange={(e) => setFormData({ ...formData, customIconUrl: e.target.value })}
-                  placeholder="https://example.com/icon.png"
+                <Label>Icon & Custom Icon</Label>
+                <IconPicker
+                  selectedIcon={formData.icon}
+                  onIconChange={(icon) => setFormData({ ...formData, icon })}
+                  customIconUrl={formData.customIconUrl}
+                  onCustomIconUrlChange={(url) => setFormData({ ...formData, customIconUrl: url })}
+                  showCustomUpload={true}
                 />
-                <p className="text-sm text-muted-foreground mt-1">
-                  Leave empty to use the selected icon above. Custom icon will override the selected icon.
-                </p>
               </div>
 
               <div>
@@ -757,40 +697,14 @@ export default function CategoriesPage() {
             </div>
 
             <div>
-              <Label htmlFor="edit-icon">Icon</Label>
-              <Select value={formData.icon} onValueChange={(value) => 
-                setFormData({ ...formData, icon: value })
-              }>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableIcons.map(iconName => {
-                    const IconComponent = iconMapping[iconName as keyof typeof iconMapping]
-                    return (
-                      <SelectItem key={iconName} value={iconName}>
-                        <div className="flex items-center space-x-2">
-                          <IconComponent className="h-4 w-4" />
-                          <span className="capitalize">{iconName.replace('-', ' ')}</span>
-                        </div>
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="edit-customIconUrl">Custom Icon URL (Optional)</Label>
-              <Input
-                id="edit-customIconUrl"
-                value={formData.customIconUrl}
-                onChange={(e) => setFormData({ ...formData, customIconUrl: e.target.value })}
-                placeholder="https://example.com/icon.png"
+              <Label>Icon & Custom Icon</Label>
+              <IconPicker
+                selectedIcon={formData.icon}
+                onIconChange={(icon) => setFormData({ ...formData, icon })}
+                customIconUrl={formData.customIconUrl}
+                onCustomIconUrlChange={(url) => setFormData({ ...formData, customIconUrl: url })}
+                showCustomUpload={true}
               />
-              <p className="text-sm text-muted-foreground mt-1">
-                Leave empty to use the selected icon above. Custom icon will override the selected icon.
-              </p>
             </div>
 
             <div>

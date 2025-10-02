@@ -16,7 +16,8 @@ Provide project context and coding guidelines that AI should follow when generat
   - Use `pnpm remove [package]` for removing dependencies
   - Use `pnpm run [script]` for running package scripts
 - **Always kill the development port before starting the app** to avoid port conflicts:
-  - Before running `pnpm run dev`, first kill any existing processes on port 3001: `lsof -ti:3001 | xargs kill -9`
+  - Before running `pnpm run dev`, first kill any existing processes on port 3001: 
+  `lsof -ti:3001 | xargs kill -9 2>/dev/null; echo "Port cleared"`
   - Then start the development server: `pnpm run dev`
   - Full command sequence: `lsof -ti:3001 | xargs kill -9 && pnpm run dev`
 - **Use shadcn-ui components as much as possible** for UI consistency and best practices:
