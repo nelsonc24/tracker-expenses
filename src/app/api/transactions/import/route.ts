@@ -27,7 +27,9 @@ function generateTransactionHash(tx: TransactionData, userId: string): string {
   }
   
   // Fallback to composite hash for banks that don't provide unique transaction IDs
-  const hashInput = `${userId}-${tx.date}-${tx.description}-${tx.amount}-${tx.account}`
+  // Normalize description to lowercase for case-insensitive duplicate detection
+  const normalizedDescription = tx.description.toLowerCase().trim()
+  const hashInput = `${userId}-${tx.date}-${normalizedDescription}-${tx.amount}-${tx.account}`
   return crypto.createHash('sha256').update(hashInput).digest('hex').substring(0, 16)
 }
 

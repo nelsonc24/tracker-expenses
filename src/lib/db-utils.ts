@@ -688,7 +688,8 @@ export async function getTransactionSummary(
 export async function getCategorySpending(
   userId: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  accountId?: string
 ): Promise<Array<{
   categoryId: string | null
   categoryName: string | null
@@ -707,6 +708,10 @@ export async function getCategorySpending(
     
     if (endDate) {
       conditions.push(lte(transactions.transactionDate, endDate))
+    }
+
+    if (accountId) {
+      conditions.push(eq(transactions.accountId, accountId))
     }
 
     const result = await db

@@ -530,9 +530,9 @@ export default function CategoriesPage() {
                 <Label>Icon & Custom Icon</Label>
                 <IconPicker
                   selectedIcon={formData.icon}
-                  onIconChange={(icon) => setFormData({ ...formData, icon })}
+                  onIconChange={(icon) => setFormData(prev => ({ ...prev, icon }))}
                   customIconUrl={formData.customIconUrl}
-                  onCustomIconUrlChange={(url) => setFormData({ ...formData, customIconUrl: url })}
+                  onCustomIconUrlChange={(url) => setFormData(prev => ({ ...prev, customIconUrl: url }))}
                   showCustomUpload={true}
                 />
               </div>
@@ -700,9 +700,9 @@ export default function CategoriesPage() {
               <Label>Icon & Custom Icon</Label>
               <IconPicker
                 selectedIcon={formData.icon}
-                onIconChange={(icon) => setFormData({ ...formData, icon })}
+                onIconChange={(icon) => setFormData(prev => ({ ...prev, icon }))}
                 customIconUrl={formData.customIconUrl}
-                onCustomIconUrlChange={(url) => setFormData({ ...formData, customIconUrl: url })}
+                onCustomIconUrlChange={(url) => setFormData(prev => ({ ...prev, customIconUrl: url }))}
                 showCustomUpload={true}
               />
             </div>
