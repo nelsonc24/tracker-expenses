@@ -27,7 +27,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -38,8 +37,17 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
 import {
   Tooltip,
@@ -48,23 +56,17 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { 
-  Search, 
-  Filter, 
   Download, 
   Upload,
   MoreHorizontal,
   Edit,
   Trash2,
-  Tag,
-  Calendar,
   DollarSign,
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
-  Plus,
   Eye,
   Copy,
-  FileText,
   Activity,
   BarChart3,
   Target
@@ -75,169 +77,13 @@ import { AdvancedSearch } from '@/components/advanced-search'
 import { KeyboardShortcutsHelp } from '@/components/keyboard-shortcuts-help'
 import { TransactionTemplates } from '@/components/transaction-templates'
 import { ImprovedMobileTransactionCard } from '@/components/improved-mobile-transaction-card'
-import { ActivityAssignmentDialog } from '@/components/activities/activity-assignment-dialog'
 import { MobileActionBar } from '@/components/mobile-action-bar'
 import { TransactionBreakdownDialog } from '@/components/transaction-breakdown-dialog'
 import { useKeyboardShortcuts, KeyboardShortcut, SHORTCUT_CATEGORIES } from '@/hooks/use-keyboard-shortcuts'
-import { useResponsive, useMobileOptimizations } from '@/hooks/use-responsive'
+import { useResponsive } from '@/hooks/use-responsive'
 import { TransactionTemplate } from '@/lib/validations/templates'
 
-// Enhanced sample transaction data
-const SAMPLE_TRANSACTIONS = [
-  {
-    id: '1',
-    date: '2024-06-15',
-    description: 'Woolworths Supermarket',
-    amount: -87.45,
-    category: 'Groceries',
-    account: 'CBA Everyday',
-    merchant: 'Woolworths',
-    reference: 'EFTPOS 1234',
-    balance: 2156.78,
-    tags: ['groceries', 'essential'],
-    notes: 'Weekly grocery shopping'
-  },
-  {
-    id: '2',
-    date: '2024-06-14',
-    description: 'Salary Deposit',
-    amount: 3200.00,
-    category: 'Income',
-    account: 'CBA Everyday',
-    merchant: 'Company Payroll',
-    reference: 'PAY001',
-    balance: 2244.23,
-    tags: ['salary', 'income'],
-    notes: 'Bi-weekly salary'
-  },
-  {
-    id: '3',
-    date: '2024-06-13',
-    description: 'Netflix Subscription',
-    amount: -19.99,
-    category: 'Entertainment',
-    account: 'CBA Everyday',
-    merchant: 'Netflix',
-    reference: 'DDS NETFLIX',
-    balance: -955.77,
-    tags: ['subscription', 'streaming'],
-    notes: 'Monthly streaming service'
-  },
-  {
-    id: '4',
-    date: '2024-06-12',
-    description: 'Shell Fuel',
-    amount: -75.20,
-    category: 'Transport',
-    account: 'CBA Everyday',
-    merchant: 'Shell',
-    reference: 'EFTPOS 5678',
-    balance: -935.78,
-    tags: ['fuel', 'transport'],
-    notes: 'Fuel for commute'
-  },
-  {
-    id: '5',
-    date: '2024-06-11',
-    description: 'Uber Ride',
-    amount: -28.50,
-    category: 'Transport',
-    account: 'CBA Everyday',
-    merchant: 'Uber',
-    reference: 'UBER TRIP',
-    balance: -860.58,
-    tags: ['rideshare', 'transport'],
-    notes: 'Trip to airport'
-  },
-  {
-    id: '6',
-    date: '2024-06-10',
-    description: 'Interest Earned',
-    amount: 12.34,
-    category: 'Income',
-    account: 'CBA Savings',
-    merchant: 'Commonwealth Bank',
-    reference: 'INT CREDIT',
-    balance: 15420.89,
-    tags: ['interest', 'savings'],
-    notes: 'Monthly interest payment'
-  },
-  {
-    id: '7',
-    date: '2024-06-09',
-    description: 'Coles Supermarket',
-    amount: -156.78,
-    category: 'Groceries',
-    account: 'CBA Everyday',
-    merchant: 'Coles',
-    reference: 'EFTPOS 9012',
-    balance: -832.08,
-    tags: ['groceries', 'bulk'],
-    notes: 'Bulk shopping for household items'
-  },
-  {
-    id: '8',
-    date: '2024-06-08',
-    description: 'Coffee Shop',
-    amount: -5.80,
-    category: 'Dining',
-    account: 'CBA Everyday',
-    merchant: 'Local Cafe',
-    reference: 'EFTPOS TAP',
-    balance: -675.30,
-    tags: ['coffee', 'dining'],
-    notes: 'Morning coffee'
-  },
-  {
-    id: '9',
-    date: '2024-06-07',
-    description: 'ATM Withdrawal',
-    amount: -100.00,
-    category: 'Cash',
-    account: 'CBA Everyday',
-    merchant: 'CBA ATM',
-    reference: 'ATM WD 123',
-    balance: -669.50,
-    tags: ['cash', 'withdrawal'],
-    notes: 'Weekend cash'
-  },
-  {
-    id: '10',
-    date: '2024-06-06',
-    description: 'Amazon Purchase',
-    amount: -89.99,
-    category: 'Shopping',
-    account: 'CBA Everyday',
-    merchant: 'Amazon',
-    reference: 'AMZN ORDER',
-    balance: -569.50,
-    tags: ['online', 'shopping'],
-    notes: 'Office supplies'
-  }
-]
-
-const CATEGORIES = [
-  'All Categories',
-  'Income',
-  'Groceries', 
-  'Entertainment',
-  'Transport',
-  'Dining',
-  'Shopping',
-  'Utilities',
-  'Healthcare',
-  'Cash',
-  'Other'
-]
-
-const ACCOUNTS = [
-  'All Accounts',
-  'CBA Everyday',
-  'CBA Savings',
-  'ANZ Transaction',
-  'Westpac Choice'
-]
-
+// Transaction type definition
 type Transaction = {
   id: string
   description: string
@@ -324,7 +170,6 @@ export function TransactionsPageClient({
   categories: propCategories,
   activities: propActivities,
   budgets: propBudgets,
-  loading,
   onTransactionUpdate,
   onTransactionDelete,
   onTransactionCreate
@@ -332,9 +177,8 @@ export function TransactionsPageClient({
   const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
-  const [showActivityAssignmentDialog, setShowActivityAssignmentDialog] = useState(false)
   
-    // Update local state when propTransactions changes
+  // Update local state when propTransactions changes
   useEffect(() => {
     if (propTransactions.length > 0) {
       const transformedTransactions = propTransactions
@@ -393,6 +237,8 @@ export function TransactionsPageClient({
   const [isBreakdownDialogOpen, setIsBreakdownDialogOpen] = useState(false)
   const [breakdownTransaction, setBreakdownTransaction] = useState<Transaction | null>(null)
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null)
   
   // Advanced search state
   const [activeFilters, setActiveFilters] = useState<any>(null)
@@ -417,9 +263,10 @@ export function TransactionsPageClient({
     } else {
       localStorage.removeItem('transaction-filters')
     }
-  }, [activeFilters])  // Mobile responsiveness
-  const { isMobile, isTablet, screenSize } = useResponsive()
-  const { showSimplifiedUI, enableSwipeGestures } = useMobileOptimizations()
+  }, [activeFilters])  
+  
+  // Mobile responsiveness
+  const { isMobile } = useResponsive()
 
   // Adjust page size based on screen size - use pageSize if explicitly set, otherwise use mobile default
   const responsivePageSize = pageSize
@@ -553,7 +400,6 @@ export function TransactionsPageClient({
 
   // Selection handlers
   const isAllSelected = selectedTransactions.length === paginatedTransactions.length && paginatedTransactions.length > 0
-  const isIndeterminate = selectedTransactions.length > 0 && selectedTransactions.length < paginatedTransactions.length
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -836,7 +682,7 @@ export function TransactionsPageClient({
   // Handle breakdown click to open breakdown dialog
   const handleBreakdownClick = (transaction: Transaction) => {
     // Find the activity associated with this transaction
-    const transactionActivity = propActivities.find(activity => 
+    const transactionActivity = propActivities.find(() => 
       // This assumes there's some way to associate activities with transactions
       // You might need to adjust this logic based on your data structure
       true // For now, we'll just use the first activity or let user select
@@ -1001,27 +847,23 @@ export function TransactionsPageClient({
     }
   }
 
-  // Delete transaction
+  // Delete transaction - open confirmation dialog
   const handleDeleteTransaction = (transaction: Transaction) => {
-    if (confirm(`Are you sure you want to delete the transaction "${transaction.description}"?`)) {
-      if (onTransactionDelete) {
-        onTransactionDelete(transaction.id)
-        toast.success(`Transaction deleted successfully`)
-      }
+    setDeletingTransaction(transaction)
+    setIsDeleteDialogOpen(true)
+  }
+
+  // Confirm delete transaction
+  const confirmDeleteTransaction = () => {
+    if (deletingTransaction && onTransactionDelete) {
+      onTransactionDelete(deletingTransaction.id)
+      toast.success(`Transaction deleted successfully`)
+      setIsDeleteDialogOpen(false)
+      setDeletingTransaction(null)
     }
   }
 
   // Bulk operations
-  const handleBulkDelete = () => {
-    console.log('Deleting transactions:', selectedTransactions)
-    setSelectedTransactions([])
-  }
-
-  const handleBulkCategorize = (category: string) => {
-    console.log('Categorizing transactions:', selectedTransactions, 'to', category)
-    setSelectedTransactions([])
-  }
-
   const handleExport = () => {
     console.log('Exporting transactions:', filteredTransactions)
   }
@@ -1034,7 +876,6 @@ export function TransactionsPageClient({
   const getTransactionBudgets = (transaction: Transaction) => {
     if (!transaction.categoryId) return []
     
-    const currentDate = new Date()
     return propBudgets.filter(budget => {
       // Check if budget is active
       if (!budget.isActive) return false
@@ -2076,6 +1917,33 @@ export function TransactionsPageClient({
         onTemplates={handleMobileTemplates}
         onBulkActions={handleMobileBulkActions}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the transaction &ldquo;{deletingTransaction?.description}&rdquo;?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDialogOpen(false)
+              setDeletingTransaction(null)
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteTransaction}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
     </TooltipProvider>
   )

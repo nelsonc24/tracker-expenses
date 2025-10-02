@@ -14,10 +14,10 @@ import {
 } from 'lucide-react'
 import { 
   InsightCard, 
-  BudgetProgressCard, 
   RecentTransactionsCard,
   SpendingInsightsCard 
 } from '@/components/dashboard-insights'
+import { BudgetProgressCard } from '@/components/budget-progress-card'
 import {
   MonthlyComparisonChart, 
   SpendingTrendChart, 
@@ -321,7 +321,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
-            <BudgetProgressCard budgets={transformedBudgets} />
+            <BudgetProgressCard initialBudgets={transformedBudgets} />
             <RecentTransactionsCard transactions={transformedTransactions} />
             <SpendingInsightsCard insights={insights} />
           </div>

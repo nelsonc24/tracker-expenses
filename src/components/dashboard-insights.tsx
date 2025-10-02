@@ -2,15 +2,12 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { 
   TrendingUp, 
   TrendingDown, 
   AlertTriangle, 
-  Target,
   DollarSign,
-  Calendar,
-  PiggyBank
+  Calendar
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 
@@ -62,92 +59,6 @@ export function InsightCard({
           <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
             {description}
           </p>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-interface BudgetProgressCardProps {
-  budgets: Array<{
-    id: string
-    name: string
-    spent: number
-    budget: number
-    category: string
-  }>
-}
-
-export function BudgetProgressCard({ budgets }: BudgetProgressCardProps) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Target className="h-5 w-5" />
-          <span>Budget Progress</span>
-        </CardTitle>
-        <CardDescription>
-          Track your spending against budget goals
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {budgets.length === 0 ? (
-          <div className="text-center py-6">
-            <PiggyBank className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No budgets set up yet</p>
-          </div>
-        ) : (
-          budgets.map((budget) => {
-            const progress = (budget.spent / budget.budget) * 100
-            const isOverBudget = progress > 100
-            
-            return (
-              <div key={budget.id} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">{budget.name}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {budget.category}
-                    </Badge>
-                  </div>
-                  <div className="text-sm">
-                    <span className={cn(
-                      'font-medium',
-                      isOverBudget && 'text-red-500'
-                    )}>
-                      ${budget.spent.toFixed(2)}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {' '}/ ${budget.budget.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Progress 
-                    value={Math.min(progress, 100)} 
-                    className={cn(
-                      'flex-1',
-                      isOverBudget && 'bg-red-100'
-                    )}
-                  />
-                  {isOverBudget && (
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                  )}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {isOverBudget ? (
-                    <span className="text-red-500">
-                      Over budget by ${(budget.spent - budget.budget).toFixed(2)}
-                    </span>
-                  ) : (
-                    <span>
-                      ${(budget.budget - budget.spent).toFixed(2)} remaining
-                    </span>
-                  )}
-                </div>
-              </div>
-            )
-          })
         )}
       </CardContent>
     </Card>
