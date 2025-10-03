@@ -71,8 +71,13 @@ export async function GET(request: NextRequest) {
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
       }
 
-      const amount = Math.abs(parseFloat(transaction.amount))
-      spendingMap.set(key, (spendingMap.get(key) || 0) + amount)
+      // Only count expenses (negative amounts), not income
+      // Spending trend should show how much was spent, not total transaction volume
+      const amount = parseFloat(transaction.amount)
+      if (amount < 0) {
+        const expense = Math.abs(amount)
+        spendingMap.set(key, (spendingMap.get(key) || 0) + expense)
+      }
     })
 
     // Convert to array and sort

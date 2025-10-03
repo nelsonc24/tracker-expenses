@@ -90,11 +90,16 @@ async function getDashboardData(userId: string) {
   // Generate trend data from last 30 days - aggregate by date
   const dailySpending = new Map<string, number>()
   
-  // Group transactions by date and sum amounts
+  // Group transactions by date and sum ONLY expenses (negative amounts)
+  // Spending trend should show how much was spent, not income
   last30DaysTransactions.forEach(({ transaction }) => {
     const date = transaction.transactionDate.toISOString().split('T')[0]
-    const amount = Math.abs(parseFloat(transaction.amount))
-    dailySpending.set(date, (dailySpending.get(date) || 0) + amount)
+    const amount = parseFloat(transaction.amount)
+    // Only count expenses (negative amounts)
+    if (amount < 0) {
+      const expense = Math.abs(amount)
+      dailySpending.set(date, (dailySpending.get(date) || 0) + expense)
+    }
   })
   
   // Convert to array and get last 7 days
