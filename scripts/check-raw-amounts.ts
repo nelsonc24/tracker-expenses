@@ -4,7 +4,6 @@
 
 import { db } from '../src/db/index'
 import { transactions } from '../src/db/schema'
-import { eq } from 'drizzle-orm'
 
 async function checkRawAmounts() {
   try {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import crypto from 'crypto'
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { transactions: transactionData, uploadId, accountId } = body
+    const { transactions: transactionData, accountId } = body
 
     // Validate request data
     if (!transactionData || !Array.isArray(transactionData)) {
@@ -242,7 +243,7 @@ async function getOrCreateDefaultAccount(userId: string) {
       isActive: true
     }).returning()
     
-    return (insertedAccounts as any[])[0]
+    return insertedAccounts[0]
   }
   
   return existingAccounts[0]
@@ -262,7 +263,7 @@ async function getOrCreateDefaultCategory(userId: string) {
       isDefault: true
     }).returning()
     
-    return (insertedCategories as any[])[0]
+    return insertedCategories[0]
   }
   
   return existingCategories[0]

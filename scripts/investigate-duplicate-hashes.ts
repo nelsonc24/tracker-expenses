@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * Investigate why duplicates have different hashes
+ * Investigate duplicate transaction hashes to understand why duplicates exist
  */
 
 import { db } from '../src/db/index'
