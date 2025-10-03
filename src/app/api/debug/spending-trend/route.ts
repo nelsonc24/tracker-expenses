@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
           id: transaction.id,
           date: transaction.transactionDate.toISOString(),
           amount: transaction.amount,
-          merchantName: transaction.merchantName,
+          merchant: transaction.merchant,
           description: transaction.description
         }))
 
