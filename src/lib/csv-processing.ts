@@ -100,6 +100,8 @@ export interface ProcessedTransaction {
   account: string
   merchant?: string
   reference?: string
+  transactionId?: string  // Bank's unique transaction identifier
+  receiptNumber?: string  // Receipt number if available
   balance?: number
   status: 'valid' | 'error' | 'warning'
   errors: ValidationError[]
@@ -375,6 +377,21 @@ export function validateTransactionRow(
   const merchant = extractMerchant(cleanedDescription)
   const category = categorizeTransaction(cleanedDescription, merchant, amount)
   
+  // Extract transaction identifiers (UBank has 'Transaction ID', others may have different names)
+  const transactionId = (rowData as Record<string, string>)['Transaction ID'] || 
+                        (rowData as Record<string, string>).transactionId || 
+                        (rowData as Record<string, string>).transactionID || 
+                        ''
+  
+  const receiptNumber = (rowData as Record<string, string>)['Receipt number'] || 
+                        (rowData as Record<string, string>).receiptNumber || 
+                        (rowData as Record<string, string>).receipt || 
+                        ''
+  
+  // Clean transaction ID (remove extra quotes)
+  const cleanedTransactionId = transactionId.replace(/^["\']+|["\']+$/g, '').trim()
+  const cleanedReceiptNumber = receiptNumber.replace(/^["\']+|["\']+$/g, '').trim()
+  
   const transaction: ProcessedTransaction = {
     id,
     date: parsedDate ? parsedDate.toISOString().split('T')[0] : dateStr,
@@ -384,11 +401,15 @@ export function validateTransactionRow(
     account: 'Imported Account', // Default, can be customized
     merchant,
     reference: (rowData as Record<string, string>).reference || (rowData as Record<string, string>).Reference || '',
+    transactionId: cleanedTransactionId || undefined,
+    receiptNumber: cleanedReceiptNumber || undefined,
     balance,
     status: errors.length > 0 ? 'error' : 'valid',
     errors,
     rawData: rowData
   }
+  
+  return transaction
   
   return transaction
 }

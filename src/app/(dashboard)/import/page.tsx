@@ -123,6 +123,7 @@ export default function ImportPage() {
   const [accounts, setAccounts] = useState<{id: string, name: string, type: string, institution?: string, accountType?: string}[]>([])
   const [selectedAccountId, setSelectedAccountId] = useState<string>('')
   const [loadingAccounts, setLoadingAccounts] = useState(false)
+  const [selectedBankFormat, setSelectedBankFormat] = useState<string>('auto')
   
   // Fetch user accounts on component mount
   useEffect(() => {
@@ -168,6 +169,31 @@ export default function ImportPage() {
     { step: 4, title: 'Review & Import', description: 'Check and save transactions', status: importStatus === 'completed' && !isImporting ? 'current' : importStatus === 'error' ? 'error' : 'pending' }
   ]
 
+  const handleDownloadTemplate = (bankName: string) => {
+    const format = bankFormats[bankName.toLowerCase().replace(' ', '')]
+    if (!format) return
+    
+    const csvContent = format.example
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${bankName}-template.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  }
+
+  const handleViewGuide = (bankName: string) => {
+    // Open the templates tab and scroll to the specific bank
+    setActiveTab('templates')
+    setTimeout(() => {
+      const element = document.getElementById(`template-${bankName.toLowerCase().replace(' ', '-')}`)
+      element?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+  }
+
   const handleFileSelect = (file: File) => {
     setSelectedFile(file)
     setImportStatus('processing')
@@ -182,8 +208,10 @@ export default function ImportPage() {
         
         setProgress(50)
         
-        // Detect bank format
-        const bankFormat = detectBankFormat(text)
+        // Detect bank format or use selected format
+        const bankFormat = selectedBankFormat === 'auto' 
+          ? detectBankFormat(text) 
+          : bankFormats[selectedBankFormat]
         
         // Skip header rows if specified in format
         const dataLines = bankFormat.skipRows ? lines.slice(bankFormat.skipRows) : lines
@@ -332,7 +360,9 @@ export default function ImportPage() {
           category: transaction.category,
           account: selectedAccountId,
           reference: transaction.reference || transaction.merchant,
-          balance: transaction.balance || null
+          balance: transaction.balance || null,
+          transactionId: transaction.transactionId || null,
+          receiptNumber: transaction.receiptNumber || null
         }))
 
       const response = await fetch('/api/transactions/import', {
@@ -520,6 +550,57 @@ export default function ImportPage() {
             </CardContent>
           </Card>
 
+          {/* Bank Format Selection */}
+          <Card className={cn(
+            "transition-all duration-200",
+            !selectedAccountId ? "opacity-60" : "border-purple-200 bg-purple-50/50 dark:bg-purple-950/20 dark:border-purple-800"
+          )}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
+                  selectedAccountId ? "bg-purple-500 text-white" : "bg-muted text-muted-foreground"
+                )}>1.5</div>
+                <FileText className="h-5 w-5" />
+                Select Bank Format
+              </CardTitle>
+              <CardDescription>
+                {selectedAccountId 
+                  ? "Choose your bank's CSV format or let us auto-detect it"
+                  : "Select an account first, then choose the bank format"
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="format-select">CSV Format</Label>
+                <Select value={selectedBankFormat} onValueChange={setSelectedBankFormat} disabled={!selectedAccountId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Auto-detect format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto-detect (Recommended)</SelectItem>
+                    <SelectItem value="commonwealth">Commonwealth Bank</SelectItem>
+                    <SelectItem value="ubank">UBank</SelectItem>
+                    <SelectItem value="anz">ANZ Bank</SelectItem>
+                    <SelectItem value="westpac">Westpac</SelectItem>
+                    <SelectItem value="nab">NAB</SelectItem>
+                  </SelectContent>
+                </Select>
+                {selectedBankFormat !== 'auto' && (
+                  <div className="mt-2 p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-4 w-4 text-purple-500" />
+                      <span className="text-sm text-purple-700 dark:text-purple-300">
+                        Using <span className="font-medium">{bankFormats[selectedBankFormat]?.name || selectedBankFormat}</span> format
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* File Upload */}
           <Card className={cn(
             "transition-all duration-200",
@@ -647,7 +728,7 @@ export default function ImportPage() {
         <TabsContent value="templates" className="space-y-6">
           <div className="grid gap-4">
             {bankTemplates.map((template) => (
-              <Card key={template.name}>
+              <Card key={template.name} id={`template-${template.name.toLowerCase().replace(' ', '-')}`}>
                 <CardHeader>
                   <CardTitle className="text-lg">{template.name}</CardTitle>
                   <CardDescription>CSV format and sample data</CardDescription>
@@ -655,22 +736,30 @@ export default function ImportPage() {
                 <CardContent className="space-y-4">
                   <div>
                     <Label className="text-sm font-medium">Expected Format:</Label>
-                    <code className="block mt-1 p-3 bg-muted rounded text-sm font-mono">
+                    <code className="block mt-1 p-3 bg-muted rounded text-sm font-mono break-all">
                       {template.format}
                     </code>
                   </div>
                   <div>
                     <Label className="text-sm font-medium">Sample Data:</Label>
-                    <code className="block mt-1 p-3 bg-muted rounded text-sm font-mono">
+                    <code className="block mt-1 p-3 bg-muted rounded text-sm font-mono break-all">
                       {template.sample}
                     </code>
                   </div>
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleDownloadTemplate(template.name)}
+                    >
                       <Download className="h-4 w-4 mr-2" />
                       Download Template
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleViewGuide(template.name)}
+                    >
                       <Eye className="h-4 w-4 mr-2" />
                       View Guide
                     </Button>
@@ -682,6 +771,106 @@ export default function ImportPage() {
         </TabsContent>
 
         <TabsContent value="review" className="space-y-6">
+          {/* Import Summary Card */}
+          {(parsedTransactions.length > 0 || importResult) && (
+            <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  Import Summary
+                </CardTitle>
+                <CardDescription>
+                  Review the details of your import before proceeding
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Account Information */}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Destination Account</Label>
+                    <div className="flex items-center gap-2 p-3 bg-white dark:bg-gray-900 rounded-lg border">
+                      <Building2 className="h-4 w-4 text-blue-600" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">
+                          {accounts.find(acc => acc.id === selectedAccountId)?.name || 'Unknown Account'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {accounts.find(acc => acc.id === selectedAccountId)?.institution} • {accounts.find(acc => acc.id === selectedAccountId)?.accountType}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* File Information */}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">CSV File</Label>
+                    <div className="flex items-center gap-2 p-3 bg-white dark:bg-gray-900 rounded-lg border">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate" title={selectedFile?.name}>
+                          {selectedFile?.name || 'No file selected'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedFile ? `${(selectedFile.size / 1024).toFixed(2)} KB` : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Format Information */}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Bank Format</Label>
+                    <div className="flex items-center gap-2 p-3 bg-white dark:bg-gray-900 rounded-lg border">
+                      <CheckCircle className="h-4 w-4 text-blue-600" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm">
+                          {selectedBankFormat === 'auto' 
+                            ? 'Auto-detected' 
+                            : bankFormats[selectedBankFormat]?.name || selectedBankFormat}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {selectedBankFormat === 'auto' ? 'Format detected automatically' : 'Manually selected format'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Transaction Count */}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Transactions</Label>
+                    <div className="flex items-center gap-2 p-3 bg-white dark:bg-gray-900 rounded-lg border">
+                      <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                        <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                          {parsedTransactions.length}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm">
+                          {parsedTransactions.filter(t => t.status === 'valid').length} Valid
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {parsedTransactions.filter(t => t.status === 'error').length} with errors
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Import Status Banner */}
+                {importResult && (
+                  <div className="mt-4 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-900 dark:text-green-100">
+                        Import completed: {importResult.importedCount} imported, {importResult.skippedCount} skipped
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Success Message */}
           {importStatus === 'completed' && importResult && (
             <Card className="border-green-200 bg-green-50">
@@ -831,14 +1020,39 @@ export default function ImportPage() {
                 ))}
               </div>
               
-              <div className="flex items-center justify-between mt-6 pt-6 border-t">
-                <div className="text-sm text-muted-foreground">
-                  {parsedTransactions.length} transactions ready to import
-                  {selectedAccountId && accounts.length > 0 && (
-                    <span className="block mt-1 text-blue-600">
-                      → {accounts.find(acc => acc.id === selectedAccountId)?.name}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-6 pt-6 border-t gap-4">
+                <div className="flex-1">
+                  <div className="text-sm font-medium">
+                    {parsedTransactions.length} transactions ready to import
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    {selectedAccountId && accounts.length > 0 && (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <Building2 className="h-3 w-3" />
+                          <span className="font-medium text-blue-600 dark:text-blue-400">
+                            {accounts.find(acc => acc.id === selectedAccountId)?.name}
+                          </span>
+                        </span>
+                        <span>•</span>
+                      </>
+                    )}
+                    {selectedFile && (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          <span className="truncate max-w-[200px]" title={selectedFile.name}>
+                            {selectedFile.name}
+                          </span>
+                        </span>
+                        <span>•</span>
+                      </>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      {selectedBankFormat === 'auto' ? 'Auto-detected' : bankFormats[selectedBankFormat]?.name || selectedBankFormat}
                     </span>
-                  )}
+                  </div>
                 </div>
                 <div className="flex space-x-2">
                   <Button 

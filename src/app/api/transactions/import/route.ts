@@ -20,16 +20,17 @@ interface TransactionData {
 }
 
 // Generate a consistent hash for duplicate detection
-function generateTransactionHash(tx: TransactionData, userId: string): string {
+function generateTransactionHash(tx: TransactionData, userId: string, accountId: string): string {
   // Use transaction ID as primary identifier if available, otherwise fall back to composite hash
   if (tx.transactionId) {
-    return crypto.createHash('sha256').update(`${userId}-${tx.transactionId}`).digest('hex').substring(0, 16)
+    return crypto.createHash('sha256').update(`${userId}-${accountId}-${tx.transactionId}`).digest('hex').substring(0, 16)
   }
   
   // Fallback to composite hash for banks that don't provide unique transaction IDs
   // Normalize description to lowercase for case-insensitive duplicate detection
   const normalizedDescription = tx.description.toLowerCase().trim()
-  const hashInput = `${userId}-${tx.date}-${normalizedDescription}-${tx.amount}-${tx.account}`
+  // Use accountId instead of account name from CSV for consistency
+  const hashInput = `${userId}-${accountId}-${tx.date}-${normalizedDescription}-${tx.amount}`
   return crypto.createHash('sha256').update(hashInput).digest('hex').substring(0, 16)
 }
 
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     const duplicateTransactions: any[] = []
 
     for (const tx of transactionData) {
-      const transactionHash = generateTransactionHash(tx, userId)
+      const transactionHash = generateTransactionHash(tx, userId, accountId)
       
       if (existingTransactionHashes.has(transactionHash)) {
         duplicateTransactions.push({
@@ -119,6 +120,28 @@ export async function POST(request: NextRequest) {
     // Save transactions to database
     if (newTransactions.length > 0) {
       await db.insert(transactionsTable).values(newTransactions)
+      
+      // Update account balance if transactions have balance information (e.g., Commonwealth Bank CSV)
+      // Use the latest transaction's balance as the current account balance
+      const transactionsWithBalance = newTransactions.filter(tx => tx.balance !== null && tx.balance !== undefined)
+      if (transactionsWithBalance.length > 0) {
+        // Sort by date to find the latest transaction
+        const sortedTransactions = transactionsWithBalance.sort((a, b) => 
+          new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime()
+        )
+        const latestBalance = sortedTransactions[0].balance
+        
+        // Update the account balance
+        await db
+          .update(accountsTable)
+          .set({ 
+            balance: latestBalance.toString(),
+            updatedAt: new Date()
+          })
+          .where(eq(accountsTable.id, accountId))
+        
+        console.log(`Updated account ${accountId} balance to ${latestBalance}`)
+      }
     }
     
     // For now, simulate processing time

@@ -22,9 +22,9 @@ import { SafePageWrapper } from '@/components/safe-page-wrapper'
 import { BrowserExtensionWarning } from '@/components/browser-extension-warning'
 
 const institutionLogos = {
-  'Commonwealth Bank': '🟡',
-  'UBank': '🔶',
-  'ANZ Bank': '🔵',
+  'Commonwealth Bank': '🔶',
+  'UBank': '🔵',
+  'ANZ Bank': '🟡',
   'Westpac': '🔴',
   'NAB': '⚫',
   'ING': '🟠',
