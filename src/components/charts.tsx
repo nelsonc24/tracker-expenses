@@ -42,6 +42,18 @@ interface CategoryData {
 export function SpendingTrendChart({ data }: { data: TimeSeriesData[] }) {
   const { currentScheme } = useChartColors()
   
+  // Helper to format date string without timezone issues
+  const formatDate = (dateStr: string, format: 'short' | 'long' = 'short') => {
+    // Parse YYYY-MM-DD without timezone conversion
+    const [year, month, day] = dateStr.split('-').map(Number)
+    if (format === 'long') {
+      const date = new Date(year, month - 1, day)
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    }
+    // Return short format: MM/DD
+    return `${month}/${day}`
+  }
+  
   return (
     <ResponsiveContainer width="100%" height={300}>
       <AreaChart data={data}>
@@ -50,10 +62,7 @@ export function SpendingTrendChart({ data }: { data: TimeSeriesData[] }) {
           dataKey="date" 
           className="text-muted-foreground"
           fontSize={12}
-          tickFormatter={(date) => {
-            const d = new Date(date)
-            return `${d.getDate()}/${d.getMonth() + 1}`
-          }}
+          tickFormatter={(date) => formatDate(date, 'short')}
         />
         <YAxis 
           className="text-muted-foreground"
@@ -66,7 +75,8 @@ export function SpendingTrendChart({ data }: { data: TimeSeriesData[] }) {
             border: '1px solid hsl(var(--border))',
             borderRadius: '8px',
           }}
-          formatter={(value) => [`${formatCurrency(value as number)}`, 'Amount']}
+          labelFormatter={(label) => formatDate(label as string, 'long')}
+          formatter={(value) => [`${formatCurrency(value as number)}`, 'Spending']}
         />
         <Area
           type="monotone"
