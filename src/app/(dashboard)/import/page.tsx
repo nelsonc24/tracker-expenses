@@ -98,6 +98,14 @@ interface ImportStep {
   status: 'pending' | 'current' | 'completed' | 'error'
 }
 
+// Type for skipped/duplicate transactions in the import result
+interface SkippedTransaction {
+  description: string
+  date: string
+  amount: number
+  reason?: string
+}
+
 export default function ImportPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -110,7 +118,7 @@ export default function ImportPage() {
     importedCount: number
     skippedCount: number
     totalProcessed: number
-    duplicateTransactions: ProcessedTransaction[]
+    duplicateTransactions: SkippedTransaction[]
   } | null>(null)
   const [accounts, setAccounts] = useState<{id: string, name: string, type: string, institution?: string, accountType?: string}[]>([])
   const [selectedAccountId, setSelectedAccountId] = useState<string>('')
@@ -295,6 +303,14 @@ export default function ImportPage() {
     }
   }
 
+  const handleDismissResults = () => {
+    setSelectedFile(null)
+    setImportStatus('idle')
+    setProgress(0)
+    setImportResult(null)
+    setParsedTransactions([])
+  }
+
   const handleImportTransactions = async () => {
     if (parsedTransactions.length === 0) return
     
@@ -351,13 +367,7 @@ export default function ImportPage() {
       // Clear the parsed transactions to show the result
       setParsedTransactions([])
       
-      // Reset form after success
-      setTimeout(() => {
-        setSelectedFile(null)
-        setImportStatus('idle')
-        setProgress(0)
-        setImportResult(null)
-      }, 5000) // Give more time to read the results
+      // Don't auto-clear - let user dismiss manually
       
     } catch (error) {
       console.error('Import error:', error)
@@ -676,9 +686,20 @@ export default function ImportPage() {
           {importStatus === 'completed' && importResult && (
             <Card className="border-green-200 bg-green-50">
               <CardContent className="pt-6">
-                <div className="flex items-center space-x-2 text-green-800">
-                  <div className="h-4 w-4 rounded-full bg-green-500"></div>
-                  <p className="font-medium">Import completed successfully!</p>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2 text-green-800">
+                    <div className="h-4 w-4 rounded-full bg-green-500"></div>
+                    <p className="font-medium">Import completed successfully!</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDismissResults}
+                    className="h-8 text-green-700 hover:text-green-900 hover:bg-green-100"
+                  >
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Dismiss
+                  </Button>
                 </div>
                 <div className="mt-3 space-y-2 text-sm">
                   <div className="flex justify-between">
@@ -699,16 +720,45 @@ export default function ImportPage() {
                 
                 {/* Show duplicate transactions if any */}
                 {importResult.duplicateTransactions.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium text-orange-800 mb-2">Skipped duplicate transactions:</p>
-                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                  <div className="mt-4 border-t border-orange-200 pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-orange-900 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        Skipped Duplicate Transactions ({importResult.duplicateTransactions.length})
+                      </p>
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
                       {importResult.duplicateTransactions.map((tx, index) => (
-                        <div key={index} className="text-xs p-2 bg-orange-50 rounded border border-orange-200">
-                          <div className="font-medium">{tx.description}</div>
-                          <div className="text-orange-600">{tx.date} • ${Math.abs(tx.amount).toFixed(2)}</div>
+                        <div key={index} className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm text-orange-900 dark:text-orange-100 truncate">
+                                {tx.description}
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 text-xs text-orange-700 dark:text-orange-300">
+                                <span className="flex items-center gap-1">
+                                  <span className="font-mono">{tx.date}</span>
+                                </span>
+                                <span className="font-semibold">
+                                  ${Math.abs(tx.amount).toFixed(2)}
+                                </span>
+                              </div>
+                              {tx.reason && (
+                                <div className="mt-1 text-xs text-orange-600 dark:text-orange-400 italic">
+                                  {tx.reason}
+                                </div>
+                              )}
+                            </div>
+                            <Badge variant="outline" className="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700 shrink-0">
+                              Duplicate
+                            </Badge>
+                          </div>
                         </div>
                       ))}
                     </div>
+                    <p className="text-xs text-orange-700 dark:text-orange-300 mt-3 italic">
+                      These transactions were skipped because they already exist in your account.
+                    </p>
                   </div>
                 )}
                 
