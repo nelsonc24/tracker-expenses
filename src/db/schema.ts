@@ -440,3 +440,237 @@ export const insertActivityLineItemSchema = createInsertSchema(activityLineItems
 export const selectActivityLineItemSchema = createSelectSchema(activityLineItems)
 export type InsertActivityLineItem = z.infer<typeof insertActivityLineItemSchema>
 export type SelectActivityLineItem = z.infer<typeof selectActivityLineItemSchema>
+
+// Debts table
+export const debts = pgTable('debts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(),
+  debtType: text('debt_type').notNull(), // 'credit_card', 'personal_loan', 'student_loan', 'mortgage', 'car_loan', 'medical', 'personal', 'line_of_credit', 'bnpl'
+  creditorName: text('creditor_name').notNull(),
+  accountNumber: text('account_number'), // Last 4 digits
+  
+  // Balance & Amount
+  currentBalance: decimal('current_balance', { precision: 15, scale: 2 }).notNull(),
+  originalAmount: decimal('original_amount', { precision: 15, scale: 2 }),
+  creditLimit: decimal('credit_limit', { precision: 15, scale: 2 }), // For revolving credit
+  
+  // Interest & Terms
+  interestRate: decimal('interest_rate', { precision: 5, scale: 2 }).notNull(), // APR
+  isVariableRate: boolean('is_variable_rate').default(false).notNull(),
+  interestCalculationMethod: text('interest_calculation_method').default('compound').notNull(), // 'simple', 'compound', 'daily'
+  
+  // Payment Info
+  minimumPayment: decimal('minimum_payment', { precision: 15, scale: 2 }).notNull(),
+  paymentFrequency: text('payment_frequency').notNull(), // 'weekly', 'biweekly', 'monthly', 'one_time'
+  paymentDueDay: integer('payment_due_day'), // 1-31 for monthly, 1-7 for weekly, null for one_time
+  nextDueDate: timestamp('next_due_date'),
+  
+  // Term Info (for fixed-term loans)
+  loanStartDate: timestamp('loan_start_date'),
+  loanMaturityDate: timestamp('loan_maturity_date'),
+  loanTermMonths: integer('loan_term_months'),
+  
+  // Fees & Penalties
+  lateFee: decimal('late_fee', { precision: 10, scale: 2 }),
+  gracePeriodDays: integer('grace_period_days').default(0).notNull(),
+  
+  // Status & Organization
+  status: text('status').default('active').notNull(), // 'active', 'paid_off', 'in_collections', 'settled', 'archived'
+  payoffPriority: integer('payoff_priority'), // 1-10
+  linkedAccountId: uuid('linked_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'set null' }),
+  
+  // Metadata
+  tags: jsonb('tags').$type<string[]>().default([]),
+  notes: text('notes'),
+  color: text('color').default('#dc2626').notNull(), // Red for debt
+  icon: text('icon').default('credit-card').notNull(),
+  
+  // Tracking
+  lastBalanceUpdate: timestamp('last_balance_update'),
+  lastPaymentDate: timestamp('last_payment_date'),
+  lastPaymentAmount: decimal('last_payment_amount', { precision: 15, scale: 2 }),
+  
+  currency: text('currency').default('AUD').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('debts_user_id_idx').on(table.userId),
+  statusIdx: index('debts_status_idx').on(table.status),
+  nextDueDateIdx: index('debts_next_due_date_idx').on(table.nextDueDate),
+  debtTypeIdx: index('debts_debt_type_idx').on(table.debtType),
+  priorityIdx: index('debts_priority_idx').on(table.payoffPriority),
+}))
+
+// Debt Payments table
+export const debtPayments = pgTable('debt_payments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  debtId: uuid('debt_id').references(() => debts.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Payment Details
+  paymentDate: timestamp('payment_date').notNull(),
+  paymentAmount: decimal('payment_amount', { precision: 15, scale: 2 }).notNull(),
+  principalAmount: decimal('principal_amount', { precision: 15, scale: 2 }).notNull(),
+  interestAmount: decimal('interest_amount', { precision: 15, scale: 2 }).default('0.00').notNull(),
+  feesAmount: decimal('fees_amount', { precision: 15, scale: 2 }).default('0.00').notNull(),
+  
+  // Source
+  fromAccountId: uuid('from_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  transactionId: uuid('transaction_id').references(() => transactions.id, { onDelete: 'set null' }),
+  
+  // Tracking
+  balanceAfterPayment: decimal('balance_after_payment', { precision: 15, scale: 2 }).notNull(),
+  confirmationNumber: text('confirmation_number'),
+  paymentMethod: text('payment_method'), // 'bank_transfer', 'credit_card', 'cash', 'check', 'auto_pay'
+  
+  // Metadata
+  notes: text('notes'),
+  isExtraPayment: boolean('is_extra_payment').default(false).notNull(), // Above minimum
+  isAutomated: boolean('is_automated').default(false).notNull(),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('debt_payments_user_id_idx').on(table.userId),
+  debtIdIdx: index('debt_payments_debt_id_idx').on(table.debtId),
+  paymentDateIdx: index('debt_payments_payment_date_idx').on(table.paymentDate),
+  extraPaymentIdx: index('debt_payments_extra_payment_idx').on(table.isExtraPayment),
+}))
+
+// Debt Strategies table
+export const debtStrategies = pgTable('debt_strategies', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Strategy Config
+  name: text('name').notNull(),
+  strategyType: text('strategy_type').notNull(), // 'snowball', 'avalanche', 'hybrid', 'custom', 'consolidation'
+  description: text('description'),
+  
+  // Parameters
+  extraMonthlyPayment: decimal('extra_monthly_payment', { precision: 15, scale: 2 }).default('0.00').notNull(),
+  extraPaymentFrequency: text('extra_payment_frequency').default('monthly').notNull(),
+  startDate: timestamp('start_date').notNull(),
+  
+  // Debt Priority Order (array of debt IDs in payoff order)
+  debtPriorityOrder: jsonb('debt_priority_order').$type<string[]>().default([]),
+  
+  // Consolidation specifics
+  consolidationRate: decimal('consolidation_rate', { precision: 5, scale: 2 }),
+  consolidationTermMonths: integer('consolidation_term_months'),
+  consolidatedDebtIds: jsonb('consolidated_debt_ids').$type<string[]>(),
+  
+  // Settings
+  isActive: boolean('is_active').default(false).notNull(),
+  isDefault: boolean('is_default').default(false).notNull(),
+  
+  // Calculated Projections (cached)
+  projectedDebtFreeDate: timestamp('projected_debt_free_date'),
+  totalInterestProjected: decimal('total_interest_projected', { precision: 15, scale: 2 }),
+  totalPaymentsProjected: decimal('total_payments_projected', { precision: 15, scale: 2 }),
+  monthsToDebtFree: integer('months_to_debt_free'),
+  interestSavedVsMinimum: decimal('interest_saved_vs_minimum', { precision: 15, scale: 2 }),
+  
+  // Metadata
+  lastCalculated: timestamp('last_calculated'),
+  calculationParams: jsonb('calculation_params'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('debt_strategies_user_id_idx').on(table.userId),
+  activeIdx: index('debt_strategies_active_idx').on(table.isActive),
+  strategyTypeIdx: index('debt_strategies_type_idx').on(table.strategyType),
+}))
+
+// Debt Projections table
+export const debtProjections = pgTable('debt_projections', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  strategyId: uuid('strategy_id').references(() => debtStrategies.id, { onDelete: 'cascade' }).notNull(),
+  debtId: uuid('debt_id').references(() => debts.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Projection Data
+  projectionMonth: integer('projection_month').notNull(), // 0 = current month
+  projectionDate: timestamp('projection_date').notNull(),
+  
+  // Projected Values
+  projectedBalance: decimal('projected_balance', { precision: 15, scale: 2 }).notNull(),
+  projectedPayment: decimal('projected_payment', { precision: 15, scale: 2 }).notNull(),
+  projectedPrincipal: decimal('projected_principal', { precision: 15, scale: 2 }).notNull(),
+  projectedInterest: decimal('projected_interest', { precision: 15, scale: 2 }).notNull(),
+  
+  // Cumulative Totals
+  cumulativePrincipalPaid: decimal('cumulative_principal_paid', { precision: 15, scale: 2 }).notNull(),
+  cumulativeInterestPaid: decimal('cumulative_interest_paid', { precision: 15, scale: 2 }).notNull(),
+  
+  // Metadata
+  isPaidOff: boolean('is_paid_off').default(false).notNull(),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('debt_projections_user_id_idx').on(table.userId),
+  strategyIdIdx: index('debt_projections_strategy_id_idx').on(table.strategyId),
+  debtIdIdx: index('debt_projections_debt_id_idx').on(table.debtId),
+  monthIdx: index('debt_projections_month_idx').on(table.projectionMonth),
+}))
+
+// Debt Milestones table
+export const debtMilestones = pgTable('debt_milestones', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  debtId: uuid('debt_id').references(() => debts.id, { onDelete: 'set null' }),
+  
+  // Milestone Details
+  milestoneType: text('milestone_type').notNull(), // 'debt_paid_off', 'half_paid', 'year_anniversary', 'interest_saved_threshold', 'custom'
+  milestoneName: text('milestone_name').notNull(),
+  description: text('description'),
+  
+  // Trigger Conditions
+  targetDate: timestamp('target_date'),
+  targetBalance: decimal('target_balance', { precision: 15, scale: 2 }),
+  targetPercentPaid: decimal('target_percent_paid', { precision: 5, scale: 2 }),
+  
+  // Status
+  isAchieved: boolean('is_achieved').default(false).notNull(),
+  achievedDate: timestamp('achieved_date'),
+  
+  // Celebration
+  celebrationMessage: text('celebration_message'),
+  iconEmoji: text('icon_emoji'), // '🎉', '💪', '🏆', etc.
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('debt_milestones_user_id_idx').on(table.userId),
+  debtIdIdx: index('debt_milestones_debt_id_idx').on(table.debtId),
+  achievedIdx: index('debt_milestones_achieved_idx').on(table.isAchieved),
+  targetDateIdx: index('debt_milestones_target_date_idx').on(table.targetDate),
+}))
+
+// Schema exports
+export const insertDebtSchema = createInsertSchema(debts)
+export const selectDebtSchema = createSelectSchema(debts)
+export type InsertDebt = z.infer<typeof insertDebtSchema>
+export type SelectDebt = z.infer<typeof selectDebtSchema>
+
+export const insertDebtPaymentSchema = createInsertSchema(debtPayments)
+export const selectDebtPaymentSchema = createSelectSchema(debtPayments)
+export type InsertDebtPayment = z.infer<typeof insertDebtPaymentSchema>
+export type SelectDebtPayment = z.infer<typeof selectDebtPaymentSchema>
+
+export const insertDebtStrategySchema = createInsertSchema(debtStrategies)
+export const selectDebtStrategySchema = createSelectSchema(debtStrategies)
+export type InsertDebtStrategy = z.infer<typeof insertDebtStrategySchema>
+export type SelectDebtStrategy = z.infer<typeof selectDebtStrategySchema>
+
+export const insertDebtProjectionSchema = createInsertSchema(debtProjections)
+export const selectDebtProjectionSchema = createSelectSchema(debtProjections)
+export type InsertDebtProjection = z.infer<typeof insertDebtProjectionSchema>
+export type SelectDebtProjection = z.infer<typeof selectDebtProjectionSchema>
+
+export const insertDebtMilestoneSchema = createInsertSchema(debtMilestones)
+export const selectDebtMilestoneSchema = createSelectSchema(debtMilestones)
+export type InsertDebtMilestone = z.infer<typeof insertDebtMilestoneSchema>
+export type SelectDebtMilestone = z.infer<typeof selectDebtMilestoneSchema>

@@ -69,7 +69,8 @@ import {
   Copy,
   Activity,
   BarChart3,
-  Target
+  Target,
+  CreditCard
 } from 'lucide-react'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { BulkOperationsBar } from '@/components/bulk-operations-bar'
@@ -79,6 +80,7 @@ import { TransactionTemplates } from '@/components/transaction-templates'
 import { ImprovedMobileTransactionCard } from '@/components/improved-mobile-transaction-card'
 import { MobileActionBar } from '@/components/mobile-action-bar'
 import { TransactionBreakdownDialog } from '@/components/transaction-breakdown-dialog'
+import { LinkTransactionToDebtDialog } from '@/components/link-transaction-to-debt-dialog'
 import { useKeyboardShortcuts, KeyboardShortcut, SHORTCUT_CATEGORIES } from '@/hooks/use-keyboard-shortcuts'
 import { useResponsive } from '@/hooks/use-responsive'
 import { TransactionTemplate } from '@/lib/validations/templates'
@@ -239,6 +241,8 @@ export function TransactionsPageClient({
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null)
+  const [isLinkDebtDialogOpen, setIsLinkDebtDialogOpen] = useState(false)
+  const [linkingTransaction, setLinkingTransaction] = useState<Transaction | null>(null)
   
   // Advanced search state
   const [activeFilters, setActiveFilters] = useState<any>(null)
@@ -691,6 +695,19 @@ export function TransactionsPageClient({
     setBreakdownTransaction(transaction)
     setSelectedActivity(transactionActivity || (propActivities.length > 0 ? propActivities[0] : null))
     setIsBreakdownDialogOpen(true)
+  }
+
+  // Handle link to debt click
+  const handleLinkToDebtClick = (transaction: Transaction) => {
+    setLinkingTransaction(transaction)
+    setIsLinkDebtDialogOpen(true)
+  }
+
+  // Handle successful debt link
+  const handleDebtLinked = () => {
+    toast.success('Transaction linked to debt payment successfully!')
+    // Optionally refresh the page or update state
+    router.refresh()
   }
 
   // Save category change
@@ -1370,6 +1387,10 @@ export function TransactionsPageClient({
                             <BarChart3 className="h-4 w-4 mr-2" />
                             Breakdown Expenses
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleLinkToDebtClick(transaction)}>
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Link to Debt Payment
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDuplicateTransaction(transaction)}>
                             <Copy className="h-4 w-4 mr-2" />
                             Duplicate
@@ -1944,6 +1965,14 @@ export function TransactionsPageClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Link Transaction to Debt Dialog */}
+      <LinkTransactionToDebtDialog
+        open={isLinkDebtDialogOpen}
+        onOpenChange={setIsLinkDebtDialogOpen}
+        transaction={linkingTransaction}
+        onLinked={handleDebtLinked}
+      />
     </div>
     </TooltipProvider>
   )
