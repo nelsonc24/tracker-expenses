@@ -18,9 +18,9 @@ import {
   SpendingInsightsCard 
 } from '@/components/dashboard-insights'
 import { BudgetProgressCard } from '@/components/budget-progress-card'
+import { SpendingTrendCard } from '@/components/spending-trend-card'
 import {
   MonthlyComparisonChart, 
-  SpendingTrendChart, 
 } from '@/components/charts'
 import { CategoryBreakdownWithFilter } from '@/components/category-breakdown-with-filter'
 import { ChartColorSettings, InlineChartColorSettings } from '@/components/chart-color-settings'
@@ -302,20 +302,7 @@ export default async function DashboardPage() {
 
         <TabsContent value="overview" className="space-y-4 sm:space-y-6">
           <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg">Spending Trend</CardTitle>
-                    <CardDescription className="text-sm">Daily spending over the last week</CardDescription>
-                  </div>
-                  <InlineChartColorSettings />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <SpendingTrendChart data={dashboardData.trendData} />
-              </CardContent>
-            </Card>
+            <SpendingTrendCard initialData={dashboardData.trendData} />
 
             <CategoryBreakdownWithFilter initialData={dashboardData.categoryData} />
           </div>
