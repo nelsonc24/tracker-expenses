@@ -1,15 +1,12 @@
 import { currentUser } from '@clerk/nextjs/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
 import { 
   BarChart3, 
   TrendingUp, 
   DollarSign, 
   CreditCard,
   ArrowUpRight,
-  Plus,
-  Download,
   Calendar
 } from 'lucide-react'
 import { 
@@ -24,6 +21,7 @@ import {
 } from '@/components/charts'
 import { CategoryBreakdownWithFilter } from '@/components/category-breakdown-with-filter'
 import { ChartColorSettings, InlineChartColorSettings } from '@/components/chart-color-settings'
+import { DashboardActions } from '@/components/dashboard-actions'
 import { 
   getCurrentUser,
   createOrUpdateUser,
@@ -54,6 +52,7 @@ async function getDashboardData(userId: string) {
     thisMonthSummary,
     lastMonthSummary,
     categorySpending,
+    thisMonthCategorySpending,
     last30DaysTransactions,
     recurringSummary
   ] = await Promise.all([
@@ -63,7 +62,8 @@ async function getDashboardData(userId: string) {
     getUserTransactions(userId, { limit: 10, sortBy: 'date', sortOrder: 'desc' }),
     getTransactionSummary(userId, startOfMonth, endOfMonth),
     getTransactionSummary(userId, startOfLastMonth, endOfLastMonth),
-    getCategorySpending(userId), // Remove date filtering to show all-time category spending
+    getCategorySpending(userId), // All-time category spending for charts
+    getCategorySpending(userId, startOfMonth, endOfMonth), // Current month for budget progress
     getUserTransactions(userId, { 
       startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
       endDate: now,
@@ -77,10 +77,10 @@ async function getDashboardData(userId: string) {
     sum + account.calculatedBalance, 0
   )
 
-  // Calculate budget progress
+  // Calculate budget progress for CURRENT MONTH only
   const budgetProgress = budgets.length > 0 
     ? budgets.reduce((sum, budget) => {
-        const spent = categorySpending
+        const spent = thisMonthCategorySpending
           .filter(cs => budget.categoryIds?.includes(cs.categoryId || ''))
           .reduce((total, cs) => total + Math.abs(parseFloat(cs.totalAmount || '0')), 0)
         return sum + (spent / parseFloat(budget.amount))
@@ -178,6 +178,13 @@ export default async function DashboardPage() {
     ? ((dashboardData.thisMonthSummary.totalExpenses - dashboardData.lastMonthSummary.totalExpenses) / dashboardData.lastMonthSummary.totalExpenses) * 100
     : dashboardData.thisMonthSummary.totalExpenses > 0 ? 100 : 0
 
+  // Calculate balance change (Total Balance change indicator)
+  // For now, we'll use net amount as a proxy for balance change
+  const balanceChange = dashboardData.thisMonthSummary.netAmount
+  const balanceChangePercentage = dashboardData.totalBalance > 0 
+    ? Math.abs((balanceChange / dashboardData.totalBalance) * 100)
+    : 0
+
   const topCategory = dashboardData.categorySpending[0]
   const avgDailySpend = dashboardData.thisMonthSummary.totalExpenses / new Date().getDate()
 
@@ -230,16 +237,17 @@ export default async function DashboardPage() {
         </div>
         <div className="flex items-center space-x-2">
           <ChartColorSettings />
-          <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-            <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-            <span className="hidden sm:inline">Export</span>
-            <span className="sm:hidden">Export</span>
-          </Button>
-          <Button size="sm" className="text-xs sm:text-sm">
-            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-            <span className="hidden sm:inline">Add Transaction</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
+          <DashboardActions 
+            accounts={dashboardData.accounts.map(a => ({
+              id: a.id,
+              name: a.name,
+              institution: a.institution
+            }))}
+            categories={dashboardData.categories.map(c => ({
+              id: c.id,
+              name: c.name
+            }))}
+          />
         </div>
       </div>
 
@@ -249,12 +257,13 @@ export default async function DashboardPage() {
           title="Total Balance"
           value={`$${dashboardData.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           change={{ 
-            value: Number(Math.abs(monthlyChange).toFixed(1)), 
-            type: monthlyChange >= 0 ? 'increase' : 'decrease', 
-            period: 'last month' 
+            value: Number(balanceChangePercentage.toFixed(1)), 
+            type: balanceChange >= 0 ? 'increase' : 'decrease', 
+            period: 'this month' 
           }}
           icon={<DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
           description={`Across ${dashboardData.accounts.length} connected accounts`}
+          href="/accounts"
         />
         <InsightCard
           title="This Month"
@@ -266,12 +275,14 @@ export default async function DashboardPage() {
           }}
           icon={<TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
           description="Total expenses"
+          href="/transactions"
         />
         <InsightCard
           title="Budget Progress"
           value={`${Math.round(dashboardData.budgetProgress)}%`}
           icon={<BarChart3 className="h-4 w-4 text-muted-foreground" />}
-          description={dashboardData.budgetProgress > 80 ? "Over budget target" : "On track for monthly goals"}
+          description={`This month: ${dashboardData.budgetProgress > 80 ? "Over budget target" : "On track"}`}
+          href="/budgets"
         />
         <InsightCard
           title="Recurring"
@@ -283,17 +294,19 @@ export default async function DashboardPage() {
           } : undefined}
           icon={<Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
           description={`$${dashboardData.recurringSummary.monthlyTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} monthly total`}
+          href="/bills"
         />
         <InsightCard
           title="Income vs Expenses"
           value={`$${dashboardData.thisMonthSummary.netAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          change={dashboardData.thisMonthSummary.totalIncome > 0 ? { 
+          change={dashboardData.thisMonthSummary.totalIncome > 0 && dashboardData.thisMonthSummary.totalExpenses > 0 ? { 
             value: Number(((dashboardData.thisMonthSummary.totalExpenses / dashboardData.thisMonthSummary.totalIncome) * 100).toFixed(1)), 
             type: dashboardData.thisMonthSummary.netAmount >= 0 ? 'increase' : 'decrease', 
-            period: 'expense ratio' 
+            period: 'spending rate' 
           } : undefined}
           icon={<CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
-          description="This month's net amount"
+          description={`Income: $${dashboardData.thisMonthSummary.totalIncome.toLocaleString()} | Expenses: $${dashboardData.thisMonthSummary.totalExpenses.toLocaleString()}`}
+          href="/transactions"
         />
       </div>
 

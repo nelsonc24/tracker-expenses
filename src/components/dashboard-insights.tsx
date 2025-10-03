@@ -10,6 +10,7 @@ import {
   Calendar
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
+import Link from 'next/link'
 
 interface InsightCardProps {
   title: string
@@ -22,6 +23,8 @@ interface InsightCardProps {
   icon: React.ReactNode
   description?: string
   className?: string
+  href?: string
+  onClick?: () => void
 }
 
 export function InsightCard({ 
@@ -30,37 +33,74 @@ export function InsightCard({
   change, 
   icon, 
   description,
-  className 
+  className,
+  href,
+  onClick 
 }: InsightCardProps) {
-  return (
-    <Card className={className}>
+  const cardContent = (
+    <>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-xs sm:text-sm font-medium truncate">{title}</CardTitle>
         {icon}
       </CardHeader>
-      <CardContent className="pb-3">
-        <div className="text-lg sm:text-2xl font-bold break-all">{value}</div>
-        {change && (
-          <div className="flex items-center space-x-1 sm:space-x-2 text-xs">
-            {change.type === 'increase' ? (
-              <TrendingUp className="h-3 w-3 text-green-500 flex-shrink-0" />
-            ) : (
-              <TrendingDown className="h-3 w-3 text-red-500 flex-shrink-0" />
-            )}
-            <span className={cn(
-              "truncate",
-              change.type === 'increase' ? 'text-green-500' : 'text-red-500'
-            )}>
-              {Math.abs(change.value).toFixed(1)}% from {change.period}
-            </span>
-          </div>
-        )}
-        {description && (
-          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-            {description}
-          </p>
-        )}
+      <CardContent className="pb-3 flex-1 flex flex-col justify-between">
+        <div className="text-lg sm:text-2xl font-bold break-all mb-2">{value}</div>
+        <div className="space-y-1">
+          {change && (
+            <div className="flex items-center space-x-1 sm:space-x-2 text-xs">
+              {change.type === 'increase' ? (
+                <TrendingUp className="h-3 w-3 text-green-500 flex-shrink-0" />
+              ) : (
+                <TrendingDown className="h-3 w-3 text-red-500 flex-shrink-0" />
+              )}
+              <span className={cn(
+                "truncate",
+                change.type === 'increase' ? 'text-green-500' : 'text-red-500'
+              )}>
+                {Math.abs(change.value).toFixed(1)}% from {change.period}
+              </span>
+            </div>
+          )}
+          {description && (
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {description}
+            </p>
+          )}
+        </div>
       </CardContent>
+    </>
+  )
+
+  if (href) {
+    return (
+      <Link href={href} className="block h-full">
+        <Card className={cn(
+          "transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer h-full flex flex-col",
+          className
+        )}>
+          {cardContent}
+        </Card>
+      </Link>
+    )
+  }
+
+  if (onClick) {
+    return (
+      <Card 
+        className={cn(
+          "transition-all duration-200 hover:shadow-md hover:scale-[1.02] cursor-pointer h-full flex flex-col",
+          className
+        )}
+        onClick={onClick}
+      >
+        {cardContent}
+      </Card>
+    )
+  }
+
+  return (
+    <Card className={cn("h-full flex flex-col", className)}>
+      {cardContent}
     </Card>
   )
 }
