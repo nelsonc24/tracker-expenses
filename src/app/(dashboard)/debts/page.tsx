@@ -106,16 +106,16 @@ export default function DebtsPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Debt Management</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Debt Management</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Track all your debts and create a payoff strategy
           </p>
         </div>
-        <Button onClick={() => setShowAddDialog(true)}>
+        <Button onClick={() => setShowAddDialog(true)} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Add Debt
         </Button>
@@ -123,14 +123,14 @@ export default function DebtsPage() {
 
       {/* Statistics Cards */}
       {stats && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Debt</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Total Debt</CardTitle>
               <DollarSign className="h-4 w-4 text-destructive" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-destructive">
+              <div className="text-xl sm:text-2xl font-bold text-destructive">
                 ${parseFloat(stats.totalDebt).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -141,11 +141,11 @@ export default function DebtsPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Payments</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Monthly Payments</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-xl sm:text-2xl font-bold">
                 ${parseFloat(stats.totalMonthlyPayments).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -156,11 +156,11 @@ export default function DebtsPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg. Interest Rate</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Avg. Interest Rate</CardTitle>
               <TrendingUp className="h-4 w-4 text-orange-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-xl sm:text-2xl font-bold">
                 {parseFloat(stats.avgInterestRate).toFixed(2)}%
               </div>
               <p className="text-xs text-muted-foreground">
@@ -171,11 +171,11 @@ export default function DebtsPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Interest (YTD)</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Interest (YTD)</CardTitle>
               <TrendingDown className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-xl sm:text-2xl font-bold">
                 ${parseFloat(stats.totalInterestPaidYTD).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
