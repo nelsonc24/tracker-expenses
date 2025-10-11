@@ -75,16 +75,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = createBillSchema.parse(body)
 
-    // Calculate next due date based on frequency and dueDay
-    let dueDate = new Date()
+    // Calculate next due date based on frequency and dueDay/dueDate
+    let dueDate: Date | null = null
+    
     if (validatedData.dueDate) {
+      // Explicit due date provided (for non-monthly frequencies)
       dueDate = new Date(validatedData.dueDate)
     } else if (validatedData.frequency === 'monthly' && validatedData.dueDay) {
+      // Monthly bills use dueDay
       dueDate = new Date()
       dueDate.setDate(validatedData.dueDay)
       if (dueDate < new Date()) {
         dueDate.setMonth(dueDate.getMonth() + 1)
       }
+    } else {
+      // Default: set to current date for other frequencies without explicit date
+      dueDate = new Date()
     }
 
     const newBill = await db

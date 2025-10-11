@@ -95,6 +95,9 @@ export async function PUT(
         dueDate.setMonth(dueDate.getMonth() + 1)
       }
       updateFields.dueDate = dueDate
+    } else if (validatedData.dueDate && validatedData.frequency !== 'monthly') {
+      // For non-monthly frequencies, use the provided dueDate
+      updateFields.dueDate = new Date(validatedData.dueDate)
     }
 
     const updatedBill = await db

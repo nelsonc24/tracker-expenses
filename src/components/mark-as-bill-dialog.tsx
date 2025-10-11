@@ -33,6 +33,7 @@ interface MarkAsBillDialogProps {
 export function MarkAsBillDialog({ open, onOpenChange, transaction, onSuccess }: MarkAsBillDialogProps) {
   const [frequency, setFrequency] = useState<string>('monthly')
   const [dueDay, setDueDay] = useState<string>('')
+  const [dueDate, setDueDate] = useState<string>('')
   const [reminderDays, setReminderDays] = useState<string>('3')
   const [isAutoPay, setIsAutoPay] = useState(false)
   const [notes, setNotes] = useState('')
@@ -55,6 +56,8 @@ export function MarkAsBillDialog({ open, onOpenChange, transaction, onSuccess }:
 
       if (frequency === 'monthly' && dueDay) {
         payload.dueDay = parseInt(dueDay)
+      } else if (frequency !== 'monthly' && dueDate) {
+        payload.dueDate = dueDate
       }
 
       const response = await fetch(`/api/transactions/${transaction.id}/mark-as-bill`, {
@@ -73,6 +76,7 @@ export function MarkAsBillDialog({ open, onOpenChange, transaction, onSuccess }:
       // Reset form
       setFrequency('monthly')
       setDueDay('')
+      setDueDate('')
       setReminderDays('3')
       setIsAutoPay(false)
       setNotes('')
@@ -182,6 +186,26 @@ export function MarkAsBillDialog({ open, onOpenChange, transaction, onSuccess }:
               />
               <div className="text-xs text-muted-foreground">
                 Leave empty to use the current transaction date
+              </div>
+            </div>
+          )}
+
+          {/* Due Date for Non-Monthly Bills */}
+          {frequency !== 'monthly' && (
+            <div className="space-y-2">
+              <Label htmlFor="dueDate">Next Due Date</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                placeholder="Select due date"
+              />
+              <div className="text-xs text-muted-foreground">
+                {frequency === 'weekly' && 'Select the next date this bill is due'}
+                {frequency === 'biweekly' && 'Select the next date this bill is due'}
+                {frequency === 'quarterly' && 'Select the next date this bill is due (every 3 months)'}
+                {frequency === 'yearly' && 'Select the next date this bill is due (annually)'}
               </div>
             </div>
           )}

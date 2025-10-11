@@ -8,6 +8,7 @@ import { z } from 'zod'
 const markAsBillSchema = z.object({
   frequency: z.enum(['weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']),
   dueDay: z.number().min(1).max(31).optional(),
+  dueDate: z.string().optional(),
   reminderDays: z.number().default(3),
   isAutoPay: z.boolean().default(false),
   notes: z.string().optional(),
@@ -41,14 +42,20 @@ export async function POST(
     const txn = transaction[0]
 
     // Calculate next due date
-    let dueDate = new Date()
-    if (validatedData.frequency === 'monthly' && validatedData.dueDay) {
+    let dueDate: Date
+    
+    if (validatedData.dueDate) {
+      // Use explicit due date if provided (for non-monthly frequencies)
+      dueDate = new Date(validatedData.dueDate)
+    } else if (validatedData.frequency === 'monthly' && validatedData.dueDay) {
+      // Monthly bills use dueDay
+      dueDate = new Date()
       dueDate.setDate(validatedData.dueDay)
       if (dueDate < new Date()) {
         dueDate.setMonth(dueDate.getMonth() + 1)
       }
     } else {
-      // For other frequencies, use transaction date + frequency interval
+      // For other frequencies without explicit date, use transaction date + frequency interval
       dueDate = new Date(txn.transactionDate)
       switch (validatedData.frequency) {
         case 'weekly':

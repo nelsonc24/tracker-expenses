@@ -31,6 +31,7 @@ interface Bill {
   categoryId?: string
   frequency: 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
   dueDay?: number
+  dueDate?: string
   reminderDays: number
   isAutoPay: boolean
   notes?: string
@@ -58,6 +59,7 @@ export function EditBillDialog({ bill, open, onOpenChange, onSuccess }: EditBill
   const [categoryId, setCategoryId] = useState('none')
   const [frequency, setFrequency] = useState<'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'>('monthly')
   const [dueDay, setDueDay] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const [reminderDays, setReminderDays] = useState('3')
   const [isAutoPay, setIsAutoPay] = useState(false)
   const [notes, setNotes] = useState('')
@@ -72,6 +74,8 @@ export function EditBillDialog({ bill, open, onOpenChange, onSuccess }: EditBill
       setCategoryId(bill.categoryId || 'none')
       setFrequency(bill.frequency)
       setDueDay(bill.dueDay?.toString() || '')
+      // Format dueDate from ISO string to YYYY-MM-DD for date input
+      setDueDate(bill.dueDate ? new Date(bill.dueDate).toISOString().split('T')[0] : '')
       setReminderDays(bill.reminderDays.toString())
       setIsAutoPay(bill.isAutoPay)
       setNotes(bill.notes || '')
@@ -138,6 +142,8 @@ export function EditBillDialog({ bill, open, onOpenChange, onSuccess }: EditBill
 
       if (frequency === 'monthly' && dueDay) {
         payload.dueDay = parseInt(dueDay)
+      } else if (frequency !== 'monthly' && dueDate) {
+        payload.dueDate = dueDate
       }
 
       const response = await fetch(`/api/bills/${bill.id}`, {
@@ -302,6 +308,26 @@ export function EditBillDialog({ bill, open, onOpenChange, onSuccess }: EditBill
               />
               <div className="text-xs text-muted-foreground">
                 Day of the month when this bill is due (1-31)
+              </div>
+            </div>
+          )}
+
+          {/* Due Date for Non-Monthly Bills */}
+          {frequency !== 'monthly' && (
+            <div className="space-y-2">
+              <Label htmlFor="dueDate">Next Due Date</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                placeholder="Select due date"
+              />
+              <div className="text-xs text-muted-foreground">
+                {frequency === 'weekly' && 'Select the next date this bill is due'}
+                {frequency === 'biweekly' && 'Select the next date this bill is due'}
+                {frequency === 'quarterly' && 'Select the next date this bill is due (every 3 months)'}
+                {frequency === 'yearly' && 'Select the next date this bill is due (annually)'}
               </div>
             </div>
           )}
