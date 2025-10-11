@@ -71,7 +71,7 @@ export function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
+            <SidebarMenuButton size="lg" asChild tooltip="ExpenseTracker">
               <Link href="/dashboard" className="flex items-center space-x-2">
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                   <BarChart3 className="w-5 h-5 text-primary-foreground" />
@@ -97,6 +97,7 @@ export function AppSidebar() {
                   <SidebarMenuButton 
                     asChild 
                     isActive={pathname === item.href}
+                    tooltip={item.name}
                   >
                     <Link href={item.href}>
                       <item.icon />
@@ -119,6 +120,7 @@ export function AppSidebar() {
                   <SidebarMenuButton 
                     asChild 
                     isActive={pathname === item.href}
+                    tooltip={item.name}
                   >
                     <Link href={item.href}>
                       <item.icon />
@@ -141,6 +143,7 @@ export function AppSidebar() {
                   <SidebarMenuButton 
                     asChild 
                     isActive={pathname === item.href}
+                    tooltip={item.name}
                   >
                     <Link href={item.href}>
                       <item.icon />
@@ -162,6 +165,9 @@ export function AppSidebar() {
                 <SidebarMenuButton
                   size="lg"
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  tooltip={{
+                    children: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Account',
+                  }}
                 >
                   <div className="flex items-center space-x-3">
                     <UserButton 
