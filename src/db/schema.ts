@@ -674,3 +674,106 @@ export const insertDebtMilestoneSchema = createInsertSchema(debtMilestones)
 export const selectDebtMilestoneSchema = createSelectSchema(debtMilestones)
 export type InsertDebtMilestone = z.infer<typeof insertDebtMilestoneSchema>
 export type SelectDebtMilestone = z.infer<typeof selectDebtMilestoneSchema>
+
+// Notifications table - tracks all notifications sent to users
+export const notifications = pgTable('notifications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Notification Content
+  notificationType: text('notification_type').notNull(), // 'bill_reminder', 'debt_due', 'budget_alert', 'payment_confirmation'
+  title: text('title').notNull(),
+  message: text('message').notNull(),
+  
+  // Delivery Details
+  channel: text('channel').notNull(), // 'email', 'push', 'sms', 'in_app'
+  status: text('status').default('pending').notNull(), // 'pending', 'sent', 'delivered', 'failed', 'read'
+  sentAt: timestamp('sent_at'),
+  deliveredAt: timestamp('delivered_at'),
+  readAt: timestamp('read_at'),
+  
+  // Related Entity
+  relatedEntityType: text('related_entity_type'), // 'bill', 'debt', 'budget', 'transaction'
+  relatedEntityId: uuid('related_entity_id'),
+  
+  // Email specifics
+  emailTo: text('email_to'),
+  emailSubject: text('email_subject'),
+  emailMessageId: text('email_message_id'), // Resend message ID for tracking
+  
+  // Metadata
+  metadata: jsonb('metadata').$type<{
+    billName?: string
+    debtName?: string
+    amount?: number
+    dueDate?: string
+    daysUntilDue?: number
+    resendResponse?: Record<string, unknown>
+    errorMessage?: string
+  }>(),
+  
+  // Error tracking
+  errorCount: integer('error_count').default(0).notNull(),
+  lastErrorMessage: text('last_error_message'),
+  lastErrorAt: timestamp('last_error_at'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('notifications_user_id_idx').on(table.userId),
+  typeIdx: index('notifications_type_idx').on(table.notificationType),
+  statusIdx: index('notifications_status_idx').on(table.status),
+  channelIdx: index('notifications_channel_idx').on(table.channel),
+  relatedEntityIdx: index('notifications_related_entity_idx').on(table.relatedEntityType, table.relatedEntityId),
+  sentAtIdx: index('notifications_sent_at_idx').on(table.sentAt),
+  createdAtIdx: index('notifications_created_at_idx').on(table.createdAt),
+}))
+
+// Notification Preferences table - user preferences for notifications
+export const notificationPreferences = pgTable('notification_preferences', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  
+  // Global Settings
+  emailNotificationsEnabled: boolean('email_notifications_enabled').default(true).notNull(),
+  pushNotificationsEnabled: boolean('push_notifications_enabled').default(false).notNull(),
+  
+  // Bill Reminders
+  billRemindersEnabled: boolean('bill_reminders_enabled').default(true).notNull(),
+  billReminderDaysBefore: integer('bill_reminder_days_before').default(3).notNull(),
+  billReminderChannel: text('bill_reminder_channel').default('email').notNull(), // 'email', 'push', 'both'
+  
+  // Debt Reminders
+  debtRemindersEnabled: boolean('debt_reminders_enabled').default(true).notNull(),
+  debtReminderDaysBefore: integer('debt_reminder_days_before').default(3).notNull(),
+  debtReminderChannel: text('debt_reminder_channel').default('email').notNull(),
+  
+  // Budget Alerts
+  budgetAlertsEnabled: boolean('budget_alerts_enabled').default(true).notNull(),
+  budgetAlertThreshold: integer('budget_alert_threshold').default(80).notNull(), // percentage
+  budgetAlertChannel: text('budget_alert_channel').default('email').notNull(),
+  
+  // Notification Frequency
+  digestFrequency: text('digest_frequency').default('daily').notNull(), // 'immediate', 'daily', 'weekly', 'never'
+  quietHoursStart: text('quiet_hours_start'), // '22:00'
+  quietHoursEnd: text('quiet_hours_end'), // '08:00'
+  
+  // Email Preferences
+  preferredEmail: text('preferred_email'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('notification_preferences_user_id_idx').on(table.userId),
+  userIdUnique: unique('notification_preferences_user_id_unique').on(table.userId),
+}))
+
+export const insertNotificationSchema = createInsertSchema(notifications)
+export const selectNotificationSchema = createSelectSchema(notifications)
+export type InsertNotification = z.infer<typeof insertNotificationSchema>
+export type SelectNotification = z.infer<typeof selectNotificationSchema>
+
+export const insertNotificationPreferenceSchema = createInsertSchema(notificationPreferences)
+export const selectNotificationPreferenceSchema = createSelectSchema(notificationPreferences)
+export type InsertNotificationPreference = z.infer<typeof insertNotificationPreferenceSchema>
+export type SelectNotificationPreference = z.infer<typeof selectNotificationPreferenceSchema>
