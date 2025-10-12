@@ -443,6 +443,7 @@ export async function createTransaction(transactionData: {
   type: 'debit' | 'credit' | 'transfer'
   tags?: string[]
   notes?: string
+  isTransfer?: boolean
 }): Promise<SelectTransaction | null> {
   try {
     const result = await db
@@ -660,13 +661,13 @@ export async function getTransactionSummary(
       .from(transactions)
       .where(and(...conditions, lte(transactions.amount, '0')))
 
-    // Get income total separately  
+    // Get income total separately - exclude transfers to avoid double counting
     const incomeResult = await db
       .select({
         totalIncome: sum(transactions.amount),
       })
       .from(transactions)
-      .where(and(...conditions, gte(transactions.amount, '0')))
+      .where(and(...conditions, gte(transactions.amount, '0'), eq(transactions.isTransfer, false)))
 
     return {
       totalTransactions: Number(summaryResult?.[0]?.totalTransactions || 0),

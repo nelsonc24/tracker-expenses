@@ -47,7 +47,8 @@ export async function GET(request: NextRequest) {
       reference: transaction.reference,
       receiptNumber: transaction.receiptNumber,
       tags: transaction.tags,
-      notes: transaction.notes
+      notes: transaction.notes,
+      isTransfer: transaction.isTransfer || false
     }))
 
     return NextResponse.json(transformedTransactions)
@@ -76,7 +77,8 @@ export async function POST(request: NextRequest) {
       transactionDate, 
       type, 
       tags, 
-      notes 
+      notes,
+      isTransfer
     } = body
 
     const transaction = await createTransaction({
@@ -91,7 +93,8 @@ export async function POST(request: NextRequest) {
       transactionDate: new Date(transactionDate),
       type,
       tags,
-      notes
+      notes,
+      isTransfer: isTransfer || false
     })
 
     if (!transaction) {

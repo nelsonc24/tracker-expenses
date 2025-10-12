@@ -103,6 +103,7 @@ type Transaction = {
   notes: string
   balance: number
   activities?: Activity[]
+  isTransfer?: boolean
 }
 
 type Activity = {
@@ -596,7 +597,8 @@ export function TransactionsPageClient({
           reference: editingTransaction.reference,
           receiptNumber: editingTransaction.receiptNumber,
           notes: editingTransaction.notes,
-          tags: editingTransaction.tags
+          tags: editingTransaction.tags,
+          isTransfer: editingTransaction.isTransfer || false
         })
       })
 
@@ -1026,8 +1028,8 @@ export function TransactionsPageClient({
     console.log('Open bulk actions')
   }
 
-  // Calculate summary statistics
-  const totalIncome = filteredTransactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0)
+  // Calculate summary statistics - exclude transfers from income to avoid double counting
+  const totalIncome = filteredTransactions.filter(t => t.amount > 0 && !t.isTransfer).reduce((sum, t) => sum + t.amount, 0)
   const totalExpenses = filteredTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0)
   const netAmount = totalIncome - totalExpenses
 
@@ -1357,14 +1359,28 @@ export function TransactionsPageClient({
                       </div>
                     </TableCell>
                     <TableCell className="w-24 text-right">
-                      <div className={cn(
-                        "font-medium",
-                        transaction.amount >= 0 ? "text-green-600" : "text-red-600"
-                      )}>
-                        {transaction.amount >= 0 ? '+' : '-'}$
-                        {Math.abs(transaction.amount).toLocaleString('en-AU', { 
-                          minimumFractionDigits: 2 
-                        })}
+                      <div className="flex items-center justify-end gap-1">
+                        <div className={cn(
+                          "font-medium",
+                          transaction.amount >= 0 ? "text-green-600" : "text-red-600"
+                        )}>
+                          {transaction.amount >= 0 ? '+' : '-'}$
+                          {Math.abs(transaction.amount).toLocaleString('en-AU', { 
+                            minimumFractionDigits: 2 
+                          })}
+                        </div>
+                        {transaction.isTransfer && transaction.amount > 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-xs px-1 py-0 h-4 bg-blue-50 text-blue-600 border-blue-200">
+                                Transfer
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Transfer from another account (excluded from income)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="w-12">
@@ -1644,6 +1660,30 @@ export function TransactionsPageClient({
                   placeholder="Enter receipt number for reconciliation..."
                 />
               </div>
+              
+              {/* Transfer Checkbox - Only show for income (positive amounts) */}
+              {editingTransaction.amount > 0 && (
+                <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg">
+                  <Checkbox
+                    id="edit-is-transfer"
+                    checked={editingTransaction.isTransfer || false}
+                    onCheckedChange={(checked) => setEditingTransaction(prev => 
+                      prev ? { ...prev, isTransfer: checked === true } : null
+                    )}
+                  />
+                  <div className="flex-1">
+                    <Label 
+                      htmlFor="edit-is-transfer" 
+                      className="text-sm font-medium cursor-pointer"
+                    >
+                      This is a transfer from another account
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Mark this income as a transfer to exclude it from total income calculations
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
@@ -1716,6 +1756,17 @@ export function TransactionsPageClient({
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-muted-foreground">Receipt Number</Label>
                   <p className="text-sm">{viewingTransaction.receiptNumber}</p>
+                </div>
+              )}
+              {viewingTransaction.isTransfer && viewingTransaction.amount > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Transaction Type</Label>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
+                    Transfer from another account
+                  </Badge>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This income is excluded from total income calculations to avoid double counting
+                  </p>
                 </div>
               )}
               {viewingTransaction.notes && (

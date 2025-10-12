@@ -220,6 +220,7 @@ export const transactions = pgTable('transactions', {
   reconciled: boolean('reconciled').default(false).notNull(),
   isBill: boolean('is_bill').default(false).notNull(),
   billId: uuid('bill_id').references(() => bills.id, { onDelete: 'set null' }),
+  isTransfer: boolean('is_transfer').default(false).notNull(), // Mark income transactions as transfers between accounts
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

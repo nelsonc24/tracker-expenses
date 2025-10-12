@@ -17,6 +17,7 @@ interface Transaction {
   reference?: string
   tags?: string[]
   notes?: string
+  isTransfer?: boolean
 }
 
 interface Account {

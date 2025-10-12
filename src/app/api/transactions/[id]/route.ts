@@ -18,6 +18,8 @@ const updateTransactionSchema = z.object({
   tags: z.array(z.string()).optional(),
   isBill: z.boolean().optional(),
   billId: z.string().uuid().optional(),
+  isTransfer: z.boolean().optional(),
+  receiptNumber: z.string().optional(),
 })
 
 export async function PUT(
@@ -133,6 +135,12 @@ export async function PUT(
     }
     if (validatedData.billId !== undefined) {
       updateData.billId = validatedData.billId
+    }
+    if (validatedData.isTransfer !== undefined) {
+      updateData.isTransfer = validatedData.isTransfer
+    }
+    if (validatedData.receiptNumber !== undefined) {
+      updateData.receiptNumber = validatedData.receiptNumber
     }
 
     // Update the transaction
