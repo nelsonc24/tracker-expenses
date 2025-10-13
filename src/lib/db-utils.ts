@@ -1183,3 +1183,167 @@ export async function getCurrentBudgetPeriod(budgetId: string): Promise<SelectBu
     return null
   }
 }
+
+/**
+ * Get bills summary for dashboard
+ */
+export async function getBillsSummary(userId: string) {
+  try {
+    const { bills } = await import('@/db/schema')
+    
+    // Get all active bills
+    const activeBills = await db
+      .select()
+      .from(bills)
+      .where(
+        and(
+          eq(bills.userId, userId),
+          eq(bills.isActive, true)
+        )
+      )
+    
+    if (activeBills.length === 0) {
+      return {
+        totalBills: 0,
+        activeBills: 0,
+        upcomingDue: 0,
+        monthlyTotal: 0,
+        nextBillAmount: 0,
+        nextBillDate: null,
+        nextBillName: null
+      }
+    }
+
+    // Calculate monthly total based on frequency
+    const frequencyMultipliers = {
+      weekly: 4.33,
+      biweekly: 2.17,
+      monthly: 1,
+      quarterly: 0.33,
+      yearly: 0.083
+    }
+
+    const monthlyTotal = activeBills.reduce((sum, bill) => {
+      const multiplier = frequencyMultipliers[bill.frequency as keyof typeof frequencyMultipliers] || 1
+      return sum + (parseFloat(bill.amount) * multiplier)
+    }, 0)
+
+    // Find next due bill
+    const now = new Date()
+    const billsWithDates = activeBills
+      .filter(bill => bill.dueDate)
+      .map(bill => ({
+        ...bill,
+        dueDateObj: new Date(bill.dueDate!)
+      }))
+      .filter(bill => bill.dueDateObj >= now)
+      .sort((a, b) => a.dueDateObj.getTime() - b.dueDateObj.getTime())
+
+    const nextBill = billsWithDates[0]
+
+    // Count bills due in the next 7 days
+    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const upcomingDue = billsWithDates.filter(bill => bill.dueDateObj <= nextWeek).length
+
+    return {
+      totalBills: activeBills.length,
+      activeBills: activeBills.length,
+      upcomingDue,
+      monthlyTotal,
+      nextBillAmount: nextBill ? parseFloat(nextBill.amount) : 0,
+      nextBillDate: nextBill?.dueDate || null,
+      nextBillName: nextBill?.name || null
+    }
+  } catch (error) {
+    console.error('Error getting bills summary:', error)
+    return {
+      totalBills: 0,
+      activeBills: 0,
+      upcomingDue: 0,
+      monthlyTotal: 0,
+      nextBillAmount: 0,
+      nextBillDate: null,
+      nextBillName: null
+    }
+  }
+}
+
+/**
+ * Get debts summary for dashboard
+ */
+export async function getDebtsSummary(userId: string) {
+  try {
+    const { debts } = await import('@/db/schema')
+    
+    // Get all active debts
+    const activeDebts = await db
+      .select()
+      .from(debts)
+      .where(
+        and(
+          eq(debts.userId, userId),
+          eq(debts.status, 'active')
+        )
+      )
+    
+    if (activeDebts.length === 0) {
+      return {
+        totalDebts: 0,
+        totalBalance: 0,
+        monthlyPayments: 0,
+        avgInterestRate: 0,
+        highestInterestDebt: null,
+        totalInterestPaidYTD: 0
+      }
+    }
+
+    // Calculate totals
+    const totalBalance = activeDebts.reduce((sum, debt) => {
+      return sum + parseFloat(debt.currentBalance)
+    }, 0)
+
+    const monthlyPayments = activeDebts.reduce((sum, debt) => {
+      return sum + parseFloat(debt.minimumPayment || '0')
+    }, 0)
+
+    // Calculate average interest rate (weighted by balance)
+    const totalInterest = activeDebts.reduce((sum, debt) => {
+      return sum + (parseFloat(debt.currentBalance) * parseFloat(debt.interestRate))
+    }, 0)
+    const avgInterestRate = totalBalance > 0 ? totalInterest / totalBalance : 0
+
+    // Find highest interest debt
+    const highestInterestDebt = activeDebts.reduce((highest, debt) => {
+      const rate = parseFloat(debt.interestRate)
+      const highestRate = highest ? parseFloat(highest.interestRate) : 0
+      return rate > highestRate ? debt : highest
+    }, activeDebts[0])
+
+    // Calculate interest paid YTD (simplified - would need payment history)
+    // TODO: Calculate from payment history when available
+    const totalInterestPaidYTD = 0
+
+    return {
+      totalDebts: activeDebts.length,
+      totalBalance,
+      monthlyPayments,
+      avgInterestRate,
+      highestInterestDebt: highestInterestDebt ? {
+        name: highestInterestDebt.name,
+        balance: parseFloat(highestInterestDebt.currentBalance),
+        rate: parseFloat(highestInterestDebt.interestRate)
+      } : null,
+      totalInterestPaidYTD
+    }
+  } catch (error) {
+    console.error('Error getting debts summary:', error)
+    return {
+      totalDebts: 0,
+      totalBalance: 0,
+      monthlyPayments: 0,
+      avgInterestRate: 0,
+      highestInterestDebt: null,
+      totalInterestPaidYTD: 0
+    }
+  }
+}

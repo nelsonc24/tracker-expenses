@@ -7,7 +7,9 @@ import {
   DollarSign, 
   CreditCard,
   ArrowUpRight,
-  Calendar
+  Calendar,
+  Receipt,
+  Landmark
 } from 'lucide-react'
 import { 
   InsightCard, 
@@ -31,7 +33,9 @@ import {
   getUserBudgets,
   getTransactionSummary,
   getCategorySpending,
-  getRecurringTransactionsSummary
+  getRecurringTransactionsSummary,
+  getBillsSummary,
+  getDebtsSummary
 } from '@/lib/db-utils'
 import { redirect } from 'next/navigation'
 
@@ -54,7 +58,9 @@ async function getDashboardData(userId: string) {
     categorySpending,
     thisMonthCategorySpending,
     last30DaysTransactions,
-    recurringSummary
+    recurringSummary,
+    billsSummary,
+    debtsSummary
   ] = await Promise.all([
     getUserAccountsWithBalance(userId),
     getUserCategories(userId),
@@ -69,7 +75,9 @@ async function getDashboardData(userId: string) {
       endDate: now,
       limit: 1000 
     }),
-    getRecurringTransactionsSummary(userId)
+    getRecurringTransactionsSummary(userId),
+    getBillsSummary(userId),
+    getDebtsSummary(userId)
   ])
 
   // Calculate total balance across accounts using calculated balances
@@ -134,7 +142,9 @@ async function getDashboardData(userId: string) {
     trendData,
     categoryData,
     monthlyData,
-    recurringSummary
+    recurringSummary,
+    billsSummary,
+    debtsSummary
   }
 }
 
@@ -252,7 +262,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         <InsightCard
           title="Total Balance"
           value={`$${dashboardData.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -295,6 +305,30 @@ export default async function DashboardPage() {
           icon={<Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
           description={`$${dashboardData.recurringSummary.monthlyTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} monthly total`}
           href="/bills"
+        />
+        <InsightCard
+          title="Bills & Projections"
+          value={`$${dashboardData.billsSummary.monthlyTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          change={dashboardData.billsSummary.upcomingDue > 0 ? { 
+            value: dashboardData.billsSummary.upcomingDue, 
+            type: 'decrease', 
+            period: 'due this week' 
+          } : undefined}
+          icon={<Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
+          description={`${dashboardData.billsSummary.activeBills} active bills tracked`}
+          href="/bills"
+        />
+        <InsightCard
+          title="Debt Tracking"
+          value={`$${dashboardData.debtsSummary.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          change={dashboardData.debtsSummary.totalDebts > 0 ? { 
+            value: Number(dashboardData.debtsSummary.avgInterestRate.toFixed(1)), 
+            type: 'decrease', 
+            period: 'avg rate' 
+          } : undefined}
+          icon={<Landmark className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
+          description={`$${dashboardData.debtsSummary.monthlyPayments.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} monthly payments`}
+          href="/debts"
         />
         <InsightCard
           title="Income vs Expenses"
@@ -445,6 +479,163 @@ export default async function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Bills & Projections Insights */}
+          {dashboardData.billsSummary.activeBills > 0 && (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Bills & Projections Overview</CardTitle>
+                  <CardDescription>Your upcoming recurring bill schedule</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Monthly Projected Total</p>
+                      <p className="text-2xl font-bold">${dashboardData.billsSummary.monthlyTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    </div>
+                    <Receipt className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  {dashboardData.billsSummary.nextBillName && (
+                    <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg">
+                      <h4 className="font-semibold text-amber-900 dark:text-amber-100 flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Next Bill Due
+                      </h4>
+                      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                        {dashboardData.billsSummary.nextBillName}: ${dashboardData.billsSummary.nextBillAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        Due: {new Date(dashboardData.billsSummary.nextBillDate!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                    </div>
+                  )}
+                  {dashboardData.billsSummary.upcomingDue > 0 && (
+                    <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                      <h4 className="font-semibold text-red-900 dark:text-red-100">⏰ Upcoming This Week</h4>
+                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                        You have {dashboardData.billsSummary.upcomingDue} bill{dashboardData.billsSummary.upcomingDue > 1 ? 's' : ''} due in the next 7 days. Make sure you have sufficient funds!
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Bill Management Tips</CardTitle>
+                  <CardDescription>Stay on top of your recurring expenses</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-2 h-2 bg-primary rounded-full mt-2" />
+                    <div>
+                      <p className="font-medium text-sm">Track All Bills</p>
+                      <p className="text-xs text-muted-foreground">
+                        You&apos;re tracking {dashboardData.billsSummary.activeBills} recurring bills. Review and update regularly to ensure accurate projections.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-2 h-2 bg-primary rounded-full mt-2" />
+                    <div>
+                      <p className="font-medium text-sm">Enable Auto-Pay</p>
+                      <p className="text-xs text-muted-foreground">
+                        Consider setting up auto-pay for bills to avoid late fees and improve your credit score.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-2 h-2 bg-primary rounded-full mt-2" />
+                    <div>
+                      <p className="font-medium text-sm">Plan Ahead</p>
+                      <p className="text-xs text-muted-foreground">
+                        Review your bill projections to plan your cash flow and avoid surprises.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Debt Tracking Insights */}
+          {dashboardData.debtsSummary.totalDebts > 0 && (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Debt Overview</CardTitle>
+                  <CardDescription>Your debt payoff journey</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Debt Balance</p>
+                      <p className="text-2xl font-bold text-red-600">${dashboardData.debtsSummary.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    </div>
+                    <Landmark className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-xs text-muted-foreground">Active Debts</p>
+                      <p className="text-xl font-bold">{dashboardData.debtsSummary.totalDebts}</p>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-xs text-muted-foreground">Avg Interest Rate</p>
+                      <p className="text-xl font-bold">{dashboardData.debtsSummary.avgInterestRate.toFixed(1)}%</p>
+                    </div>
+                  </div>
+                  {dashboardData.debtsSummary.highestInterestDebt && (
+                    <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
+                      <h4 className="font-semibold text-orange-900 dark:text-orange-100">🎯 Priority Debt</h4>
+                      <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
+                        {dashboardData.debtsSummary.highestInterestDebt.name} at {dashboardData.debtsSummary.highestInterestDebt.rate.toFixed(1)}% interest
+                      </p>
+                      <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                        Balance: ${dashboardData.debtsSummary.highestInterestDebt.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Debt Payoff Strategies</CardTitle>
+                  <CardDescription>Accelerate your path to debt freedom</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-2 h-2 bg-primary rounded-full mt-2" />
+                    <div>
+                      <p className="font-medium text-sm">Pay More Than Minimum</p>
+                      <p className="text-xs text-muted-foreground">
+                        Your monthly minimum payments total ${dashboardData.debtsSummary.monthlyPayments.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Even $50 extra per month can save thousands in interest.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-2 h-2 bg-primary rounded-full mt-2" />
+                    <div>
+                      <p className="font-medium text-sm">Target High-Interest First</p>
+                      <p className="text-xs text-muted-foreground">
+                        Focus on paying off high-interest debts first to minimize total interest paid over time.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-2 h-2 bg-primary rounded-full mt-2" />
+                    <div>
+                      <p className="font-medium text-sm">Track Your Progress</p>
+                      <p className="text-xs text-muted-foreground">
+                        Log all debt payments to visualize your payoff timeline and stay motivated.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
