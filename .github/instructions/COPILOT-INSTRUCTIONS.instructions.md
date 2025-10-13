@@ -42,3 +42,18 @@ Provide project context and coding guidelines that AI should follow when generat
   - Verify all file paths and imports are still valid after cleanup
   - Run `pnpm run build` to ensure the project still builds successfully after cleanup
   - Confirm cleanup completion with the user before considering the task finished
+- **Database Migration Strategy** - Follow these steps when running Drizzle migrations:
+  - **Development Database**: Use the development DATABASE_URL from `.env.local`
+    ```bash
+    DATABASE_URL="<dev-database-url>" pnpm drizzle-kit push
+    ```
+  - **Production Database**: Use the production DATABASE_URL from `.env.local`
+    ```bash
+    DATABASE_URL="<prod-database-url>" pnpm drizzle-kit push
+    ```
+  - Always review the migration changes when prompted before confirming
+  - For auto-confirmation, prefix command with `yes |` to automatically answer prompts
+  - Create migration files in `drizzle/` folder with sequential numbering (e.g., `0004_add_is_transfer.sql`)
+  - Document each migration with clear comments about what it does and why
+  - Test migrations on development database first before running on production
+  - Migrations are backward compatible - use sensible defaults for new columns
