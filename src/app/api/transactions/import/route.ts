@@ -85,6 +85,16 @@ export async function POST(request: NextRequest) {
     const duplicateTransactions: any[] = []
 
     for (const tx of transactionData) {
+      // Skip transactions with zero amount
+      const amount = parseFloat(tx.amount.toString())
+      if (amount === 0) {
+        duplicateTransactions.push({
+          ...tx,
+          reason: 'Transaction has zero amount'
+        })
+        continue
+      }
+
       const transactionHash = generateTransactionHash(tx, userId, accountId)
       
       if (existingTransactionHashes.has(transactionHash)) {
@@ -99,13 +109,13 @@ export async function POST(request: NextRequest) {
           userId,
           accountId: accountId, // Use the selected account ID
           categoryId: defaultCategory.id,
-          amount: parseFloat(tx.amount.toString()).toFixed(2),
+          amount: amount.toFixed(2),
           description: tx.description.trim(),
           merchant: tx.merchant || extractMerchant(tx.description),
           reference: tx.reference || null,
           receiptNumber: tx.receiptNumber || null,
           transactionDate: new Date(tx.date),
-          type: parseFloat(tx.amount.toString()) < 0 ? 'debit' : 'credit',
+          type: amount < 0 ? 'debit' : 'credit',
           status: 'cleared',
           duplicateCheckHash: transactionHash,
           originalData: tx,
