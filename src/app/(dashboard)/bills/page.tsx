@@ -46,9 +46,12 @@ interface BillProjection {
     averageAmount: number
     occurrences: number
     dueDate?: string
+    dueDay?: number
     isAutoPay: boolean
     lastPaidAmount?: string
     lastPaidDate?: string
+    notes?: string
+    tags: string[]
   }>
 }
 
@@ -343,33 +346,82 @@ export default function BillsPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {projection.bills.map((bill) => (
-                      <div key={bill.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div>
-                            <div className="font-medium">{bill.name}</div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div key={bill.id} className="p-4 border rounded-lg space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-lg">{bill.name}</div>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <Badge className={getFrequencyColor(bill.frequency)}>
                                 {bill.frequency}
                               </Badge>
                               {bill.occurrences > 1 && (
-                                <span>× {bill.occurrences}</span>
+                                <Badge variant="secondary">× {bill.occurrences} times</Badge>
                               )}
                               {bill.isAutoPay && (
-                                <Badge variant="outline">Auto Pay</Badge>
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Auto Pay</Badge>
                               )}
                             </div>
                           </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold">{formatCurrency(bill.estimatedAmount)}</div>
+                            {bill.averageAmount !== bill.estimatedAmount && (
+                              <div className="text-sm text-muted-foreground">
+                                Avg: {formatCurrency(bill.averageAmount)}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-medium">{formatCurrency(bill.estimatedAmount)}</div>
-                          {bill.averageAmount !== bill.estimatedAmount && (
-                            <div className="text-sm text-muted-foreground">
-                              Avg: {formatCurrency(bill.averageAmount)}
+                        
+                        {/* Bill Details Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-2 border-t">
+                          {bill.dueDate && (
+                            <div>
+                              <div className="text-xs text-muted-foreground">Due Date</div>
+                              <div className="text-sm font-medium">{format(new Date(bill.dueDate), 'MMM dd, yyyy')}</div>
+                            </div>
+                          )}
+                          {bill.dueDay && (
+                            <div>
+                              <div className="text-xs text-muted-foreground">Due Day</div>
+                              <div className="text-sm font-medium">Day {bill.dueDay} of month</div>
+                            </div>
+                          )}
+                          {bill.lastPaidDate && (
+                            <div>
+                              <div className="text-xs text-muted-foreground">Last Paid</div>
+                              <div className="text-sm font-medium">{format(new Date(bill.lastPaidDate), 'MMM dd, yyyy')}</div>
+                            </div>
+                          )}
+                          {bill.lastPaidAmount && (
+                            <div>
+                              <div className="text-xs text-muted-foreground">Last Amount</div>
+                              <div className="text-sm font-medium">{formatCurrency(parseFloat(bill.lastPaidAmount))}</div>
                             </div>
                           )}
                         </div>
+
+                        {/* Notes */}
+                        {bill.notes && (
+                          <div className="pt-2 border-t">
+                            <div className="text-xs text-muted-foreground mb-1">Notes</div>
+                            <div className="text-sm">{bill.notes}</div>
+                          </div>
+                        )}
+
+                        {/* Tags */}
+                        {bill.tags && bill.tags.length > 0 && (
+                          <div className="pt-2 border-t">
+                            <div className="flex gap-1 flex-wrap">
+                              {bill.tags.map((tag, index) => (
+                                <Badge key={index} variant="secondary" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -93,11 +93,13 @@ export async function GET(request: NextRequest) {
             averageAmount: averageAmount * billFrequencyInPeriod,
             occurrences: billFrequencyInPeriod,
             dueDate: bill.dueDate,
+            dueDay: bill.dueDay,
             isAutoPay: bill.isAutoPay,
             category: bill.categoryId,
-            tags: bill.tags,
+            tags: bill.tags || [],
             lastPaidAmount: bill.lastPaidAmount,
             lastPaidDate: bill.lastPaidDate,
+            notes: bill.notes,
           })
         }
       }
