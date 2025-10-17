@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react'
@@ -26,6 +27,7 @@ interface DebtStats {
 }
 
 export default function DebtsPage() {
+  const searchParams = useSearchParams()
   const [debts, setDebts] = useState([])
   const [stats, setStats] = useState<DebtStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -33,6 +35,13 @@ export default function DebtsPage() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [selectedDebt, setSelectedDebt] = useState<Record<string, unknown> | null>(null)
+
+  // Check for action=add query parameter
+  useEffect(() => {
+    if (searchParams.get('action') === 'add') {
+      setShowAddDialog(true)
+    }
+  }, [searchParams])
 
   const fetchDebts = useCallback(async () => {
     try {
