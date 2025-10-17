@@ -18,6 +18,7 @@ interface TransactionData {
   balance?: number
   receiptNumber?: string  // Added receipt number field
   transactionId?: string  // Added bank transaction ID
+  isTransfer?: boolean    // Flag to indicate transfer between accounts
 }
 
 // Generate a consistent hash for duplicate detection
@@ -117,6 +118,7 @@ export async function POST(request: NextRequest) {
           transactionDate: new Date(tx.date),
           type: amount < 0 ? 'debit' : 'credit',
           status: 'cleared',
+          isTransfer: tx.isTransfer || false, // Save the transfer flag from CSV processing
           duplicateCheckHash: transactionHash,
           originalData: tx,
           createdAt: new Date(),
@@ -236,6 +238,7 @@ export async function GET(request: NextRequest) {
 }
 
 // Helper functions to get or create default account and category
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function getOrCreateDefaultAccount(userId: string) {
   // Try to get existing account
   const existingAccounts = await db.select().from(accountsTable).where(eq(accountsTable.userId, userId)).limit(1)

@@ -653,13 +653,13 @@ export async function getTransactionSummary(
       .from(transactions)
       .where(and(...conditions))
 
-    // Get expense total separately
+    // Get expense total separately - exclude transfers to avoid double counting
     const expenseResult = await db
       .select({
         totalExpenses: sum(transactions.amount),
       })
       .from(transactions)
-      .where(and(...conditions, lte(transactions.amount, '0')))
+      .where(and(...conditions, lte(transactions.amount, '0'), eq(transactions.isTransfer, false)))
 
     // Get income total separately - exclude transfers to avoid double counting
     const incomeResult = await db
@@ -700,7 +700,8 @@ export async function getCategorySpending(
 }>> {
   try {
     const conditions = [
-      eq(transactions.userId, userId)
+      eq(transactions.userId, userId),
+      eq(transactions.isTransfer, false) // Exclude transfers from category spending
     ]
     
     if (startDate) {

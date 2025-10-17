@@ -990,6 +990,11 @@ export default function ImportPage() {
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                         <span>{transaction.date}</span>
                         <Badge variant="outline">{transaction.category}</Badge>
+                        {transaction.isTransfer && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
+                            Transfer
+                          </Badge>
+                        )}
                         {transaction.status === 'error' && (
                           <Badge variant="destructive" className="text-xs">
                             Error: {transaction.errors[0]?.message}

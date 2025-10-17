@@ -103,6 +103,7 @@ export interface ProcessedTransaction {
   transactionId?: string  // Bank's unique transaction identifier
   receiptNumber?: string  // Receipt number if available
   balance?: number
+  isTransfer?: boolean    // Flag to indicate if this is a transfer between accounts
   status: 'valid' | 'error' | 'warning'
   errors: ValidationError[]
   rawData: Record<string, string> | string[]
@@ -308,6 +309,28 @@ export function categorizeTransaction(description: string, merchant: string, amo
   return 'Uncategorized'
 }
 
+// Detect if a transaction is a transfer between accounts
+export function isTransferTransaction(description: string): boolean {
+  const desc = description.toLowerCase()
+  
+  // Common transfer patterns in bank statements
+  const transferPatterns = [
+    /transfer to .* account/i,           // "Transfer To Ubank Bills Account"
+    /transfer from .* account/i,         // "Transfer From Savings Account"
+    /fast transfer (to|from)/i,          // "Fast Transfer From PERSON"
+    /payid (payment|transfer)/i,         // "PayID Payment"
+    /osko payment/i,                     // "Osko Payment"
+    /bpay transfer/i,                    // "BPAY Transfer"
+    /internal transfer/i,                // "Internal Transfer"
+    /account transfer/i,                 // "Account Transfer"
+    /transfer - .* to .*/i,              // "Transfer - Account A to Account B"
+    /own account transfer/i,             // "Own Account Transfer"
+  ]
+  
+  return transferPatterns.some(pattern => pattern.test(desc))
+}
+
+
 // Validate a single transaction row
 export function validateTransactionRow(
   row: Record<string, string> | string[], 
@@ -377,6 +400,9 @@ export function validateTransactionRow(
   const merchant = extractMerchant(cleanedDescription)
   const category = categorizeTransaction(cleanedDescription, merchant, amount)
   
+  // Detect if this is a transfer transaction
+  const isTransfer = isTransferTransaction(cleanedDescription)
+  
   // Extract transaction identifiers (UBank has 'Transaction ID', others may have different names)
   const transactionId = (rowData as Record<string, string>)['Transaction ID'] || 
                         (rowData as Record<string, string>).transactionId || 
@@ -404,6 +430,7 @@ export function validateTransactionRow(
     transactionId: cleanedTransactionId || undefined,
     receiptNumber: cleanedReceiptNumber || undefined,
     balance,
+    isTransfer,  // Add the transfer flag
     status: errors.length > 0 ? 'error' : 'valid',
     errors,
     rawData: rowData

@@ -40,6 +40,7 @@ type Transaction = {
   balance: number
   tags?: string[]
   notes?: string
+  isTransfer?: boolean
 }
 
 type ImprovedMobileTransactionCardProps = {
@@ -127,7 +128,7 @@ export function ImprovedMobileTransactionCard({
             
             {/* Bottom row: Category and Account */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
                 <Badge 
                   variant="secondary" 
                   className={cn(
@@ -143,6 +144,11 @@ export function ImprovedMobileTransactionCard({
                 <Badge variant="outline" className="text-xs truncate max-w-[100px]" title={transaction.account}>
                   {transaction.account}
                 </Badge>
+                {transaction.isTransfer && transaction.amount > 0 && (
+                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200">
+                    Transfer
+                  </Badge>
+                )}
               </div>
               
               {/* Action buttons */}
