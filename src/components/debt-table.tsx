@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { MoreHorizontal, Pencil, Trash2, DollarSign, Filter, TrendingUp } from 'lucide-react'
+import { MoreHorizontal, Pencil, Trash2, DollarSign, Filter, TrendingUp, History } from 'lucide-react'
 import { toast } from 'sonner'
 import { DebtDetailsDialog } from '@/components/debt-details-dialog'
 
@@ -64,6 +64,7 @@ interface DebtTableProps {
   onDelete: () => void
   onEdit?: (debt: Debt) => void
   onLogPayment?: (debt: Debt) => void
+  onViewPayments?: (debt: Debt) => void
 }
 
 const DEBT_TYPE_LABELS: Record<string, string> = {
@@ -95,7 +96,7 @@ const STATUS_LABELS: Record<string, string> = {
   archived: 'Archived',
 }
 
-export function DebtTable({ debts, onDelete, onEdit, onLogPayment }: DebtTableProps) {
+export function DebtTable({ debts, onDelete, onEdit, onLogPayment, onViewPayments }: DebtTableProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [debtToDelete, setDebtToDelete] = useState<Debt | null>(null)
@@ -253,6 +254,10 @@ export function DebtTable({ debts, onDelete, onEdit, onLogPayment }: DebtTablePr
                           <DollarSign className="mr-2 h-4 w-4" />
                           Log Payment
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onViewPayments?.(debt)}>
+                          <History className="mr-2 h-4 w-4" />
+                          View Payments
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onEdit?.(debt)}>
                           <Pencil className="mr-2 h-4 w-4" />
                           Edit
@@ -334,6 +339,10 @@ export function DebtTable({ debts, onDelete, onEdit, onLogPayment }: DebtTablePr
                           <DollarSign className="mr-2 h-4 w-4" />
                           Log Payment
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onViewPayments?.(debt)}>
+                          <History className="mr-2 h-4 w-4" />
+                          View Payments
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onEdit?.(debt)}>
                           <Pencil className="mr-2 h-4 w-4" />
                           Edit
@@ -387,6 +396,10 @@ export function DebtTable({ debts, onDelete, onEdit, onLogPayment }: DebtTablePr
                       <DropdownMenuItem onClick={() => onLogPayment?.(debt)}>
                         <DollarSign className="mr-2 h-4 w-4" />
                         Log Payment
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onViewPayments?.(debt)}>
+                        <History className="mr-2 h-4 w-4" />
+                        View Payments
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onEdit?.(debt)}>
                         <Pencil className="mr-2 h-4 w-4" />
@@ -448,6 +461,15 @@ export function DebtTable({ debts, onDelete, onEdit, onLogPayment }: DebtTablePr
                   >
                     <DollarSign className="mr-1 h-3 w-3" />
                     Log Payment
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => onViewPayments?.(debt)}
+                  >
+                    <History className="mr-1 h-3 w-3" />
+                    View
                   </Button>
                   <Button
                     variant="outline"

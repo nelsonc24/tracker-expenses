@@ -8,6 +8,7 @@ import { Plus, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-rea
 import { AddDebtDialog } from '@/components/add-debt-dialog'
 import { LogPaymentDialog } from '@/components/log-payment-dialog'
 import { EditDebtDialog } from '@/components/edit-debt-dialog'
+import { PaymentHistoryDialog } from '@/components/payment-history-dialog'
 import { DebtTable } from '@/components/debt-table'
 import { DebtStats } from '@/components/debt-stats'
 import { toast } from 'sonner'
@@ -34,6 +35,7 @@ export default function DebtsPage() {
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const [showPaymentHistoryDialog, setShowPaymentHistoryDialog] = useState(false)
   const [selectedDebt, setSelectedDebt] = useState<Record<string, unknown> | null>(null)
 
   // Check for action=add query parameter
@@ -101,6 +103,11 @@ export default function DebtsPage() {
   const handleLogPayment = (debt: { id: string; name: string; currentBalance: string; minimumPayment: string; creditorName: string }) => {
     setSelectedDebt(debt)
     setShowPaymentDialog(true)
+  }
+
+  const handleViewPayments = (debt: { id: string; name: string; currentBalance: string; creditorName: string }) => {
+    setSelectedDebt(debt)
+    setShowPaymentHistoryDialog(true)
   }
 
   if (isLoading) {
@@ -229,6 +236,7 @@ export default function DebtsPage() {
               onDelete={handleDebtDeleted}
               onEdit={handleEditDebt}
               onLogPayment={handleLogPayment}
+              onViewPayments={handleViewPayments}
             />
           </CardContent>
         </Card>
@@ -260,6 +268,14 @@ export default function DebtsPage() {
         onOpenChange={setShowEditDialog}
         debt={selectedDebt as { id: string; name: string; debtType: string; creditorName: string; currentBalance: string; interestRate: string; minimumPayment: string; paymentFrequency: string; paymentDueDay?: number | null; status: string } | null}
         onDebtUpdated={handleDebtUpdated}
+      />
+
+      {/* Payment History Dialog */}
+      <PaymentHistoryDialog
+        open={showPaymentHistoryDialog}
+        onOpenChange={setShowPaymentHistoryDialog}
+        debt={selectedDebt as { id: string; name: string; creditorName: string; currentBalance: string } | null}
+        onPaymentChanged={handleDebtUpdated}
       />
     </div>
   )
