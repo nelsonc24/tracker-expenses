@@ -74,6 +74,29 @@ export const bankFormats: Record<string, BankFormat> = {
     descriptionColumn: 'Description',
     skipRows: 1 // Skip header row
   },
+  latitud: {
+    name: 'Latitud Credit Card',
+    columns: ['Date', 'Card', 'Description', 'Debits', 'Credits'],
+    dateFormat: 'DD/MM/YYYY',
+    example: 'Date,Card,Description,Debits,Credits\n08/09/2025,7458,BPAY Payment Received--Thank You,,4160.00\n09/09/2025,7458,Woolworths Epping,54.15,',
+    amountColumns: {
+      debit: 'Debits',
+      credit: 'Credits'
+    },
+    descriptionColumn: 'Description',
+    skipRows: 1 // Skip header row
+  },
+  creditcard: {
+    name: 'Generic Credit Card',
+    columns: ['date', 'description', 'amount'],
+    dateFormat: 'DD/MM/YYYY',
+    example: 'Date,Description,Amount\n01/01/2025,Purchase at Store,-50.00\n05/01/2025,Payment Received,200.00',
+    amountColumns: {
+      amount: 'Amount'
+    },
+    descriptionColumn: 'Description',
+    skipRows: 1
+  },
   custom: {
     name: 'Custom Format',
     columns: [],

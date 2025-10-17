@@ -194,12 +194,73 @@ export default function ImportPage() {
     }, 100)
   }
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     setSelectedFile(file)
     setImportStatus('processing')
     setProgress(25)
     
-    // Read and parse the actual CSV file
+    // Handle different file types
+    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+    
+    // For PDF and JSON files, use the new API endpoint
+    if (fileExtension === 'pdf' || fileExtension === 'json') {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('accountId', selectedAccountId || '')
+        formData.append('fileType', fileExtension)
+        
+        setProgress(50)
+        
+        const response = await fetch('/api/transactions/parse-file', {
+          method: 'POST',
+          body: formData
+        })
+        
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.details || error.error || 'Failed to parse file')
+        }
+        
+        const result = await response.json()
+        setProgress(75)
+        
+        // Convert the parsed transactions to our format
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const processedTransactions = result.transactions.map((t: any, index: number) => ({
+          id: `import_${Date.now()}_${index}`,
+          date: t.date,
+          description: t.description,
+          amount: t.amount,
+          category: t.category,
+          account: selectedAccountId || '',
+          merchant: t.description,
+          reference: '',
+          balance: 0,
+          status: 'valid' as const,
+          errors: [],
+          rawData: t
+        }))
+        
+        setParsedTransactions(processedTransactions)
+        setProgress(100)
+        setImportStatus('completed')
+        
+        // If it's a PDF, show metadata
+        if (result.metadata) {
+          console.log('Statement metadata:', result.metadata)
+        }
+        
+        return
+      } catch (error) {
+        console.error('Error parsing file:', error)
+        setImportStatus('error')
+        alert(error instanceof Error ? error.message : 'Failed to parse file')
+        return
+      }
+    }
+    
+    // Handle CSV files (existing logic)
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
@@ -637,10 +698,10 @@ export default function ImportPage() {
                   <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                   <div className="space-y-2">
                     <p className="text-lg font-medium">
-                      {!selectedAccountId ? "Select an account first" : "Drop your CSV file here"}
+                      {!selectedAccountId ? "Select an account first" : "Drop your file here"}
                     </p>
                     <p className="text-muted-foreground">
-                      {!selectedAccountId ? "Choose which account these transactions belong to" : "or click to browse"}
+                      {!selectedAccountId ? "Choose which account these transactions belong to" : "Supports CSV, PDF (credit card statements), and JSON files"}
                     </p>
                   </div>
                   {selectedAccountId && (
@@ -653,7 +714,7 @@ export default function ImportPage() {
                       <Input
                         id="file-upload"
                         type="file"
-                        accept=".csv"
+                        accept=".csv,.pdf,.json"
                         className="hidden"
                         onChange={handleFileChange}
                       />
@@ -680,29 +741,38 @@ export default function ImportPage() {
           {/* Format Requirements */}
           <Card>
             <CardHeader>
-              <CardTitle>📋 CSV Format Requirements</CardTitle>
+              <CardTitle>📋 File Format Guide</CardTitle>
               <CardDescription>
-                Make sure your CSV follows these guidelines for best results
+                Supported formats: CSV, PDF (credit card statements), and JSON files
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-green-600">✅ Required</h4>
+                  <h4 className="font-semibold text-green-600">📄 CSV Files</h4>
                   <ul className="text-sm space-y-1 text-muted-foreground">
-                    <li>• Date column (various formats supported)</li>
-                    <li>• Description/Merchant column</li>
-                    <li>• Amount column (debit/credit or single)</li>
+                    <li>• Date column (various formats)</li>
+                    <li>• Description/Merchant</li>
+                    <li>• Amount (debit/credit or single)</li>
                     <li>• UTF-8 encoding</li>
                   </ul>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-blue-600">💡 Optional</h4>
+                  <h4 className="font-semibold text-red-600">� PDF Statements</h4>
                   <ul className="text-sm space-y-1 text-muted-foreground">
-                    <li>• Category column</li>
-                    <li>• Reference/Transaction ID</li>
-                    <li>• Account balance</li>
-                    <li>• Transaction type</li>
+                    <li>• Credit card statements</li>
+                    <li>• Currently: Latitud supported</li>
+                    <li>• Auto-extracts transactions</li>
+                    <li>• Includes statement metadata</li>
+                  </ul>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-blue-600">🔧 JSON Files</h4>
+                  <ul className="text-sm space-y-1 text-muted-foreground">
+                    <li>• Array of transactions</li>
+                    <li>• Or {`{transactions: [...]}`}</li>
+                    <li>• Required: date, description, amount</li>
+                    <li>• Optional: category</li>
                   </ul>
                 </div>
               </div>
@@ -712,11 +782,10 @@ export default function ImportPage() {
                   <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5" />
                   <div>
                     <p className="font-medium text-orange-900 dark:text-orange-100">
-                      Supported Banks
+                      Supported Sources
                     </p>
                     <p className="text-sm text-orange-700 dark:text-orange-300">
-                      UBank, CommBank, ANZ, Westpac, NAB, and most Australian banks. 
-                      Check the templates tab for specific formats.
+                      CSV: UBank, CommBank, ANZ, Westpac, NAB, Latitud • PDF: Latitud credit cards • JSON: Custom exports
                     </p>
                   </div>
                 </div>
