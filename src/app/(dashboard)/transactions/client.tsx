@@ -162,6 +162,7 @@ interface TransactionsPageClientProps {
     isActive: boolean
   }>
   loading: boolean
+  initialAccountFilter?: string | null
   onTransactionUpdate: (transaction: any) => void
   onTransactionDelete: (id: string) => void
   onTransactionCreate: (transaction: any) => void
@@ -173,6 +174,7 @@ export function TransactionsPageClient({
   categories: propCategories,
   activities: propActivities,
   budgets: propBudgets,
+  initialAccountFilter,
   onTransactionUpdate,
   onTransactionDelete,
   onTransactionCreate
@@ -220,7 +222,7 @@ export function TransactionsPageClient({
   
   // Filter states
   const [categoryFilter, setCategoryFilter] = useState('All Categories')
-  const [accountFilter, setAccountFilter] = useState('All Accounts')  
+  const [accountFilter, setAccountFilter] = useState(initialAccountFilter || 'All Accounts')  
   const [activityFilter, setActivityFilter] = useState('All Activities')
   // const [dateRange, setDateRange] = useState('all')
   const [sortField, setSortField] = useState<SortField>('date')
@@ -1065,6 +1067,33 @@ export function TransactionsPageClient({
           </div>
         </div>
       </div>
+
+      {/* Account Filter Badge */}
+      {initialAccountFilter && initialAccountFilter !== 'All Accounts' && (
+        <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  Viewing transactions for: <span className="font-bold">{initialAccountFilter}</span>
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setAccountFilter('All Accounts')
+                  router.push('/transactions')
+                }}
+                className="h-8 text-blue-700 hover:text-blue-900 hover:bg-blue-100 dark:text-blue-300 dark:hover:text-blue-100"
+              >
+                View All Accounts
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -63,8 +63,8 @@ export function AccountActions({ account }: AccountActionsProps) {
   }
 
   const handleViewHistory = () => {
-    // Navigate to transactions page filtered by this account
-    router.push(`/transactions?account=${account.id}`)
+    // Navigate to transactions page filtered by this account name
+    router.push(`/transactions?account=${encodeURIComponent(account.name)}`)
   }
 
   const handleDeleteConfirm = async () => {

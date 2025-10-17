@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { TransactionsPageClient } from './client'
 
 interface Transaction {
@@ -54,6 +55,9 @@ interface Budget {
 }
 
 export default function TransactionsPage() {
+  const searchParams = useSearchParams()
+  const accountFilter = searchParams.get('account')
+  
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -175,6 +179,7 @@ export default function TransactionsPage() {
       activities={activities}
       budgets={budgets}
       loading={loading}
+      initialAccountFilter={accountFilter}
       onTransactionUpdate={handleTransactionUpdate}
       onTransactionDelete={handleTransactionDelete}
       onTransactionCreate={handleTransactionCreate}
