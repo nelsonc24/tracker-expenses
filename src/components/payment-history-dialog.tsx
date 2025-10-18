@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -148,23 +148,24 @@ export function PaymentHistoryDialog({ open, onOpenChange, debt, onPaymentChange
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="w-full sm:max-w-[95vw] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Payment History</SheetTitle>
-            <SheetDescription>
-              {debt && (
-                <>
-                  {debt.name} - {debt.creditorName}
-                  <span className="ml-2 text-sm font-semibold">
-                    Current Balance: {formatCurrency(debt.currentBalance)}
-                  </span>
-                </>
-              )}
-            </SheetDescription>
-          </SheetHeader>
+      <Drawer open={open} onOpenChange={onOpenChange} direction="bottom">
+        <DrawerContent className="h-full w-full max-w-[95vw] ml-auto">
+          <div className="h-full overflow-y-auto flex flex-col p-6">
+            <DrawerHeader className="px-0">
+              <DrawerTitle>Payment History</DrawerTitle>
+              <DrawerDescription>
+                {debt && (
+                  <>
+                    {debt.name} - {debt.creditorName}
+                    <span className="ml-2 text-sm font-semibold">
+                      Current Balance: {formatCurrency(debt.currentBalance)}
+                    </span>
+                  </>
+                )}
+              </DrawerDescription>
+            </DrawerHeader>
 
-          <div className="mt-6">
+            <div className="mt-6 flex-1">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -295,8 +296,9 @@ export function PaymentHistoryDialog({ open, onOpenChange, debt, onPaymentChange
               </div>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       {/* Edit Payment Dialog */}
       <EditPaymentDialog
