@@ -1278,7 +1278,7 @@ export function TransactionsPageClient({
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
-                  <TableHead className="min-w-0 max-w-xs">
+                  <TableHead className="min-w-[200px] max-w-[300px]">
                     <Button 
                       variant="ghost" 
                       onClick={() => handleSort('description')}
@@ -1288,7 +1288,7 @@ export function TransactionsPageClient({
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
-                  <TableHead className="w-32">
+                  <TableHead className="min-w-[140px]">
                     <Button 
                       variant="ghost" 
                       onClick={() => handleSort('category')}
@@ -1298,9 +1298,9 @@ export function TransactionsPageClient({
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
-                  <TableHead className="w-32">Account</TableHead>
-                  <TableHead className="w-24">Receipt #</TableHead>
-                  <TableHead className="w-24 text-right">
+                  <TableHead className="w-40">Account</TableHead>
+                  <TableHead className="w-28">Receipt #</TableHead>
+                  <TableHead className="min-w-[120px] text-right">
                     <Button 
                       variant="ghost" 
                       onClick={() => handleSort('amount')}
@@ -1329,26 +1329,28 @@ export function TransactionsPageClient({
                         {formatDate(transaction.date)}
                       </div>
                     </TableCell>
-                    <TableCell className="min-w-0 max-w-xs">
-                      <div className="space-y-1">
+                    <TableCell className="min-w-[200px] max-w-[300px]">
+                      <div className="space-y-1.5">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="font-medium truncate cursor-help">{transaction.description}</div>
+                            <div className="font-medium truncate cursor-help leading-tight">{transaction.description}</div>
                           </TooltipTrigger>
                           <TooltipContent>
                             <p>{transaction.description}</p>
                           </TooltipContent>
                         </Tooltip>
-                        <div className="text-sm text-muted-foreground truncate">
-                          {transaction.merchant} • {transaction.reference}
-                        </div>
+                        {(transaction.merchant || transaction.reference) && (
+                          <div className="text-xs text-muted-foreground truncate leading-tight">
+                            {[transaction.merchant, transaction.reference].filter(Boolean).join(' • ')}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
-                    <TableCell className="w-32">
-                      <div className="flex flex-col items-start gap-1">
+                    <TableCell className="min-w-[140px]">
+                      <div className="flex flex-col items-start gap-1.5">
                         <Badge 
                           variant="secondary" 
-                          className="cursor-pointer hover:bg-secondary/80 transition-colors truncate max-w-full"
+                          className="cursor-pointer hover:bg-secondary/80 transition-colors truncate max-w-full text-xs"
                           onClick={() => handleCategoryClick(transaction)}
                         >
                           {transaction.category}
@@ -1359,20 +1361,20 @@ export function TransactionsPageClient({
                           return budgetStatus ? (
                             <Badge 
                               variant="outline" 
-                              className="text-xs flex items-center gap-1 text-blue-600 border-blue-200 truncate max-w-full"
+                              className="text-[10px] flex items-center gap-1 text-blue-600 border-blue-200 truncate max-w-full py-0 h-5"
                               title={budgetStatus.hasMultiple 
                                 ? `Part of ${transactionBudgets.length} budgets (${transactionBudgets.map(b => b.name).join(', ')})`
                                 : `Part of "${budgetStatus.name}" budget`
                               }
                             >
-                              <Target className="h-3 w-3" />
-                              {budgetStatus.hasMultiple ? `${transactionBudgets.length} budgets` : budgetStatus.name}
+                              <Target className="h-2.5 w-2.5 flex-shrink-0" />
+                              <span className="truncate">{budgetStatus.hasMultiple ? `${transactionBudgets.length} budgets` : budgetStatus.name}</span>
                             </Badge>
                           ) : null
                         })()}
                       </div>
                     </TableCell>
-                    <TableCell className="w-32">
+                    <TableCell className="w-40">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="text-sm truncate cursor-help">{transaction.account}</div>
@@ -1382,15 +1384,15 @@ export function TransactionsPageClient({
                         </TooltipContent>
                       </Tooltip>
                     </TableCell>
-                    <TableCell className="w-24">
+                    <TableCell className="w-28">
                       <div className="text-sm text-muted-foreground truncate">
                         {transaction.receiptNumber || '-'}
                       </div>
                     </TableCell>
-                    <TableCell className="w-24 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                    <TableCell className="min-w-[120px]">
+                      <div className="flex flex-col items-end gap-1">
                         <div className={cn(
-                          "font-medium",
+                          "font-medium text-sm whitespace-nowrap",
                           transaction.amount >= 0 ? "text-green-600" : "text-red-600"
                         )}>
                           {transaction.amount >= 0 ? '+' : '-'}$
@@ -1401,7 +1403,7 @@ export function TransactionsPageClient({
                         {transaction.isTransfer && transaction.amount > 0 && (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Badge variant="outline" className="text-xs px-1 py-0 h-4 bg-blue-50 text-blue-600 border-blue-200">
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-blue-50 text-blue-600 border-blue-200 whitespace-nowrap">
                                 Transfer
                               </Badge>
                             </TooltipTrigger>
