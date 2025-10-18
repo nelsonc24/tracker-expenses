@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -148,11 +148,11 @@ export function PaymentHistoryDialog({ open, onOpenChange, debt, onPaymentChange
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[95vw] w-full max-h-[95vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Payment History</DialogTitle>
-            <DialogDescription>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="right" className="w-full sm:max-w-[95vw] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Payment History</SheetTitle>
+            <SheetDescription>
               {debt && (
                 <>
                   {debt.name} - {debt.creditorName}
@@ -161,15 +161,16 @@ export function PaymentHistoryDialog({ open, onOpenChange, debt, onPaymentChange
                   </span>
                 </>
               )}
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Loading payments...</span>
-            </div>
-          ) : payments.length === 0 ? (
+          <div className="mt-6">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-muted-foreground">Loading payments...</span>
+              </div>
+            ) : payments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <DollarSign className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Payments Yet</h3>
@@ -177,22 +178,22 @@ export function PaymentHistoryDialog({ open, onOpenChange, debt, onPaymentChange
                 Payment history will appear here once you log your first payment.
               </p>
             </div>
-          ) : (
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[140px]">Date</TableHead>
-                    <TableHead className="min-w-[120px]">Amount</TableHead>
-                    <TableHead className="min-w-[120px]">Principal</TableHead>
-                    <TableHead className="min-w-[120px]">Interest</TableHead>
-                    <TableHead className="min-w-[100px]">Fees</TableHead>
-                    <TableHead className="min-w-[140px]">Balance After</TableHead>
-                    <TableHead className="min-w-[140px]">Method</TableHead>
-                    <TableHead className="min-w-[100px]">Type</TableHead>
-                    <TableHead className="w-[70px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
+            ) : (
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[140px]">Date</TableHead>
+                      <TableHead className="min-w-[120px]">Amount</TableHead>
+                      <TableHead className="min-w-[120px]">Principal</TableHead>
+                      <TableHead className="min-w-[120px]">Interest</TableHead>
+                      <TableHead className="min-w-[100px]">Fees</TableHead>
+                      <TableHead className="min-w-[140px]">Balance After</TableHead>
+                      <TableHead className="min-w-[140px]">Method</TableHead>
+                      <TableHead className="min-w-[100px]">Type</TableHead>
+                      <TableHead className="w-[70px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
                 <TableBody>
                   {payments.map((payment) => (
                     <TableRow key={payment.id}>
@@ -277,24 +278,25 @@ export function PaymentHistoryDialog({ open, onOpenChange, debt, onPaymentChange
                 </TableBody>
               </Table>
             </div>
-          )}
+            )}
 
-          {payments.length > 0 && (
-            <div className="flex justify-between items-center text-sm text-muted-foreground pt-4 border-t">
-              <div>
-                Total Payments: <span className="font-semibold">{payments.length}</span>
+            {payments.length > 0 && (
+              <div className="flex justify-between items-center text-sm text-muted-foreground pt-4 border-t mt-4">
+                <div>
+                  Total Payments: <span className="font-semibold">{payments.length}</span>
+                </div>
+                <div>
+                  Total Paid: <span className="font-semibold text-green-600">
+                    {formatCurrency(
+                      payments.reduce((sum, p) => sum + parseFloat(p.paymentAmount), 0).toFixed(2)
+                    )}
+                  </span>
+                </div>
               </div>
-              <div>
-                Total Paid: <span className="font-semibold text-green-600">
-                  {formatCurrency(
-                    payments.reduce((sum, p) => sum + parseFloat(p.paymentAmount), 0).toFixed(2)
-                  )}
-                </span>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Edit Payment Dialog */}
       <EditPaymentDialog
