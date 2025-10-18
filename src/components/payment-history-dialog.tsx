@@ -149,7 +149,7 @@ export function PaymentHistoryDialog({ open, onOpenChange, debt, onPaymentChange
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-full max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Payment History</DialogTitle>
             <DialogDescription>
@@ -178,18 +178,18 @@ export function PaymentHistoryDialog({ open, onOpenChange, debt, onPaymentChange
               </p>
             </div>
           ) : (
-            <div className="rounded-md border">
+            <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Principal</TableHead>
-                    <TableHead>Interest</TableHead>
-                    <TableHead>Fees</TableHead>
-                    <TableHead>Balance After</TableHead>
-                    <TableHead>Method</TableHead>
-                    <TableHead>Type</TableHead>
+                    <TableHead className="min-w-[140px]">Date</TableHead>
+                    <TableHead className="min-w-[120px]">Amount</TableHead>
+                    <TableHead className="min-w-[120px]">Principal</TableHead>
+                    <TableHead className="min-w-[120px]">Interest</TableHead>
+                    <TableHead className="min-w-[100px]">Fees</TableHead>
+                    <TableHead className="min-w-[140px]">Balance After</TableHead>
+                    <TableHead className="min-w-[140px]">Method</TableHead>
+                    <TableHead className="min-w-[100px]">Type</TableHead>
                     <TableHead className="w-[70px]"></TableHead>
                   </TableRow>
                 </TableHeader>
