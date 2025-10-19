@@ -18,6 +18,7 @@ import {
 import { redirect } from 'next/navigation'
 import { AccountActions } from '@/components/accounts/account-actions'
 import { AddAccountDialog } from '@/components/accounts/add-account-dialog'
+import { AccountsClientHandler } from '@/components/accounts/accounts-page-wrapper'
 import { SafePageWrapper } from '@/components/safe-page-wrapper'
 import { BrowserExtensionWarning } from '@/components/browser-extension-warning'
 
@@ -91,6 +92,7 @@ export default async function AccountsPage() {
 
   return (
     <SafePageWrapper>
+      <AccountsClientHandler />
       <div className="space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
