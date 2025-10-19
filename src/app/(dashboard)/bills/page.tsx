@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -65,6 +66,7 @@ interface ProjectionSummary {
 }
 
 export default function BillsPage() {
+  const searchParams = useSearchParams()
   const [bills, setBills] = useState<Bill[]>([])
   const [projections, setProjections] = useState<BillProjection[]>([])
   const [summary, setSummary] = useState<ProjectionSummary | null>(null)
@@ -115,6 +117,17 @@ export default function BillsPage() {
     }
     loadData()
   }, [fetchProjections])
+
+  // Auto-open create dialog when action=add query parameter is present
+  useEffect(() => {
+    const action = searchParams.get('action')
+    if (action === 'add') {
+      setShowAddDialog(true)
+      // Remove the query parameter from the URL
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (initialLoadComplete) {

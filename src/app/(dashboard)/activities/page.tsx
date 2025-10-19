@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Plus, Activity, Calendar, DollarSign, TrendingUp, Target, MoreVertical, Edit, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +28,7 @@ interface ActivityWithAnalytics extends SelectActivity {
 }
 
 export default function ActivitiesPage() {
+  const searchParams = useSearchParams()
   const [activities, setActivities] = useState<ActivityWithAnalytics[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
@@ -37,6 +39,17 @@ export default function ActivitiesPage() {
   useEffect(() => {
     fetchActivities()
   }, [])
+
+  // Auto-open create dialog when action=add query parameter is present
+  useEffect(() => {
+    const action = searchParams.get('action')
+    if (action === 'add') {
+      setShowAddDialog(true)
+      // Remove the query parameter from the URL
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [searchParams])
 
   const fetchActivities = async () => {
     try {

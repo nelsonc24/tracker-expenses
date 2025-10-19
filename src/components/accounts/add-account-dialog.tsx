@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { 
   Dialog,
@@ -53,6 +53,7 @@ const institutionLabels = {
 
 export function AddAccountDialog() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState<FormData>({
@@ -64,6 +65,17 @@ export function AddAccountDialog() {
     balance: ''
   })
   const [errors, setErrors] = useState<FormErrors>({})
+
+  // Auto-open dialog when action=add query parameter is present
+  useEffect(() => {
+    const action = searchParams.get('action')
+    if (action === 'add') {
+      setIsOpen(true)
+      // Remove the query parameter from the URL
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [searchParams])
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {}
@@ -124,7 +136,7 @@ export function AddAccountDialog() {
         throw new Error(error.error || 'Failed to create account')
       }
 
-      const account = await response.json()
+      await response.json()
       
       toast.success('Account added successfully!')
       setIsOpen(false)

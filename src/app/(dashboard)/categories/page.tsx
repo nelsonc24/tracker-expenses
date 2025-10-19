@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useUser } from '@clerk/nextjs'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -83,6 +84,7 @@ const colorOptions = [
 
 export default function CategoriesPage() {
   const { user, isLoaded } = useUser()
+  const searchParams = useSearchParams()
   const [categories, setCategories] = useState<CategoryWithStats[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -179,6 +181,17 @@ export default function CategoriesPage() {
     if (!isLoaded || !user) return
     fetchCategories()
   }, [isLoaded, user, fetchCategories])
+
+  // Auto-open create dialog when action=add query parameter is present
+  useEffect(() => {
+    const action = searchParams.get('action')
+    if (action === 'add') {
+      setIsCreateDialogOpen(true)
+      // Remove the query parameter from the URL
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [searchParams])
 
   async function handleCreateCategory() {
     try {

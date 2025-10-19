@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useUser } from '@clerk/nextjs'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -153,6 +154,7 @@ interface BudgetPeriodData {
 
 export default function BudgetsPage() {
   const { user, isLoaded } = useUser()
+  const searchParams = useSearchParams()
   const [budgets, setBudgets] = useState<BudgetWithProgress[]>([])
   const [previousBudgets, setPreviousBudgets] = useState<BudgetPeriodData[]>([])
   const [allBudgetHistory, setAllBudgetHistory] = useState<BudgetPeriodData[]>([])
@@ -376,6 +378,17 @@ export default function BudgetsPage() {
     if (!isLoaded || !user) return
     fetchData()
   }, [user, isLoaded, fetchData])
+
+  // Auto-open create dialog when action=add query parameter is present
+  useEffect(() => {
+    const action = searchParams.get('action')
+    if (action === 'add') {
+      setIsCreateBudgetOpen(true)
+      // Remove the query parameter from the URL
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
+    }
+  }, [searchParams])
 
   // Fetch budget periods when categories are loaded or tab changes
   useEffect(() => {
@@ -749,6 +762,7 @@ export default function BudgetsPage() {
                 
                 <div className="flex items-center space-x-2">
                   <input 
+                    title='reset period'
                     type="checkbox" 
                     id="auto-reset" 
                     className="rounded" 
@@ -788,6 +802,7 @@ export default function BudgetsPage() {
                 
                 <div className="flex items-center space-x-2">
                   <input 
+                    title='rollover'
                     type="checkbox" 
                     id="rollover" 
                     className="rounded" 

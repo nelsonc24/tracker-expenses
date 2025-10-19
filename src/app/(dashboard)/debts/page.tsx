@@ -42,6 +42,9 @@ export default function DebtsPage() {
   useEffect(() => {
     if (searchParams.get('action') === 'add') {
       setShowAddDialog(true)
+      // Remove the query parameter from the URL
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
     }
   }, [searchParams])
 
