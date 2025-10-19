@@ -1,0 +1,42 @@
+{
+  "name": "Expenses Tracker",
+  "short_name": "Tracker",
+  "description": "Smart Personal Finance Management - Track your spending, set budgets, and gain insights into your financial health",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.svg",
+      "sizes": "180x180",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["finance", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Add Transaction",
+      "url": "/transactions?action=add",
+      "description": "Quickly add a new transaction"
+    },
+    {
+      "name": "View Dashboard",
+      "url": "/dashboard",
+      "description": "View your financial dashboard"
+    },
+    {
+      "name": "Budgets",
+      "url": "/budgets",
+      "description": "Manage your budgets"
+    }
+  ]
+}

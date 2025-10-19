@@ -23,6 +23,20 @@ export function generateMetadata(): Metadata {
     title: "Expenses Tracker - Smart Personal Finance Management",
     description: "Track your spending, set budgets, and gain insights into your financial health with our modern expense tracking app.",
     keywords: ["expense tracker", "budgeting", "personal finance", "money management", "Australia"],
+    icons: {
+      icon: [
+        { url: '/favicon.svg', type: 'image/svg+xml' },
+      ],
+      apple: [
+        { url: '/apple-touch-icon.svg', type: 'image/svg+xml' },
+      ],
+    },
+    manifest: '/manifest.json',
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'default',
+      title: 'Expenses Tracker',
+    },
     other: {
       ...Sentry.getTraceData(),
       // Prevent Google Translate and other extensions from interfering
