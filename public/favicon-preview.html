@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Favicon Preview - Expenses Tracker</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 900px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    
+    h1 {
+      color: #1a202c;
+      margin-bottom: 10px;
+      font-size: 2em;
+    }
+    
+    .subtitle {
+      color: #718096;
+      margin-bottom: 40px;
+      font-size: 1.1em;
+    }
+    
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 30px;
+      margin-top: 30px;
+    }
+    
+    .preview-item {
+      background: #f7fafc;
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+    }
+    
+    .preview-item h3 {
+      color: #2d3748;
+      margin-bottom: 15px;
+      font-size: 1.1em;
+    }
+    
+    .preview-item p {
+      color: #718096;
+      font-size: 0.9em;
+      margin-bottom: 20px;
+    }
+    
+    .icon-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 120px;
+    }
+    
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+    
+    .size-16 { width: 16px; height: 16px; }
+    .size-32 { width: 32px; height: 32px; }
+    .size-64 { width: 64px; height: 64px; }
+    .size-128 { width: 128px; height: 128px; }
+    .size-180 { width: 180px; height: 180px; border-radius: 40px; }
+    
+    .features {
+      margin-top: 40px;
+      padding-top: 40px;
+      border-top: 2px solid #e2e8f0;
+    }
+    
+    .features h2 {
+      color: #1a202c;
+      margin-bottom: 20px;
+    }
+    
+    .feature-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+    
+    .feature-item {
+      background: #edf2f7;
+      padding: 15px 20px;
+      border-radius: 8px;
+      color: #2d3748;
+      font-size: 0.95em;
+    }
+    
+    .feature-item::before {
+      content: "✓ ";
+      color: #48bb78;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+    
+    .mockup {
+      background: #2d3748;
+      border-radius: 8px;
+      padding: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    
+    .tab-text {
+      color: #cbd5e0;
+      font-size: 0.85em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎨 Expenses Tracker Favicon</h1>
+    <p class="subtitle">Professional app icon system with PWA support</p>
+    
+    <div class="preview-grid">
+      <div class="preview-item">
+        <h3>Browser Tab (16x16)</h3>
+        <p>How it appears in your browser tab</p>
+        <div class="icon-container">
+          <div class="mockup">
+            <img src="../favicon.svg" alt="Favicon" class="size-16">
+            <span class="tab-text">Expenses Tracker</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="preview-item">
+        <h3>Bookmark (32x32)</h3>
+        <p>Bookmark and address bar icon</p>
+        <div class="icon-container">
+          <img src="../favicon.svg" alt="Favicon" class="size-32">
+        </div>
+      </div>
+      
+      <div class="preview-item">
+        <h3>Desktop (64x64)</h3>
+        <p>Desktop shortcut appearance</p>
+        <div class="icon-container">
+          <img src="../favicon.svg" alt="Favicon" class="size-64">
+        </div>
+      </div>
+      
+      <div class="preview-item">
+        <h3>High Resolution (128x128)</h3>
+        <p>Retina displays and PWA</p>
+        <div class="icon-container">
+          <img src="../favicon.svg" alt="Favicon" class="size-128">
+        </div>
+      </div>
+      
+      <div class="preview-item">
+        <h3>iOS Home Screen</h3>
+        <p>Apple Touch Icon with rounded corners</p>
+        <div class="icon-container">
+          <img src="../apple-touch-icon.svg" alt="Apple Touch Icon" class="size-180">
+        </div>
+      </div>
+      
+      <div class="preview-item">
+        <h3>Original SVG</h3>
+        <p>Scalable vector format</p>
+        <div class="icon-container">
+          <img src="../favicon.svg" alt="Favicon" style="width: 120px; height: 120px;">
+        </div>
+      </div>
+    </div>
+    
+    <div class="features">
+      <h2>✨ Features & Benefits</h2>
+      <div class="feature-list">
+        <div class="feature-item">Modern SVG format</div>
+        <div class="feature-item">Scales perfectly</div>
+        <div class="feature-item">iOS home screen support</div>
+        <div class="feature-item">PWA manifest included</div>
+        <div class="feature-item">App shortcuts</div>
+        <div class="feature-item">Blue to purple gradient</div>
+        <div class="feature-item">Dollar sign symbol</div>
+        <div class="feature-item">Chart growth accent</div>
+        <div class="feature-item">High contrast</div>
+        <div class="feature-item">Professional design</div>
+        <div class="feature-item">Mobile optimized</div>
+        <div class="feature-item">Add to home screen</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
