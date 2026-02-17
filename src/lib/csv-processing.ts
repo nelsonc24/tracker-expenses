@@ -284,52 +284,347 @@ export function extractMerchant(description: string): string {
 // Categorize transaction based on description and merchant
 export function categorizeTransaction(description: string, merchant: string, amount: number): string {
   const desc = description.toLowerCase()
+  const merch = merchant.toLowerCase()
   
-  // Food & Dining
-  if (desc.match(/(restaurant|cafe|coffee|pizza|mcdonald|kfc|subway|domino|uber eats|deliveroo|menulog)/)) {
-    return 'Dining Out'
+  // Handle transfers first (regardless of amount)
+  if (isTransferTransaction(description)) {
+    return 'Transfers'
   }
   
-  if (desc.match(/(woolworths|coles|iga|aldi|grocery|supermarket|food)/)) {
-    return 'Groceries'
-  }
-  
-  // Transport
-  if (desc.match(/(uber|taxi|metro|train|bus|petrol|shell|bp|caltex|ampol|costco)/)) {
-    return 'Transport'
-  }
-  
-  // Entertainment
-  if (desc.match(/(netflix|spotify|amazon prime|disney|cinema|movie|gym|fitness)/)) {
-    return 'Entertainment'
-  }
-  
-  // Utilities
-  if (desc.match(/(electricity|gas|water|internet|phone|telstra|optus|energy)/)) {
-    return 'Utilities'
-  }
-  
-  // Healthcare
-  if (desc.match(/(pharmacy|medical|doctor|dentist|hospital|health)/)) {
-    return 'Healthcare'
-  }
-  
-  // Shopping
-  if (desc.match(/(amazon|ebay|target|kmart|bunnings|harvey norman|jb hi-fi)/)) {
-    return 'Shopping'
-  }
-  
-  // Income
-  if (amount > 0 && desc.match(/(salary|wage|transfer|refund|interest)/)) {
+  // Specific Income patterns (positive amounts for actual income)
+  if (amount > 0) {
+    if (desc.match(/(salary|wage|payroll|income|refund|direct credit|deposit|interest|dividend|pension|benefit)/)) {
+      return 'Income'
+    }
+    if (desc.match(/(transfer from|received from)/)) {
+      return 'Transfers'
+    }
+    // If positive but no clear income pattern, might be a refund
+    if (desc.match(/(credit|refund|return)/)) {
+      return 'Refunds'
+    }
+    // Default positive unknown amounts to income for now
     return 'Income'
   }
   
+  // For expenses (negative amounts), categorize by merchant/description
+  
+  // Groceries - most specific patterns first
+  if (desc.match(/(aldi stores?|coles|woolworths|costco|iga|market|grocery|supermarket|fresh food)/)) {
+    return 'Groceries'
+  }
+  
+  if (merch.match(/(costco|aldi stores|coles|woolworths|iga)/)) {
+    return 'Groceries'
+  }
+  
+  // Food & Dining
+  if (desc.match(/(restaurant|cafe|coffee|pizza|mcdonald|kfc|subway|domino|uber eats|deliveroo|menulog|takeaway|bakery|bakers? delight|kebab|gozleme|boost juice|nandos|hungry jacks|mad mex|dining|momo|classic bake|laurent bakery)/)) {
+    return 'Dining Out'
+  }
+  
+  if (merch.match(/(classic bake|bakers delight|mcdonald|pizza|cafe|kebab|boost juice|nandos|hungry jacks|mad mex|atas dining|laurent bakery|subway|epping kebab)/)) {
+    return 'Dining Out'
+  }
+  
+  // Subscriptions & Software
+  if (desc.match(/(apple\.com\/bill|netflix|spotify|amazon prime|disney|github|subscription|monthly|annual|aldimobile)/)) {
+    return 'Subscriptions'
+  }
+  
+  if (merch.match(/(apple\.com|netflix|github|spotify|adobe|microsoft|aldimobile)/)) {
+    return 'Subscriptions'
+  }
+  
+  // Transport & Fuel (removed costco from here)
+  if (desc.match(/(uber|taxi|metro|train|bus|petrol|shell|bp|caltex|ampol|fuel|parking|toll|carwash|car wash|7-eleven|easypark|copp parking)/)) {
+    return 'Transport'
+  }
+  
+  if (merch.match(/(carwash|7-eleven|easypark|copp parking)/)) {
+    return 'Transport'
+  }
+  
+  // Healthcare
+  if (desc.match(/(pharmacy|medical|doctor|dentist|hospital|health|medicare|ahm|chiro|physiotherapy|physio|chemist warehouse|great holds|dr |dr\.|med\*|wellbeing chiropractic)/)) {
+    return 'Healthcare'
+  }
+  
+  if (merch.match(/(hunt chiro|ahm|pharmacy|medical|dental|chemist warehouse|great holds|dr |shahril|xavier|wellbeing chiropractic)/)) {
+    return 'Healthcare'
+  }
+  
+  // Entertainment & Recreation
+  if (desc.match(/(zoo|cinema|movie|gym|fitness|sport|recreation|entertainment|salsa foundation|linkin park|la fiesta|ticket|melbourne zoo|zoos victoria)/)) {
+    return 'Entertainment'
+  }
+  
+  if (merch.match(/(melbourne zoo|zoos victoria|cinema|gym|sport|salsa foundation|la fiesta|ticketek)/)) {
+    return 'Entertainment'
+  }
+  
+  // Housing & Utilities
+  if (desc.match(/(rent|mortgage|electricity|gas|water|internet|phone|telstra|optus|energy|utilities|agl telco|agl sales)/)) {
+    return 'Housing & Utilities'
+  }
+  
+  if (merch.match(/(agl telco|agl sales)/)) {
+    return 'Housing & Utilities'
+  }
+  
+  // Shopping & Retail
+  if (desc.match(/(kmart|target|amazon|ebay|bunnings|harvey norman|jb hi-fi|retail|shopping|big w|connor clothing|bourke place news|officeworks|the reject shop)/)) {
+    return 'Shopping'
+  }
+  
+  if (merch.match(/(kmart|target|bunnings|retail|big w|connor clothing|bourke place news|officeworks|the reject shop)/)) {
+    return 'Shopping'
+  }
+  
+  // Personal Care & Services
+  if (desc.match(/(child support|support|personal)/)) {
+    return 'Personal & Family'
+  }
+  
+  // Professional Services & Fees
+  if (desc.match(/(visa provisioning|bank fee|service fee|professional|consultation|credit card fee|interest charged|payment handling fee)/)) {
+    return 'Fees & Services'
+  }
+  
+  if (merch.match(/(visa provisioning|creditcardfee|interest|payment handling)/)) {
+    return 'Fees & Services'
+  }
+  
   // Bills & Finance
-  if (desc.match(/(insurance|bank fee|loan|mortgage|rent)/)) {
+  if (desc.match(/(insurance|loan|finance|direct debit|dd |payment|bill|nissan financial|greatrex|vanguard|budget direct|ezi failpay)/)) {
+    return 'Bills & Finance'
+  }
+  
+  if (merch.match(/(nissan financial|greatrex|vanguard|budget direct|ezi failpay)/)) {
     return 'Bills & Finance'
   }
   
   return 'Uncategorized'
+}
+
+// Check if current category should be updated with improved categorization
+export function shouldUpdateCategory(
+  currentCategory: string, 
+  suggestedCategory: string, 
+  description: string,
+  merchant: string,
+  amount: number
+): boolean {
+  // Don't update if already properly categorized
+  if (currentCategory === suggestedCategory) {
+    return false
+  }
+  
+  // Always update if current category is Income and we have a more specific category
+  // (unless the transaction is actually income based on amount and patterns)
+  if (currentCategory === 'Income') {
+    // If it's a positive amount that looks like actual income, keep as Income
+    if (amount > 0) {
+      const desc = description.toLowerCase()
+      const isActualIncome = desc.match(/(salary|wage|payroll|direct credit|deposit|interest|dividend|pension|benefit)/)
+      
+      // Don't update genuine income transactions
+      if (isActualIncome) {
+        return false
+      }
+      
+      // Don't update transfers that happen to be positive
+      if (suggestedCategory === 'Transfers') {
+        return false
+      }
+      
+      // For positive amounts without clear income indicators, allow updates
+      // (these were likely wrongly categorized as Income)
+      return suggestedCategory !== 'Income'
+    }
+    
+    // For negative amounts categorized as Income, definitely update
+    // (these were clearly wrong)
+    return suggestedCategory !== 'Income'
+  }
+  
+  // Update if current category is Uncategorized and we have a specific category
+  if (currentCategory === 'Uncategorized' && suggestedCategory !== 'Uncategorized') {
+    return true
+  }
+  
+  // Generally don't update other properly categorized transactions
+  // unless they're moving from a generic to more specific category
+  const genericCategories = ['Uncategorized', 'Income', 'Other']
+  const isCurrentGeneric = genericCategories.includes(currentCategory)
+  const isSuggestedSpecific = !genericCategories.includes(suggestedCategory)
+  
+  return isCurrentGeneric && isSuggestedSpecific
+}
+
+// Get improved category for existing transaction
+export function getImprovedCategory(
+  existingTransaction: {
+    description: string
+    merchant?: string
+    amount: number
+    category: string
+  }
+): { shouldUpdate: boolean; newCategory: string } {
+  const merchant = existingTransaction.merchant || extractMerchant(existingTransaction.description)
+  const suggestedCategory = categorizeTransaction(
+    existingTransaction.description,
+    merchant,
+    existingTransaction.amount
+  )
+  
+  const shouldUpdate = shouldUpdateCategory(
+    existingTransaction.category,
+    suggestedCategory,
+    existingTransaction.description,
+    merchant,
+    existingTransaction.amount
+  )
+  
+  return {
+    shouldUpdate,
+    newCategory: suggestedCategory
+  }
+}
+
+// Batch update existing transactions with improved categorization during import
+export interface ExistingTransactionUpdate {
+  id: string
+  currentCategory: string
+  newCategory: string
+  description: string
+  merchant: string
+  amount: number
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export function analyzeExistingTransactionsForUpdate(
+  existingTransactions: Array<{
+    id: string
+    description: string
+    merchant?: string
+    amount: number
+    category: string
+  }>
+): ExistingTransactionUpdate[] {
+  const updates: ExistingTransactionUpdate[] = []
+  
+  for (const transaction of existingTransactions) {
+    const improvement = getImprovedCategory(transaction)
+    
+    if (improvement.shouldUpdate) {
+      // Determine confidence level based on categorization strength
+      let confidence: 'high' | 'medium' | 'low' = 'medium'
+      
+      const desc = transaction.description.toLowerCase()
+      const merchant = transaction.merchant || extractMerchant(transaction.description)
+      const merch = merchant.toLowerCase()
+      
+      // High confidence for clear patterns
+      if (
+        // Clear grocery stores
+        desc.match(/(aldi stores?|coles|woolworths|costco)/i) ||
+        merch.match(/(costco|aldi stores|coles|woolworths)/i) ||
+        // Clear restaurant chains
+        desc.match(/(mcdonald|kfc|subway|nandos|hungry jacks)/i) ||
+        merch.match(/(mcdonald|subway|nandos|hungry jacks)/i) ||
+        // Clear subscriptions
+        desc.match(/(apple\.com\/bill|netflix|spotify|github)/i) ||
+        merch.match(/(apple\.com|netflix|github|spotify)/i) ||
+        // Clear healthcare
+        desc.match(/(ahm|chemist warehouse|great holds)/i) ||
+        merch.match(/(ahm|chemist warehouse|great holds)/i) ||
+        // Clear transfers
+        isTransferTransaction(transaction.description)
+      ) {
+        confidence = 'high'
+      }
+      // Low confidence for generic patterns
+      else if (
+        desc.match(/(payment|bill|fee)/i) ||
+        improvement.newCategory === 'Uncategorized'
+      ) {
+        confidence = 'low'
+      }
+      
+      updates.push({
+        id: transaction.id,
+        currentCategory: transaction.category,
+        newCategory: improvement.newCategory,
+        description: transaction.description,
+        merchant: merchant,
+        amount: transaction.amount,
+        confidence
+      })
+    }
+  }
+  
+  return updates
+}
+
+// Generate update summary for user confirmation
+export interface UpdateSummary {
+  totalUpdates: number
+  highConfidence: number
+  mediumConfidence: number
+  lowConfidence: number
+  categoryChanges: Record<string, { from: string; to: string; count: number }>
+  examples: Array<{
+    description: string
+    from: string
+    to: string
+    confidence: string
+  }>
+}
+
+export function generateUpdateSummary(updates: ExistingTransactionUpdate[]): UpdateSummary {
+  const categoryChanges: Record<string, { from: string; to: string; count: number }> = {}
+  const examples: Array<{
+    description: string
+    from: string
+    to: string
+    confidence: string
+  }> = []
+  
+  // Group by category changes
+  for (const update of updates) {
+    const key = `${update.currentCategory}->${update.newCategory}`
+    if (!categoryChanges[key]) {
+      categoryChanges[key] = {
+        from: update.currentCategory,
+        to: update.newCategory,
+        count: 0
+      }
+    }
+    categoryChanges[key].count++
+    
+    // Collect examples (max 5 per change type)
+    const existingExamples = examples.filter(e => 
+      e.from === update.currentCategory && e.to === update.newCategory
+    )
+    if (existingExamples.length < 3) {
+      examples.push({
+        description: update.description.substring(0, 50) + '...',
+        from: update.currentCategory,
+        to: update.newCategory,
+        confidence: update.confidence
+      })
+    }
+  }
+  
+  return {
+    totalUpdates: updates.length,
+    highConfidence: updates.filter(u => u.confidence === 'high').length,
+    mediumConfidence: updates.filter(u => u.confidence === 'medium').length,
+    lowConfidence: updates.filter(u => u.confidence === 'low').length,
+    categoryChanges,
+    examples: examples.slice(0, 10) // Max 10 examples total
+  }
 }
 
 // Detect if a transaction is a transfer between accounts
