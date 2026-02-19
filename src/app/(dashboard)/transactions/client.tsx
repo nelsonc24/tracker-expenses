@@ -1472,7 +1472,7 @@ export function TransactionsPageClient({
                 ? ` (Filters: ${activeFilters.join(', ')})` 
                 : ''
               
-              return `Showing ${filteredTransactions.length} of ${transactions.length} transactions${filterText}`
+              return `Showing ${filteredTransactions.length} transactions${filterText}`
             })()}
           </CardDescription>
         </CardHeader>
