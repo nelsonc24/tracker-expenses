@@ -230,7 +230,7 @@ export function TransactionsPageClient({
   const [accountFilter, setAccountFilter] = useState(initialAccountFilter || 'All Accounts')  
   const [activityFilter, setActivityFilter] = useState('All Activities')
   const [transferFilter, setTransferFilter] = useState('All Transactions')
-  const [dateRange, setDateRange] = useState('current_month')
+  const [dateRange, setDateRange] = useState('all')
   const [sortField, setSortField] = useState<SortField>('date')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [currentPage, setCurrentPage] = useState(1)
