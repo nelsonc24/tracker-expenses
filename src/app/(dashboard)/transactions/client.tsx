@@ -1209,9 +1209,9 @@ export function TransactionsPageClient({
     console.log('Open bulk actions')
   }
 
-  // Calculate summary statistics - exclude transfers from income to avoid double counting
+  // Calculate summary statistics - exclude transfers to avoid double counting
   const totalIncome = filteredTransactions.filter(t => t.amount > 0 && !t.isTransfer).reduce((sum, t) => sum + t.amount, 0)
-  const totalExpenses = filteredTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0)
+  const totalExpenses = filteredTransactions.filter(t => t.amount < 0 && !t.isTransfer).reduce((sum, t) => sum + Math.abs(t.amount), 0)
   const netAmount = totalIncome - totalExpenses
 
   return (
@@ -1312,7 +1312,7 @@ export function TransactionsPageClient({
               ${totalIncome.toLocaleString('en-AU', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
-              From {filteredTransactions.filter(t => t.amount > 0).length} transactions
+              From {filteredTransactions.filter(t => t.amount > 0 && !t.isTransfer).length} transactions
             </p>
           </CardContent>
         </Card>
@@ -1337,7 +1337,7 @@ export function TransactionsPageClient({
               ${totalExpenses.toLocaleString('en-AU', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
-              From {filteredTransactions.filter(t => t.amount < 0).length} transactions
+              From {filteredTransactions.filter(t => t.amount < 0 && !t.isTransfer).length} transactions
             </p>
           </CardContent>
         </Card>
