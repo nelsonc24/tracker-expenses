@@ -37,6 +37,13 @@ export async function GET(request: NextRequest) {
     })
 
     console.log('[API /transactions] Returned', transactions.length, 'transactions')
+    if (transactions.length > 0) {
+      console.log('[API /transactions] Sample transaction:', {
+        id: transactions[0].transaction.id,
+        date: transactions[0].transaction.transactionDate,
+        amount: transactions[0].transaction.amount
+      })
+    }
 
     // Transform for client
     const transformedTransactions = transactions.map(({ transaction, account, category }) => ({
@@ -54,7 +61,8 @@ export async function GET(request: NextRequest) {
       receiptNumber: transaction.receiptNumber,
       tags: transaction.tags,
       notes: transaction.notes,
-      isTransfer: transaction.isTransfer || false
+      isTransfer: transaction.isTransfer || false,
+      transferPairId: transaction.transferPairId || null
     }))
 
     return NextResponse.json(transformedTransactions)
