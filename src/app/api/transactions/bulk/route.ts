@@ -29,12 +29,24 @@ const bulkAssignActivitySchema = z.object({
   activityId: z.string(),
 })
 
+const bulkMarkTransferSchema = z.object({
+  operation: z.literal('mark_transfer'),
+  transactionIds: z.array(z.string()).min(1, 'At least one transaction ID is required'),
+})
+
+const bulkUnmarkTransferSchema = z.object({
+  operation: z.literal('unmark_transfer'),
+  transactionIds: z.array(z.string()).min(1, 'At least one transaction ID is required'),
+})
+
 // Union schema for all operations
 const bulkOperationSchema = z.union([
   bulkDeleteSchema,
   bulkCategorizeSchema,
   bulkUpdateAccountSchema,
   bulkAssignActivitySchema,
+  bulkMarkTransferSchema,
+  bulkUnmarkTransferSchema,
 ])
 
 export async function POST(request: NextRequest) {
@@ -235,6 +247,50 @@ export async function POST(request: NextRequest) {
           affectedCount: validTransactionIds.length,
           operation: 'assign_activity',
           activityName: activity[0].name
+        }
+        break
+
+      case 'mark_transfer':
+        await db
+          .update(transactions)
+          .set({ 
+            isTransfer: true,
+            updatedAt: new Date()
+          })
+          .where(
+            and(
+              eq(transactions.userId, userId),
+              inArray(transactions.id, validatedData.transactionIds)
+            )
+          )
+
+        result = {
+          success: true,
+          message: `Successfully marked ${validatedData.transactionIds.length} transaction(s) as transfers`,
+          affectedCount: validatedData.transactionIds.length,
+          operation: 'mark_transfer'
+        }
+        break
+
+      case 'unmark_transfer':
+        await db
+          .update(transactions)
+          .set({ 
+            isTransfer: false,
+            updatedAt: new Date()
+          })
+          .where(
+            and(
+              eq(transactions.userId, userId),
+              inArray(transactions.id, validatedData.transactionIds)
+            )
+          )
+
+        result = {
+          success: true,
+          message: `Successfully unmarked ${validatedData.transactionIds.length} transaction(s) as transfers`,
+          affectedCount: validatedData.transactionIds.length,
+          operation: 'unmark_transfer'
         }
         break
 

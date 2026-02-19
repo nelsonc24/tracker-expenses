@@ -19,6 +19,7 @@ interface Transaction {
   tags?: string[]
   notes?: string
   isTransfer?: boolean
+  transferPairId?: string | null
 }
 
 interface Account {

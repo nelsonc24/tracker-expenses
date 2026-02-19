@@ -70,7 +70,9 @@ import {
   Activity,
   BarChart3,
   Target,
-  CreditCard
+  CreditCard,
+  ArrowLeftRight,
+  CheckCircle
 } from 'lucide-react'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { BulkOperationsBar } from '@/components/bulk-operations-bar'
@@ -81,6 +83,8 @@ import { ImprovedMobileTransactionCard } from '@/components/improved-mobile-tran
 import { MobileActionBar } from '@/components/mobile-action-bar'
 import { TransactionBreakdownDialog } from '@/components/transaction-breakdown-dialog'
 import { LinkTransactionToDebtDialog } from '@/components/link-transaction-to-debt-dialog'
+import { CreateTransferDialog } from '@/components/create-transfer-dialog'
+import { LinkTransfersDialog } from '@/components/link-transfers-dialog'
 import { useKeyboardShortcuts, KeyboardShortcut, SHORTCUT_CATEGORIES } from '@/hooks/use-keyboard-shortcuts'
 import { useResponsive } from '@/hooks/use-responsive'
 import { TransactionTemplate } from '@/lib/validations/templates'
@@ -104,6 +108,7 @@ type Transaction = {
   balance: number
   activities?: Activity[]
   isTransfer?: boolean
+  transferPairId?: string | null
 }
 
 type Activity = {
@@ -224,7 +229,8 @@ export function TransactionsPageClient({
   const [categoryFilter, setCategoryFilter] = useState('All Categories')
   const [accountFilter, setAccountFilter] = useState(initialAccountFilter || 'All Accounts')  
   const [activityFilter, setActivityFilter] = useState('All Activities')
-  // const [dateRange, setDateRange] = useState('all')
+  const [transferFilter, setTransferFilter] = useState('All Transactions')
+  const [dateRange, setDateRange] = useState('current_month')
   const [sortField, setSortField] = useState<SortField>('date')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [currentPage, setCurrentPage] = useState(1)
@@ -246,6 +252,8 @@ export function TransactionsPageClient({
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null)
   const [isLinkDebtDialogOpen, setIsLinkDebtDialogOpen] = useState(false)
   const [linkingTransaction, setLinkingTransaction] = useState<Transaction | null>(null)
+  const [isCreateTransferDialogOpen, setIsCreateTransferDialogOpen] = useState(false)
+  const [isLinkTransfersDialogOpen, setIsLinkTransfersDialogOpen] = useState(false)
   
   // Advanced search state
   const [activeFilters, setActiveFilters] = useState<any>(null)
@@ -280,6 +288,85 @@ export function TransactionsPageClient({
   // Get unique merchants for search
   const uniqueMerchants = Array.from(new Set(transactions.map(t => t.merchant).filter(Boolean))) as string[]
 
+  // Helper function to get date range filters
+  const getDateRangeFilter = (range: string) => {
+    const now = new Date()
+    
+    switch (range) {
+      case 'current_month': {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        return { start: startOfMonth, end: null }
+      }
+      case 'last_month': {
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
+        return { start: startOfLastMonth, end: endOfLastMonth }
+      }
+      case 'last_3_months': {
+        const start = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+        return { start, end: null }
+      }
+      case 'last_6_months': {
+        const start = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+        return { start, end: null }
+      }
+      case 'year_to_date': {
+        const startOfYear = new Date(now.getFullYear(), 0, 1)
+        return { start: startOfYear, end: null }
+      }
+      case 'all':
+      default:
+        return { start: null, end: null }
+    }
+  }
+
+  // Helper function to get active filters description
+  const getActiveFiltersDescription = () => {
+    const filters: string[] = []
+    
+    // Date range filter
+    const dateRangeLabels: Record<string, string> = {
+      'current_month': 'This Month',
+      'last_month': 'Last Month',
+      'last_3_months': 'Last 3 Months',
+      'last_6_months': 'Last 6 Months',
+      'year_to_date': 'Year to Date',
+      'all': 'All Time'
+    }
+    const dateLabel = dateRangeLabels[dateRange] || dateRange
+    if (dateRange !== 'all') {
+      filters.push(dateLabel)
+    }
+    
+    // Category filter
+    if (categoryFilter !== 'All Categories') {
+      filters.push(`Category: ${categoryFilter}`)
+    }
+    
+    // Account filter
+    if (accountFilter !== 'All Accounts') {
+      filters.push(`Account: ${accountFilter}`)
+    }
+    
+    // Activity filter
+    if (activityFilter !== 'All Activities') {
+      filters.push(`Activity: ${activityFilter}`)
+    }
+    
+    // Transfer filter
+    if (transferFilter === 'Transfers Only') {
+      filters.push('Transfers Only')
+    } else if (transferFilter === 'Non-Transfers Only') {
+      filters.push('Non-Transfers Only')
+    } else if (transferFilter === 'Linked Transfers Only') {
+      filters.push('Linked Transfers')
+    } else if (transferFilter === 'Unlinked Transfers Only') {
+      filters.push('Unlinked Transfers')
+    }
+    
+    return filters
+  }
+
   // Filter and sort transactions
   const filteredTransactions = useMemo(() => {
     // First, ensure we only work with transactions that have valid IDs
@@ -288,6 +375,14 @@ export function TransactionsPageClient({
     )
     
     const filtered = validTransactions.filter(transaction => {
+      // Date range filter (applies to all)
+      const dateFilter = getDateRangeFilter(dateRange)
+      if (dateFilter.start || dateFilter.end) {
+        const transactionDate = new Date(transaction.date)
+        if (dateFilter.start && transactionDate < dateFilter.start) return false
+        if (dateFilter.end && transactionDate > dateFilter.end) return false
+      }
+
       // Advanced search filters take precedence
       if (activeFilters) {
         // Search query filter
@@ -371,6 +466,20 @@ export function TransactionsPageClient({
         }
       }
 
+      // Transfer filter
+      if (transferFilter === 'Transfers Only' && !transaction.isTransfer) {
+        return false
+      }
+      if (transferFilter === 'Non-Transfers Only' && transaction.isTransfer) {
+        return false
+      }
+      if (transferFilter === 'Linked Transfers Only' && (!transaction.isTransfer || !transaction.transferPairId)) {
+        return false
+      }
+      if (transferFilter === 'Unlinked Transfers Only' && (!transaction.isTransfer || transaction.transferPairId)) {
+        return false
+      }
+
       return true
     })
 
@@ -398,7 +507,7 @@ export function TransactionsPageClient({
     })
 
     return filtered
-  }, [transactions, sortField, sortDirection, activeFilters, categoryFilter, accountFilter, activityFilter])
+  }, [transactions, sortField, sortDirection, activeFilters, categoryFilter, accountFilter, activityFilter, transferFilter, dateRange])
 
   // Pagination
   const totalPages = Math.ceil(filteredTransactions.length / responsivePageSize)
@@ -570,6 +679,29 @@ export function TransactionsPageClient({
     setEditingTransaction({ ...transaction })
     setOriginalEditingCategory(transaction.category) // Track original category for budget impact
     setIsEditDialogOpen(true)
+  }
+
+  // Navigate to paired transfer transaction
+  const handleNavigateToPairedTransfer = (transaction: Transaction) => {
+    if (!transaction.transferPairId) {
+      toast.info('This transfer is not linked to another transaction')
+      return
+    }
+
+    // Find the paired transaction
+    const pairedTransaction = transactions.find(
+      t => t.transferPairId === transaction.transferPairId && t.id !== transaction.id
+    )
+
+    if (pairedTransaction) {
+      // Scroll to and highlight the paired transaction
+      // First, open the view details dialog
+      setViewingTransaction(pairedTransaction)
+      setIsViewDetailsDialogOpen(true)
+      toast.success('Found paired transfer transaction')
+    } else {
+      toast.error('Paired transaction not found in current view')
+    }
   }
 
   const handleSaveTransaction = async () => {
@@ -1056,6 +1188,22 @@ export function TransactionsPageClient({
               <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
               <span className="hidden sm:inline">Import</span>
             </Button>
+            <Button 
+              variant="default" 
+              onClick={() => setIsCreateTransferDialogOpen(true)} 
+              className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700"
+            >
+              <ArrowLeftRight className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              <span className="hidden sm:inline">Transfer</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsLinkTransfersDialogOpen(true)} 
+              className="flex-1 sm:flex-none"
+            >
+              <ArrowLeftRight className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              <span className="hidden sm:inline">Link</span>
+            </Button>
           </div>
           <div className="hidden sm:flex sm:space-x-2">
             <TransactionTemplates
@@ -1099,7 +1247,17 @@ export function TransactionsPageClient({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Total Income</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Total Income
+              {dateRange !== 'all' && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  ({dateRange === 'current_month' ? 'This Month' : 
+                    dateRange === 'last_month' ? 'Last Month' : 
+                    dateRange === 'last_3_months' ? 'Last 3 Months' : 
+                    dateRange === 'last_6_months' ? 'Last 6 Months' : 'YTD'})
+                </span>
+              )}
+            </CardTitle>
             <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
           </CardHeader>
           <CardContent>
@@ -1114,7 +1272,17 @@ export function TransactionsPageClient({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Total Expenses</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Total Expenses
+              {dateRange !== 'all' && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  ({dateRange === 'current_month' ? 'This Month' : 
+                    dateRange === 'last_month' ? 'Last Month' : 
+                    dateRange === 'last_3_months' ? 'Last 3 Months' : 
+                    dateRange === 'last_6_months' ? 'Last 6 Months' : 'YTD'})
+                </span>
+              )}
+            </CardTitle>
             <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
           </CardHeader>
           <CardContent>
@@ -1129,7 +1297,17 @@ export function TransactionsPageClient({
 
         <Card className="sm:col-span-2 lg:col-span-1">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium">Net Amount</CardTitle>
+            <CardTitle className="text-xs sm:text-sm font-medium">
+              Net Amount
+              {dateRange !== 'all' && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  ({dateRange === 'current_month' ? 'This Month' : 
+                    dateRange === 'last_month' ? 'Last Month' : 
+                    dateRange === 'last_3_months' ? 'Last 3 Months' : 
+                    dateRange === 'last_6_months' ? 'Last 6 Months' : 'YTD'})
+                </span>
+              )}
+            </CardTitle>
             <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -1147,7 +1325,24 @@ export function TransactionsPageClient({
       </div>
 
       {/* Quick Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="space-y-2">
+          <Label className="text-xs sm:text-sm font-medium">Time Period</Label>
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current_month">This Month</SelectItem>
+              <SelectItem value="last_month">Last Month</SelectItem>
+              <SelectItem value="last_3_months">Last 3 Months</SelectItem>
+              <SelectItem value="last_6_months">Last 6 Months</SelectItem>
+              <SelectItem value="year_to_date">Year to Date</SelectItem>
+              <SelectItem value="all">All Time</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="space-y-2">
           <Label className="text-xs sm:text-sm font-medium">Category</Label>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -1201,14 +1396,32 @@ export function TransactionsPageClient({
         </div>
 
         <div className="space-y-2">
+          <Label className="text-xs sm:text-sm font-medium">Transfer</Label>
+          <Select value={transferFilter} onValueChange={setTransferFilter}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All Transactions">All Transactions</SelectItem>
+              <SelectItem value="Transfers Only">Transfers Only</SelectItem>
+              <SelectItem value="Non-Transfers Only">Non-Transfers</SelectItem>
+              <SelectItem value="Linked Transfers Only">Linked Transfers</SelectItem>
+              <SelectItem value="Unlinked Transfers Only">Unlinked Transfers</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
           <Label className="text-xs sm:text-sm font-medium opacity-0">Clear</Label>
           <Button 
             variant="outline" 
             className="w-full"
             onClick={() => {
+              setDateRange('current_month')
               setCategoryFilter('All Categories')
               setAccountFilter('All Accounts')
               setActivityFilter('All Activities')
+              setTransferFilter('All Transactions')
             }}
           >
             Clear Filters
@@ -1235,7 +1448,7 @@ export function TransactionsPageClient({
         onClearSelection={() => setSelectedTransactions([])}
         onOperationComplete={() => {
           // Trigger a refresh of transactions data
-          console.log('Bulk operation completed, should refresh data')
+          router.refresh()
         }}
         categories={propCategories}
         accounts={propAccounts}
@@ -1249,10 +1462,18 @@ export function TransactionsPageClient({
             Transactions ({filteredTransactions.length})
           </CardTitle>
           <CardDescription>
-            {filteredTransactions.length === transactions.length 
-              ? 'Showing all transactions'
-              : `Showing ${filteredTransactions.length} of ${transactions.length} transactions`
-            }
+            {(() => {
+              const activeFilters = getActiveFiltersDescription()
+              if (filteredTransactions.length === transactions.length) {
+                return 'Showing all transactions'
+              }
+              
+              const filterText = activeFilters.length > 0 
+                ? ` (Filters: ${activeFilters.join(', ')})` 
+                : ''
+              
+              return `Showing ${filteredTransactions.length} of ${transactions.length} transactions${filterText}`
+            })()}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1400,15 +1621,37 @@ export function TransactionsPageClient({
                             minimumFractionDigits: 2 
                           })}
                         </div>
-                        {transaction.isTransfer && transaction.amount > 0 && (
+                        {transaction.isTransfer && (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-blue-50 text-blue-600 border-blue-200 whitespace-nowrap">
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "text-[10px] px-1.5 py-0 h-4 bg-blue-50 text-blue-600 border-blue-200 whitespace-nowrap flex items-center gap-0.5",
+                                  transaction.transferPairId && "cursor-pointer hover:bg-blue-100 hover:border-blue-300"
+                                )}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (transaction.transferPairId) {
+                                    handleNavigateToPairedTransfer(transaction)
+                                  }
+                                }}
+                              >
+                                <ArrowLeftRight className="h-2.5 w-2.5" />
                                 Transfer
                               </Badge>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>Transfer from another account (excluded from income)</p>
+                              <p>
+                                {transaction.transferPairId 
+                                  ? `Transfer ${transaction.amount > 0 ? 'from' : 'to'} another account (click to view paired transaction)`
+                                  : transaction.amount > 0 
+                                  ? "Transfer from another account (excluded from income)"
+                                  : transaction.amount < 0
+                                  ? "Transfer to another account (excluded from expenses)"
+                                  : "Transfer between accounts"
+                                }
+                              </p>
                             </TooltipContent>
                           </Tooltip>
                         )}
@@ -1486,7 +1729,13 @@ export function TransactionsPageClient({
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
               <div className="text-sm text-muted-foreground">
-                Showing {startIndex + 1} to {Math.min(startIndex + responsivePageSize, filteredTransactions.length)} of {filteredTransactions.length} transactions
+                {(() => {
+                  const activeFilters = getActiveFiltersDescription()
+                  const filterText = activeFilters.length > 0 
+                    ? ` (${activeFilters.join(', ')})` 
+                    : ''
+                  return `Showing ${startIndex + 1}-${Math.min(startIndex + responsivePageSize, filteredTransactions.length)} of ${filteredTransactions.length}${filterText}`
+                })()}
               </div>
               <div className="flex items-center space-x-2">
                 <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
@@ -1692,29 +1941,45 @@ export function TransactionsPageClient({
                 />
               </div>
               
-              {/* Transfer Checkbox - Only show for income (positive amounts) */}
-              {editingTransaction.amount > 0 && (
-                <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg">
-                  <Checkbox
-                    id="edit-is-transfer"
-                    checked={editingTransaction.isTransfer || false}
-                    onCheckedChange={(checked) => setEditingTransaction(prev => 
-                      prev ? { ...prev, isTransfer: checked === true } : null
-                    )}
-                  />
-                  <div className="flex-1">
-                    <Label 
-                      htmlFor="edit-is-transfer" 
-                      className="text-sm font-medium cursor-pointer"
-                    >
-                      This is a transfer from another account
-                    </Label>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Mark this income as a transfer to exclude it from total income calculations
-                    </p>
-                  </div>
+              {/* Transfer Checkbox - Show for all transactions */}
+              <div className={cn(
+                "flex items-start space-x-2 p-3 rounded-lg border",
+                editingTransaction.isTransfer 
+                  ? "bg-blue-50 border-blue-200" 
+                  : "bg-muted/50 border-muted"
+              )}>
+                <Checkbox
+                  id="edit-is-transfer"
+                  checked={editingTransaction.isTransfer || false}
+                  onCheckedChange={(checked) => setEditingTransaction(prev => 
+                    prev ? { ...prev, isTransfer: checked === true } : null
+                  )}
+                  className="mt-1"
+                />
+                <div className="flex-1 space-y-1.5">
+                  <Label 
+                    htmlFor="edit-is-transfer" 
+                    className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                  >
+                    <ArrowLeftRight className="h-4 w-4" />
+                    Transfer between accounts
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {editingTransaction.amount > 0 
+                      ? "Mark this as a transfer from another account to exclude it from income calculations"
+                      : editingTransaction.amount < 0
+                      ? "Mark this as a transfer to another account to exclude it from expense calculations"
+                      : "Mark this as a transfer between accounts"
+                    }
+                  </p>
+                  {editingTransaction.isTransfer && (
+                    <div className="flex items-center gap-1.5 text-xs text-blue-600 font-medium mt-2">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      Excluded from balance calculations
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -1789,14 +2054,20 @@ export function TransactionsPageClient({
                   <p className="text-sm">{viewingTransaction.receiptNumber}</p>
                 </div>
               )}
-              {viewingTransaction.isTransfer && viewingTransaction.amount > 0 && (
+              {viewingTransaction.isTransfer && (
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-muted-foreground">Transaction Type</Label>
-                  <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
-                    Transfer from another account
+                  <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 flex items-center gap-1 w-fit">
+                    <ArrowLeftRight className="h-3 w-3" />
+                    Transfer between accounts
                   </Badge>
                   <p className="text-xs text-muted-foreground mt-1">
-                    This income is excluded from total income calculations to avoid double counting
+                    {viewingTransaction.amount > 0 
+                      ? "This income is excluded from total income calculations to avoid double counting"
+                      : viewingTransaction.amount < 0
+                      ? "This expense is excluded from total expense calculations to avoid double counting"
+                      : "This transfer is excluded from balance calculations"
+                    }
                   </p>
                 </div>
               )}
@@ -2054,6 +2325,30 @@ export function TransactionsPageClient({
         onOpenChange={setIsLinkDebtDialogOpen}
         transaction={linkingTransaction}
         onLinked={handleDebtLinked}
+      />
+
+      {/* Create Transfer Dialog */}
+      <CreateTransferDialog
+        open={isCreateTransferDialogOpen}
+        onOpenChange={setIsCreateTransferDialogOpen}
+        accounts={propAccounts}
+        categories={propCategories}
+        onSuccess={() => {
+          setIsCreateTransferDialogOpen(false)
+          router.refresh()
+          toast.success('Transfer created successfully')
+        }}
+      />
+
+      {/* Link Transfers Dialog */}
+      <LinkTransfersDialog
+        open={isLinkTransfersDialogOpen}
+        onOpenChange={setIsLinkTransfersDialogOpen}
+        transactions={transactions}
+        onSuccess={() => {
+          setIsLinkTransfersDialogOpen(false)
+          router.refresh()
+        }}
       />
     </div>
     </TooltipProvider>

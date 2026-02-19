@@ -38,7 +38,8 @@ import {
   ChevronDown,
   Loader2,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  ArrowLeftRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -79,6 +80,8 @@ type BulkOperation =
   | 'update_notes'
   | 'duplicate'
   | 'assign_activity'
+  | 'mark_transfer'
+  | 'unmark_transfer'
 
 interface BulkOperationConfig {
   name: string
@@ -130,6 +133,20 @@ const operationConfigs: Record<BulkOperation, BulkOperationConfig> = {
     icon: Tag,
     destructive: false,
     requiresConfirmation: false
+  },
+  mark_transfer: {
+    name: 'Mark as Transfer',
+    description: 'Mark transactions as transfers (excluded from income/expense)',
+    icon: ArrowLeftRight,
+    destructive: false,
+    requiresConfirmation: true
+  },
+  unmark_transfer: {
+    name: 'Unmark Transfer',
+    description: 'Remove transfer marking (include in income/expense)',
+    icon: ArrowLeftRight,
+    destructive: false,
+    requiresConfirmation: true
   }
 }
 
@@ -289,8 +306,16 @@ export function BulkOperationsBar({
   const handleConfirmedOperation = () => {
     if (!selectedOperation) return
 
-    if (selectedOperation === 'delete') {
-      performBulkOperation('delete', {})
+    switch (selectedOperation) {
+      case 'delete':
+        performBulkOperation('delete', {})
+        break
+      case 'mark_transfer':
+        performBulkOperation('mark_transfer', {})
+        break
+      case 'unmark_transfer':
+        performBulkOperation('unmark_transfer', {})
+        break
     }
   }
 
@@ -700,12 +725,33 @@ export function BulkOperationsBar({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-              Confirm Deletion
+              <AlertTriangle className={cn(
+                "h-5 w-5",
+                selectedOperation === 'delete' ? "text-red-600" : "text-amber-600"
+              )} />
+              {selectedOperation === 'delete' && 'Confirm Deletion'}
+              {selectedOperation === 'mark_transfer' && 'Confirm Mark as Transfer'}
+              {selectedOperation === 'unmark_transfer' && 'Confirm Unmark Transfer'}
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete {selectedCount} transaction{selectedCount !== 1 ? 's' : ''}? 
-              This action cannot be undone.
+              {selectedOperation === 'delete' && (
+                <>
+                  Are you sure you want to delete {selectedCount} transaction{selectedCount !== 1 ? 's' : ''}? 
+                  This action cannot be undone.
+                </>
+              )}
+              {selectedOperation === 'mark_transfer' && (
+                <>
+                  Mark {selectedCount} transaction{selectedCount !== 1 ? 's' : ''} as transfer{selectedCount !== 1 ? 's' : ''}?
+                  {' '}These transactions will be excluded from income and expense calculations, improving balance accuracy.
+                </>
+              )}
+              {selectedOperation === 'unmark_transfer' && (
+                <>
+                  Remove transfer marking from {selectedCount} transaction{selectedCount !== 1 ? 's' : ''}?
+                  {' '}These transactions will be included again in income and expense calculations.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -719,10 +765,12 @@ export function BulkOperationsBar({
             <Button
               onClick={handleConfirmedOperation}
               disabled={isLoading}
-              variant="destructive"
+              variant={selectedOperation === 'delete' ? 'destructive' : 'default'}
             >
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Delete Transactions
+              {selectedOperation === 'delete' && 'Delete Transactions'}
+              {selectedOperation === 'mark_transfer' && 'Mark as Transfer'}
+              {selectedOperation === 'unmark_transfer' && 'Unmark Transfer'}
             </Button>
           </DialogFooter>
         </DialogContent>

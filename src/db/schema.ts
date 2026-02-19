@@ -221,6 +221,7 @@ export const transactions = pgTable('transactions', {
   isBill: boolean('is_bill').default(false).notNull(),
   billId: uuid('bill_id').references(() => bills.id, { onDelete: 'set null' }),
   isTransfer: boolean('is_transfer').default(false).notNull(), // Mark income transactions as transfers between accounts
+  transferPairId: uuid('transfer_pair_id'), // UUID linking two transfer transactions together
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -234,6 +235,7 @@ export const transactions = pgTable('transactions', {
   duplicateHashIdx: index('transactions_duplicate_hash_idx').on(table.duplicateCheckHash),
   isBillIdx: index('transactions_is_bill_idx').on(table.isBill),
   billIdIdx: index('transactions_bill_id_idx').on(table.billId),
+  transferPairIdIdx: index('transactions_transfer_pair_id_idx').on(table.transferPairId),
 }))
 
 // Import sessions table (for CSV uploads)

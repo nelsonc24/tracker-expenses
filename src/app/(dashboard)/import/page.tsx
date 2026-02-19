@@ -1051,6 +1051,63 @@ export default function ImportPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Action Buttons at Top */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 pb-6 border-b gap-4">
+                <div className="flex-1">
+                  <div className="text-sm font-medium">
+                    {parsedTransactions.length} transactions ready to import
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    {selectedAccountId && accounts.length > 0 && (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <Building2 className="h-3 w-3" />
+                          <span className="font-medium text-blue-600 dark:text-blue-400">
+                            {accounts.find(acc => acc.id === selectedAccountId)?.name}
+                          </span>
+                        </span>
+                        <span>•</span>
+                      </>
+                    )}
+                    {selectedFile && (
+                      <>
+                        <span className="flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          <span className="truncate max-w-[200px]" title={selectedFile.name}>
+                            {selectedFile.name}
+                          </span>
+                        </span>
+                        <span>•</span>
+                      </>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      {selectedBankFormat === 'auto' ? 'Auto-detected' : bankFormats[selectedBankFormat]?.name || selectedBankFormat}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedFile(null)
+                      setParsedTransactions([])
+                      setImportStatus('idle')
+                      setProgress(0)
+                    }}
+                    disabled={isImporting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleImportTransactions}
+                    disabled={isImporting || parsedTransactions.length === 0 || !selectedAccountId}
+                  >
+                    {isImporting ? 'Importing...' : 'Import Transactions'}
+                  </Button>
+                </div>
+              </div>
+
               <div className="space-y-4">
                 {parsedTransactions.map((transaction, index) => (
                   <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
