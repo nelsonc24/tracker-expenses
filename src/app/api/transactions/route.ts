@@ -20,6 +20,10 @@ export async function GET(request: NextRequest) {
     const sortBy = (searchParams.get('sortBy') as 'date' | 'amount' | 'description') || 'date'
     const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc'
 
+    // Diagnostic logging
+    console.log('[API /transactions] User ID:', user.id)
+    console.log('[API /transactions] Query params:', { accountId, categoryId, startDate, endDate, limit, offset })
+
     const transactions = await getUserTransactions(user.id, {
       accountId,
       categoryId,
@@ -31,6 +35,8 @@ export async function GET(request: NextRequest) {
       sortBy,
       sortOrder
     })
+
+    console.log('[API /transactions] Returned', transactions.length, 'transactions')
 
     // Transform for client
     const transformedTransactions = transactions.map(({ transaction, account, category }) => ({

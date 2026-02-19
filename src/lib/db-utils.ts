@@ -368,6 +368,9 @@ export async function getUserTransactions(
     // Build where conditions
     const conditions = [eq(transactions.userId, userId)]
     
+    console.log('[getUserTransactions] Querying for userId:', userId)
+    console.log('[getUserTransactions] Filters:', { accountId, categoryId, startDate, endDate, limit, offset })
+    
     if (accountId) {
       conditions.push(eq(transactions.accountId, accountId))
     }
@@ -418,6 +421,8 @@ export async function getUserTransactions(
       .orderBy(orderBy)
       .limit(limit)
       .offset(offset)
+
+    console.log('[getUserTransactions] Query returned', result.length, 'transactions')
 
     return result as Array<{
       transaction: SelectTransaction
