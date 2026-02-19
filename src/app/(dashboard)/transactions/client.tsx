@@ -846,6 +846,53 @@ export function TransactionsPageClient({
     router.refresh()
   }
 
+  // Handle toggle transfer status
+  const handleToggleTransfer = async (transaction: Transaction) => {
+    try {
+      const newTransferStatus = !transaction.isTransfer
+      
+      const response = await fetch(`/api/transactions/${transaction.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          isTransfer: newTransferStatus
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update transaction')
+      }
+
+      // Update local state
+      setTransactions(prev => prev.map(t => 
+        t.id === transaction.id ? { ...t, isTransfer: newTransferStatus } : t
+      ))
+      
+      // Call the callback to update parent state
+      if (onTransactionUpdate) {
+        onTransactionUpdate({ ...transaction, isTransfer: newTransferStatus })
+      }
+
+      // Dispatch a custom event to notify other components
+      window.dispatchEvent(new CustomEvent('transactionUpdated', { 
+        detail: { 
+          transactionId: transaction.id, 
+          isTransfer: newTransferStatus
+        } 
+      }))
+
+      toast.success(newTransferStatus ? 'Marked as transfer' : 'Unmarked as transfer')
+      
+    } catch (error) {
+      console.error('Error toggling transfer status:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to update transaction')
+    }
+  }
+
   // Save category change
   const handleSaveCategoryChange = async (newCategoryName: string) => {
     if (!categoryEditingTransaction) return
@@ -1680,6 +1727,19 @@ export function TransactionsPageClient({
                           <DropdownMenuItem onClick={() => handleLinkToDebtClick(transaction)}>
                             <CreditCard className="h-4 w-4 mr-2" />
                             Link to Debt Payment
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleTransfer(transaction)}>
+                            {transaction.isTransfer ? (
+                              <>
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Unmark as Transfer
+                              </>
+                            ) : (
+                              <>
+                                <ArrowLeftRight className="h-4 w-4 mr-2" />
+                                Mark as Transfer
+                              </>
+                            )}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDuplicateTransaction(transaction)}>
                             <Copy className="h-4 w-4 mr-2" />
