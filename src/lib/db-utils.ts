@@ -706,7 +706,8 @@ export async function getCategorySpending(
   try {
     const conditions = [
       eq(transactions.userId, userId),
-      eq(transactions.isTransfer, false) // Exclude transfers from category spending
+      eq(transactions.isTransfer, false), // Exclude transfers from category spending
+      eq(transactions.type, 'debit') // Only include expenses (debits), not income (credits)
     ]
     
     if (startDate) {

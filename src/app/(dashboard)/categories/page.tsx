@@ -33,6 +33,20 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { MobileNavigationHeader } from '@/components/mobile-navigation-header'
+import { InsightCard } from '@/components/dashboard-insights'
+import { 
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend
+} from 'recharts'
+import { PieLabelProps } from 'recharts/types/polar/Pie'
 import { 
   Plus, 
   MoreHorizontal, 
@@ -40,11 +54,23 @@ import {
   Trash2, 
   Eye,
   EyeOff,
-  FolderPlus
+  FolderPlus,
+  TrendingUp,
+  DollarSign,
+  Activity,
+  Target
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getIconComponent } from '@/lib/category-icons'
 import { IconPicker } from '@/components/icon-picker'
+import { CategoryDetailDialog } from '@/components/category-detail-dialog'
+
+interface CategorySpendingData {
+  category: string
+  amount: number
+  color: string
+  transactionCount: number
+}
 
 interface Category {
   id: string
@@ -94,6 +120,11 @@ export default function CategoriesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showSystemCategories, setShowSystemCategories] = useState(true)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const [selectedPeriod, setSelectedPeriod] = useState('1m')
+  const [categorySpendingData, setCategorySpendingData] = useState<CategorySpendingData[]>([])
+  const [insightsLoading, setInsightsLoading] = useState(false)
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
+  const [selectedCategoryForDetail, setSelectedCategoryForDetail] = useState<CategoryWithStats | null>(null)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -143,6 +174,22 @@ export default function CategoriesPage() {
     return rootCategories
   }, [expandedCategories])
 
+  const fetchCategorySpending = useCallback(async () => {
+    try {
+      setInsightsLoading(true)
+      const response = await fetch(`/api/analytics/category-spending?period=${selectedPeriod}`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        setCategorySpendingData(data.data || [])
+      }
+    } catch (err) {
+      console.error('Error fetching category spending:', err)
+    } finally {
+      setInsightsLoading(false)
+    }
+  }, [selectedPeriod])
+
   const fetchCategories = useCallback(async function() {
     try {
       setLoading(true)
@@ -181,6 +228,62 @@ export default function CategoriesPage() {
     if (!isLoaded || !user) return
     fetchCategories()
   }, [isLoaded, user, fetchCategories])
+
+  useEffect(() => {
+    if (!isLoaded || !user) return
+    fetchCategorySpending()
+  }, [isLoaded, user, fetchCategorySpending, selectedPeriod])
+
+  // Calculate insights from category spending data
+  const getInsights = () => {
+    if (!categorySpendingData || categorySpendingData.length === 0) {
+      return {
+        topCategory: null,
+        totalSpending: 0,
+        avgPerCategory: 0,
+        categoriesWithSpending: 0,
+        totalCategories: categories.length
+      }
+    }
+
+    const sorted = [...categorySpendingData].sort((a, b) => b.amount - a.amount)
+    const totalSpending = categorySpendingData.reduce((sum, cat) => sum + cat.amount, 0)
+    const categoriesWithSpending = categorySpendingData.filter(cat => cat.amount > 0).length
+
+    return {
+      topCategory: sorted[0],
+      totalSpending,
+      avgPerCategory: categoriesWithSpending > 0 ? totalSpending / categoriesWithSpending : 0,
+      categoriesWithSpending,
+      totalCategories: categories.length
+    }
+  }
+
+  const insights = getInsights()
+
+  // Prepare chart data - top 10 categories for bar chart
+  const topCategoriesData = [...categorySpendingData]
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 10)
+
+  // Prepare pie chart data - top 8 + others
+  const pieChartData = (() => {
+    const sorted = [...categorySpendingData].sort((a, b) => b.amount - a.amount)
+    const top8 = sorted.slice(0, 8).map(cat => ({
+      name: cat.category,
+      category: cat.category,
+      amount: cat.amount,
+      color: cat.color
+    }))
+    const others = sorted.slice(8)
+    
+    if (others.length > 0) {
+      const othersTotal = others.reduce((sum, cat) => sum + cat.amount, 0)
+      return [...top8, { name: 'Others', category: 'Others', amount: othersTotal, color: '#9ca3af' }]
+    }
+    
+    return top8
+  })()
 
   // Auto-open create dialog when action=add query parameter is present
   useEffect(() => {
@@ -295,6 +398,11 @@ export default function CategoriesPage() {
     setIsEditDialogOpen(true)
   }
 
+  function openDetailDialog(category: CategoryWithStats) {
+    setSelectedCategoryForDetail(category)
+    setIsDetailDialogOpen(true)
+  }
+
   function toggleCategoryExpansion(categoryId: string) {
     const newExpanded = new Set(expandedCategories)
     if (newExpanded.has(categoryId)) {
@@ -368,15 +476,21 @@ export default function CategoriesPage() {
 
     return (
       <div key={category.id} className={cn("border-l-2 border-muted", depth > 0 && "ml-4")}>
-        <Card className="mb-2">
+        <Card className="mb-2 transition-all hover:shadow-md">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3 flex-1">
+              <div 
+                className="flex items-center space-x-3 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => openDetailDialog(category)}
+              >
                 {hasChildren && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => toggleCategoryExpansion(category.id)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleCategoryExpansion(category.id)
+                    }}
                     className="p-1 h-6 w-6"
                   >
                     {isExpanded ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
@@ -494,99 +608,325 @@ export default function CategoriesPage() {
           </p>
         </div>
         
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm} className="w-full sm:w-auto">
-              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-              Add Category
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create New Category</DialogTitle>
-              <DialogDescription>
-                Add a new category to organize your transactions.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Category name"
-                />
-              </div>
+        <div className="flex items-center space-x-2">
+          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+            <SelectTrigger className="w-28 sm:w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1m">1 Month</SelectItem>
+              <SelectItem value="3m">3 Months</SelectItem>
+              <SelectItem value="6m">6 Months</SelectItem>
+              <SelectItem value="1y">1 Year</SelectItem>
+              <SelectItem value="all">All Time</SelectItem>
+            </SelectContent>
+          </Select>
 
-              <div>
-                <Label htmlFor="parent">Parent Category (Optional)</Label>
-                <Select value={formData.parentId || "none"} onValueChange={(value) => 
-                  setFormData({ ...formData, parentId: value === "none" ? "" : value })
-                }>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select parent category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None (Top Level)</SelectItem>
-                    {categories.map(category => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={resetForm} className="w-full sm:w-auto">
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                Add Category
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create New Category</DialogTitle>
+                <DialogDescription>
+                  Add a new category to organize your transactions.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Category name"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="parent">Parent Category (Optional)</Label>
+                  <Select value={formData.parentId || "none"} onValueChange={(value) => 
+                    setFormData({ ...formData, parentId: value === "none" ? "" : value })
+                  }>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select parent category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None (Top Level)</SelectItem>
+                      {categories.map(category => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Icon & Custom Icon</Label>
+                  <IconPicker
+                    selectedIcon={formData.icon}
+                    onIconChange={(icon) => setFormData(prev => ({ ...prev, icon }))}
+                    customIconUrl={formData.customIconUrl}
+                    onCustomIconUrlChange={(url) => setFormData(prev => ({ ...prev, customIconUrl: url }))}
+                    showCustomUpload={true}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="color">Color</Label>
+                  <div className="grid grid-cols-5 gap-2 mt-2">
+                    {colorOptions.map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={cn(
+                          "w-8 h-8 rounded-full border-2 transition-all",
+                          formData.color === color 
+                            ? "border-foreground scale-110" 
+                            : "border-transparent hover:scale-105"
+                        )}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setFormData({ ...formData, color })}
+                        aria-label={`Select color ${color}`}
+                        title={`Select color ${color}`}
+                      />
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label>Icon & Custom Icon</Label>
-                <IconPicker
-                  selectedIcon={formData.icon}
-                  onIconChange={(icon) => setFormData(prev => ({ ...prev, icon }))}
-                  customIconUrl={formData.customIconUrl}
-                  onCustomIconUrlChange={(url) => setFormData(prev => ({ ...prev, customIconUrl: url }))}
-                  showCustomUpload={true}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="color">Color</Label>
-                <div className="grid grid-cols-5 gap-2 mt-2">
-                  {colorOptions.map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      className={cn(
-                        "w-8 h-8 rounded-full border-2 transition-all",
-                        formData.color === color 
-                          ? "border-foreground scale-110" 
-                          : "border-transparent hover:scale-105"
-                      )}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setFormData({ ...formData, color })}
-                      aria-label={`Select color ${color}`}
-                      title={`Select color ${color}`}
-                    />
-                  ))}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleCreateCategory} 
-                disabled={!formData.name.trim()}
-              >
-                Create Category
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateCategory} 
+                  disabled={!formData.name.trim()}
+                >
+                  Create Category
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
+
+      {/* Insights Summary Section */}
+      {!loading && !insightsLoading && categorySpendingData.length > 0 && (
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+          <InsightCard
+            title="Top Category"
+            value={insights.topCategory ? insights.topCategory.category : 'N/A'}
+            icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+            description={insights.topCategory ? `$${insights.topCategory.amount.toLocaleString()}` : 'No spending'}
+          />
+          <InsightCard
+            title="Total Spending"
+            value={`$${insights.totalSpending.toLocaleString()}`}
+            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+            description={`Across ${insights.categoriesWithSpending} categories`}
+          />
+          <InsightCard
+            title="Average per Category"
+            value={`$${insights.avgPerCategory.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+            icon={<Activity className="h-4 w-4 text-muted-foreground" />}
+            description="Mean spending amount"
+          />
+          <InsightCard
+            title="Active Categories"
+            value={`${insights.categoriesWithSpending}/${insights.totalCategories}`}
+            icon={<Target className="h-4 w-4 text-muted-foreground" />}
+            description="Categories with spending"
+          />
+        </div>
+      )}
+
+      {/* Overview Charts Section */}
+      {!loading && !insightsLoading && categorySpendingData.length > 0 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Pie Chart - Category Breakdown */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Spending Distribution</CardTitle>
+              <CardDescription>
+                Breakdown by category for selected period
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <PieChart>
+                  <Pie
+                    data={pieChartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={(props: PieLabelProps) => {
+                      const percent = props.percent ?? 0
+                      if (percent < 0.05) return '' // Hide labels for tiny slices
+                      return `${(percent * 100).toFixed(1)}%`
+                    }}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="amount"
+                  >
+                    {pieChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value: number) => `$${value.toLocaleString()}`}
+                  />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '20px' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Bar Chart - Top Spending Categories */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Spending Categories</CardTitle>
+              <CardDescription>
+                Highest spending categories for selected period
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={topCategoriesData} layout="vertical" margin={{ left: 20 }}>
+                  <XAxis 
+                    type="number" 
+                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                  />
+                  <YAxis 
+                    dataKey="category" 
+                    type="category" 
+                    width={120}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => `$${value.toLocaleString()}`}
+                    labelStyle={{ color: '#000', fontWeight: 'bold' }}
+                  />
+                  <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
+                    {topCategoriesData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Detailed Expense Table by Category */}
+      {!loading && !insightsLoading && categorySpendingData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Category Expenses Breakdown</CardTitle>
+            <CardDescription>
+              Detailed view of all category expenses for the selected period
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                        Category
+                      </th>
+                      <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">
+                        Amount
+                      </th>
+                      <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground hidden sm:table-cell">
+                        Transactions
+                      </th>
+                      <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground hidden md:table-cell">
+                        % of Total
+                      </th>
+                      <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground hidden md:table-cell">
+                        Avg per Transaction
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categorySpendingData
+                      .sort((a, b) => b.amount - a.amount)
+                      .map((category) => {
+                        const percentOfTotal = insights.totalSpending > 0 
+                          ? (category.amount / insights.totalSpending) * 100 
+                          : 0
+                        const avgPerTransaction = category.transactionCount > 0
+                          ? category.amount / category.transactionCount
+                          : 0
+                        
+                        return (
+                          <tr 
+                            key={category.category}
+                            className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
+                            onClick={() => {
+                              const cat = categories.find(c => c.name === category.category)
+                              if (cat) openDetailDialog(cat)
+                            }}
+                          >
+                            <td className="p-4">
+                              <div className="flex items-center gap-3">
+                                <div 
+                                  className="w-3 h-3 rounded-full flex-shrink-0" 
+                                  style={{ backgroundColor: category.color }}
+                                />
+                                <span className="font-medium">{category.category}</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-right font-semibold">
+                              ${category.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="p-4 text-right text-muted-foreground hidden sm:table-cell">
+                              {category.transactionCount}
+                            </td>
+                            <td className="p-4 text-right text-muted-foreground hidden md:table-cell">
+                              {percentOfTotal.toFixed(1)}%
+                            </td>
+                            <td className="p-4 text-right text-muted-foreground hidden md:table-cell">
+                              ${avgPerTransaction.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 bg-muted/30 font-bold">
+                      <td className="p-4">Total</td>
+                      <td className="p-4 text-right">
+                        ${insights.totalSpending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-4 text-right hidden sm:table-cell">
+                        {categorySpendingData.reduce((sum, cat) => sum + cat.transactionCount, 0)}
+                      </td>
+                      <td className="p-4 text-right hidden md:table-cell">
+                        100%
+                      </td>
+                      <td className="p-4 text-right hidden md:table-cell">
+                        ${insights.avgPerCategory.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters and Search */}
       <Card>
@@ -756,6 +1096,19 @@ export default function CategoriesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Category Detail Dialog */}
+      {selectedCategoryForDetail && (
+        <CategoryDetailDialog
+          categoryId={selectedCategoryForDetail.id}
+          categoryName={selectedCategoryForDetail.name}
+          categoryColor={selectedCategoryForDetail.color || '#6b7280'}
+          categoryIcon={selectedCategoryForDetail.icon || 'hash'}
+          isOpen={isDetailDialogOpen}
+          onClose={() => setIsDetailDialogOpen(false)}
+          period={selectedPeriod}
+        />
+      )}
     </div>
   )
 }
