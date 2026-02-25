@@ -127,6 +127,7 @@ export interface ProcessedTransaction {
   receiptNumber?: string  // Receipt number if available
   balance?: number
   isTransfer?: boolean    // Flag to indicate if this is a transfer between accounts
+  suggestedAsBill?: boolean  // Flag to suggest this is a recurring bill
   status: 'valid' | 'error' | 'warning'
   errors: ValidationError[]
   rawData: Record<string, string> | string[]
@@ -648,6 +649,58 @@ export function isTransferTransaction(description: string): boolean {
   return transferPatterns.some(pattern => pattern.test(desc))
 }
 
+// Detect if a transaction is likely a recurring bill
+export function isSuggestedBill(description: string, merchant?: string): boolean {
+  const desc = description.toLowerCase()
+  const merch = (merchant || '').toLowerCase()
+  
+  // Skip transfers - they're not bills
+  if (isTransferTransaction(description)) return false
+  
+  // Skip positive amounts are income, not bills (checked by caller)
+  
+  // Strong keyword patterns that almost certainly indicate a bill
+  const billPatterns = [
+    /\bdirect debit\b/i,               // "Direct Debit - Electricity"
+    /\bdd\s+/i,                        // "DD Netflix" or "DD 12345"
+    /\bauto[- ]?pay/i,                 // "AutoPay" or "Auto-Pay"
+    /\bauto[- ]?debit/i,               // "AutoDebit"
+    /\brecurring\b/i,                  // "Recurring Payment"
+    /\bsubscription\b/i,               // "Monthly Subscription"
+    /\bannual[- ](fee|membership|subscription)/i, // "Annual Fee"
+    /\bmonthly[- ](fee|charge|payment)/i,         // "Monthly Fee"
+  ]
+  
+  if (billPatterns.some(p => p.test(desc))) return true
+  
+  // Known bill merchant names (utilities, insurance, subscriptions, telecom)
+  const billMerchants = [
+    // Utilities
+    'energy', 'electricity', 'gas ', 'origin energy', 'agl', 'ergon',
+    'energex', 'synergy', 'simply energy', 'momentum energy', 'diamond energy',
+    'water', 'council', 'rates',
+    // Internet / Telecom
+    'optus', 'telstra', 'tpg', 'aussie broadband', 'aussie bb', 'amaysim',
+    'belong', 'spintel', 'vodafone', 'boost mobile', 'woolworths mobile',
+    // Insurance
+    'insurance', 'allianz', 'nrma', 'budget direct', 'suncorp', 'youi',
+    'aami', 'real insurance', 'ahm', 'medibank', 'bupa', 'hcf', 'nib',
+    // Streaming / subscriptions
+    'netflix', 'spotify', 'apple', 'google one', 'youtube premium',
+    'disney', 'stan', 'binge', 'foxtel', 'paramount', 'amazon prime',
+    'adobe', 'microsoft 365', 'microsoft 365', 'dropbox', 'icloud',
+    // Finance
+    'loan', 'repayment', 'mortgage', 'rent', 'lease',
+    'nissan financial', 'toyota finance', 'macquarie', 'latitude',
+    'afterpay', 'zip pay', 'humm',
+    // Health / gym
+    'anytime fitness', 'snap fitness', 'gym', 'physiotherapy', 'physio',
+  ]
+  
+  const searchText = `${desc} ${merch}`
+  return billMerchants.some(m => searchText.includes(m))
+}
+
 
 // Validate a single transaction row
 export function validateTransactionRow(
@@ -721,6 +774,11 @@ export function validateTransactionRow(
   // Detect if this is a transfer transaction
   const isTransfer = isTransferTransaction(cleanedDescription)
   
+  // Detect if this looks like a recurring bill (only for expenses/debits)
+  const suggestedAsBill = amount < 0 && !isTransfer
+    ? isSuggestedBill(cleanedDescription, merchant)
+    : false
+  
   // Extract transaction identifiers (UBank has 'Transaction ID', others may have different names)
   const transactionId = (rowData as Record<string, string>)['Transaction ID'] || 
                         (rowData as Record<string, string>).transactionId || 
@@ -749,12 +807,11 @@ export function validateTransactionRow(
     receiptNumber: cleanedReceiptNumber || undefined,
     balance,
     isTransfer,  // Add the transfer flag
+    suggestedAsBill,  // Add the bill suggestion flag
     status: errors.length > 0 ? 'error' : 'valid',
     errors,
     rawData: rowData
   }
-  
-  return transaction
   
   return transaction
 }

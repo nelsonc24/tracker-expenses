@@ -72,7 +72,8 @@ import {
   Target,
   CreditCard,
   ArrowLeftRight,
-  CheckCircle
+  CheckCircle,
+  Receipt
 } from 'lucide-react'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { BulkOperationsBar } from '@/components/bulk-operations-bar'
@@ -85,6 +86,7 @@ import { TransactionBreakdownDialog } from '@/components/transaction-breakdown-d
 import { LinkTransactionToDebtDialog } from '@/components/link-transaction-to-debt-dialog'
 import { CreateTransferDialog } from '@/components/create-transfer-dialog'
 import { LinkTransfersDialog } from '@/components/link-transfers-dialog'
+import { MarkAsBillDialog } from '@/components/mark-as-bill-dialog'
 import { useKeyboardShortcuts, KeyboardShortcut, SHORTCUT_CATEGORIES } from '@/hooks/use-keyboard-shortcuts'
 import { useResponsive } from '@/hooks/use-responsive'
 import { TransactionTemplate } from '@/lib/validations/templates'
@@ -109,6 +111,8 @@ type Transaction = {
   activities?: Activity[]
   isTransfer?: boolean
   transferPairId?: string | null
+  isBill?: boolean
+  billId?: string | null
 }
 
 type Activity = {
@@ -254,6 +258,8 @@ export function TransactionsPageClient({
   const [linkingTransaction, setLinkingTransaction] = useState<Transaction | null>(null)
   const [isCreateTransferDialogOpen, setIsCreateTransferDialogOpen] = useState(false)
   const [isLinkTransfersDialogOpen, setIsLinkTransfersDialogOpen] = useState(false)
+  const [isMarkAsBillDialogOpen, setIsMarkAsBillDialogOpen] = useState(false)
+  const [markAsBillTransaction, setMarkAsBillTransaction] = useState<Transaction | null>(null)
   
   // Advanced search state
   const [activeFilters, setActiveFilters] = useState<any>(null)
@@ -837,6 +843,12 @@ export function TransactionsPageClient({
   const handleLinkToDebtClick = (transaction: Transaction) => {
     setLinkingTransaction(transaction)
     setIsLinkDebtDialogOpen(true)
+  }
+
+  // Handle mark as bill click
+  const handleMarkAsBillClick = (transaction: Transaction) => {
+    setMarkAsBillTransaction(transaction)
+    setIsMarkAsBillDialogOpen(true)
   }
 
   // Handle successful debt link
@@ -1668,6 +1680,15 @@ export function TransactionsPageClient({
                             minimumFractionDigits: 2 
                           })}
                         </div>
+                        {transaction.isBill && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-4 bg-purple-50 text-purple-700 border-purple-200 whitespace-nowrap flex items-center gap-0.5"
+                          >
+                            <Receipt className="h-2.5 w-2.5" />
+                            Bill
+                          </Badge>
+                        )}
                         {transaction.isTransfer && (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -1727,6 +1748,10 @@ export function TransactionsPageClient({
                           <DropdownMenuItem onClick={() => handleLinkToDebtClick(transaction)}>
                             <CreditCard className="h-4 w-4 mr-2" />
                             Link to Debt Payment
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleMarkAsBillClick(transaction)}>
+                            <Receipt className="h-4 w-4 mr-2" />
+                            {transaction.isBill ? 'View Linked Bill' : 'Mark as Bill'}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleToggleTransfer(transaction)}>
                             {transaction.isTransfer ? (
@@ -2408,6 +2433,31 @@ export function TransactionsPageClient({
         onSuccess={() => {
           setIsLinkTransfersDialogOpen(false)
           router.refresh()
+        }}
+      />
+
+      {/* Mark as Bill Dialog */}
+      <MarkAsBillDialog
+        open={isMarkAsBillDialogOpen}
+        onOpenChange={(open) => {
+          setIsMarkAsBillDialogOpen(open)
+          if (!open) setMarkAsBillTransaction(null)
+        }}
+        transaction={markAsBillTransaction ? {
+          id: markAsBillTransaction.id,
+          description: markAsBillTransaction.description,
+          amount: markAsBillTransaction.amount,
+          categoryId: markAsBillTransaction.categoryId,
+          accountId: markAsBillTransaction.accountId,
+          transactionDate: markAsBillTransaction.date,
+          merchant: markAsBillTransaction.merchant,
+          tags: markAsBillTransaction.tags,
+        } : null}
+        onSuccess={() => {
+          setIsMarkAsBillDialogOpen(false)
+          setMarkAsBillTransaction(null)
+          router.refresh()
+          toast.success('Transaction marked as bill and added to Bills & Projections')
         }}
       />
     </div>
