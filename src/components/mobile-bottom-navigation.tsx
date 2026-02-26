@@ -7,7 +7,8 @@ import {
   Settings,
   Target,
   FolderOpen,
-  Menu
+  Menu,
+  Sparkles,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -32,6 +33,7 @@ const bottomNavItems = [
 
 // Additional navigation items shown in "More" sheet
 const moreNavItems = [
+  { name: 'Goals', href: '/goals', icon: Sparkles },
   { name: 'Budgets', href: '/budgets', icon: Target },
   { name: 'Bills', href: '/bills', icon: BarChart3 },
   { name: 'Recurring', href: '/recurring', icon: BarChart3 },

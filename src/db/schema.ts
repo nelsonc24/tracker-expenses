@@ -780,3 +780,55 @@ export const insertNotificationPreferenceSchema = createInsertSchema(notificatio
 export const selectNotificationPreferenceSchema = createSelectSchema(notificationPreferences)
 export type InsertNotificationPreference = z.infer<typeof insertNotificationPreferenceSchema>
 export type SelectNotificationPreference = z.infer<typeof selectNotificationPreferenceSchema>
+
+// ─── Goals ─────────────────────────────────────────────────────────────────
+
+// Goals table - saving goals with optional recurring target and ad-hoc top-ups
+export const goals = pgTable('goals', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(),
+  emoji: text('emoji').default('🎯').notNull(),
+  description: text('description'),
+  // 'vacation' | 'emergency_fund' | 'car' | 'home' | 'education' | 'wedding' | 'retirement' | 'custom'
+  type: text('type').default('custom').notNull(),
+  color: text('color').default('#6366f1').notNull(),
+  targetAmount: decimal('target_amount', { precision: 15, scale: 2 }).notNull(),
+  currentAmount: decimal('current_amount', { precision: 15, scale: 2 }).default('0.00').notNull(),
+  currency: text('currency').default('AUD').notNull(),
+  // 'weekly' | 'fortnightly' | 'monthly' | null
+  saveFrequency: text('save_frequency'),
+  saveAmount: decimal('save_amount', { precision: 15, scale: 2 }),
+  targetDate: timestamp('target_date'),
+  // 'active' | 'completed' | 'paused'
+  status: text('status').default('active').notNull(),
+  completedAt: timestamp('completed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('goals_user_id_idx').on(table.userId),
+  statusIdx: index('goals_status_idx').on(table.status),
+}))
+
+// Goal Contributions table - individual top-ups / deposits to a goal
+export const goalContributions = pgTable('goal_contributions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  goalId: uuid('goal_id').references(() => goals.id, { onDelete: 'cascade' }).notNull(),
+  userId: text('user_id').notNull(),
+  amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
+  note: text('note'),
+  contributedAt: timestamp('contributed_at').defaultNow().notNull(),
+}, (table) => ({
+  goalIdIdx: index('goal_contributions_goal_id_idx').on(table.goalId),
+  userIdIdx: index('goal_contributions_user_id_idx').on(table.userId),
+}))
+
+export const insertGoalSchema = createInsertSchema(goals)
+export const selectGoalSchema = createSelectSchema(goals)
+export type InsertGoal = z.infer<typeof insertGoalSchema>
+export type SelectGoal = z.infer<typeof selectGoalSchema>
+
+export const insertGoalContributionSchema = createInsertSchema(goalContributions)
+export const selectGoalContributionSchema = createSelectSchema(goalContributions)
+export type InsertGoalContribution = z.infer<typeof insertGoalContributionSchema>
+export type SelectGoalContribution = z.infer<typeof selectGoalContributionSchema>

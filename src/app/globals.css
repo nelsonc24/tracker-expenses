@@ -120,3 +120,45 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ── Goals Feature Animations ─────────────────────────────────── */
+
+@keyframes shimmer-gold {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes progress-fill {
+  from { width: 0%; }
+  to   { width: var(--progress-to, 0%); }
+}
+
+@keyframes milestone-pop {
+  0%   { transform: scale(0) rotate(-10deg); opacity: 0; }
+  60%  { transform: scale(1.2) rotate(4deg); opacity: 1; }
+  80%  { transform: scale(0.95) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes goal-complete-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+  50%       { box-shadow: 0 0 0 8px rgba(234, 179, 8, 0.25); }
+}
+
+.animate-shimmer-gold {
+  background: linear-gradient(90deg, transparent, rgba(234,179,8,0.3), transparent);
+  background-size: 200% 100%;
+  animation: shimmer-gold 2.5s linear infinite;
+}
+
+.animate-progress-fill {
+  animation: progress-fill 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-milestone-pop {
+  animation: milestone-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-goal-complete-pulse {
+  animation: goal-complete-pulse 2s ease-in-out infinite;
+}

@@ -14,7 +14,8 @@ import {
   Receipt,
   Activity,
   ChevronUp,
-  CreditCardIcon
+  CreditCardIcon,
+  Sparkles,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useUser } from '@clerk/nextjs'
@@ -45,6 +46,7 @@ const navigation = [
   { name: 'Transactions', href: '/transactions', icon: BarChart3 },
   { name: 'Accounts', href: '/accounts', icon: CreditCard },
   { name: 'Debts', href: '/debts', icon: CreditCardIcon },
+  { name: 'Goals', href: '/goals', icon: Sparkles },
   { name: 'Categories', href: '/categories', icon: FolderOpen },
   { name: 'Activities', href: '/activities', icon: Activity },
   { name: 'Budgets', href: '/budgets', icon: Target },
