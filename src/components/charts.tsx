@@ -26,10 +26,17 @@ interface ChartData {
   color?: string
 }
 
+interface CategoryBreakdown {
+  name: string
+  color: string
+  amount: number
+}
+
 interface TimeSeriesData {
   date: string
   amount: number
   category?: string
+  categories?: CategoryBreakdown[]
 }
 
 interface CategoryData {
@@ -53,6 +60,53 @@ export function SpendingTrendChart({ data }: { data: TimeSeriesData[] }) {
     // Return short format: MM/DD
     return `${month}/${day}`
   }
+
+  // Custom tooltip showing category breakdown
+  const CustomTooltip = ({ active, payload, label }: {
+    active?: boolean
+    payload?: Array<{ value: number; payload: TimeSeriesData }>
+    label?: string
+  }) => {
+    if (!active || !payload || payload.length === 0) return null
+    const entry = payload[0].payload
+    const categories = entry.categories || []
+    const total = entry.amount
+
+    return (
+      <div
+        style={{
+          backgroundColor: 'hsl(var(--card))',
+          border: '1px solid hsl(var(--border))',
+          borderRadius: '8px',
+          padding: '10px 14px',
+          minWidth: '200px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+        }}
+      >
+        <p style={{ marginBottom: '8px', fontWeight: 600, fontSize: '13px', color: 'hsl(var(--foreground))' }}>
+          {label ? formatDate(label, 'long') : ''}
+        </p>
+        <p style={{ marginBottom: categories.length > 0 ? '8px' : 0, fontSize: '14px', color: 'hsl(var(--foreground))' }}>
+          Total: <strong>{formatCurrency(total)}</strong>
+        </p>
+        {categories.length > 0 && (
+          <div style={{ borderTop: '1px solid hsl(var(--border))', paddingTop: '8px' }}>
+            {categories.map((cat) => (
+              <div key={cat.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: cat.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: '12px', color: 'hsl(var(--muted-foreground))' }}>{cat.name}</span>
+                </div>
+                <span style={{ fontSize: '12px', fontWeight: 500, color: 'hsl(var(--foreground))' }}>
+                  {formatCurrency(cat.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
   
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -69,15 +123,7 @@ export function SpendingTrendChart({ data }: { data: TimeSeriesData[] }) {
           fontSize={12}
           tickFormatter={(value) => `${formatCurrency(value)}`}
         />
-        <Tooltip
-          contentStyle={{
-            backgroundColor: 'hsl(var(--card))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: '8px',
-          }}
-          labelFormatter={(label) => formatDate(label as string, 'long')}
-          formatter={(value) => [`${formatCurrency(value as number)}`, 'Spending']}
-        />
+        <Tooltip content={<CustomTooltip />} />
         <Area
           type="monotone"
           dataKey="amount"

@@ -52,9 +52,10 @@ export async function GET(request: NextRequest) {
     })
 
     // Aggregate spending data based on period
-    const spendingMap = new Map<string, number>()
+    type CategoryAccum = { name: string; color: string; amount: number }
+    const spendingMap = new Map<string, { total: number; categories: Map<string, CategoryAccum> }>()
 
-    transactions.forEach(({ transaction }) => {
+    transactions.forEach(({ transaction, category }) => {
       const date = new Date(transaction.transactionDate)
       let key: string
 
@@ -76,18 +77,33 @@ export async function GET(request: NextRequest) {
       const amount = parseFloat(transaction.amount)
       if (amount < 0) {
         const expense = Math.abs(amount)
-        spendingMap.set(key, (spendingMap.get(key) || 0) + expense)
+        if (!spendingMap.has(key)) {
+          spendingMap.set(key, { total: 0, categories: new Map() })
+        }
+        const entry = spendingMap.get(key)!
+        entry.total += expense
+
+        const catName = category?.name || 'Uncategorized'
+        const catColor = category?.color || '#6b7280'
+        if (!entry.categories.has(catName)) {
+          entry.categories.set(catName, { name: catName, color: catColor, amount: 0 })
+        }
+        entry.categories.get(catName)!.amount += expense
       }
     })
 
     // Convert to array and sort
     let trendData = Array.from(spendingMap.entries())
-      .map(([date, amount]) => ({ date, amount }))
+      .map(([date, { total, categories }]) => ({
+        date,
+        amount: total,
+        categories: Array.from(categories.values()).sort((a, b) => b.amount - a.amount)
+      }))
       .sort((a, b) => a.date.localeCompare(b.date))
 
     // Fill in missing dates/periods with zero values for better visualization
     if (aggregationType === 'daily' && trendData.length > 0) {
-      const filledData: Array<{ date: string; amount: number }> = []
+      const filledData: Array<{ date: string; amount: number; categories: Array<{ name: string; color: string; amount: number }> }> = []
       const start = new Date(startDate)
       const end = new Date(endDate)
       
@@ -96,7 +112,8 @@ export async function GET(request: NextRequest) {
         const existing = trendData.find(item => item.date === dateKey)
         filledData.push({
           date: dateKey,
-          amount: existing ? existing.amount : 0
+          amount: existing ? existing.amount : 0,
+          categories: existing ? existing.categories : []
         })
       }
       trendData = filledData

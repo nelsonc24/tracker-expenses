@@ -5,10 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SpendingTrendChart } from '@/components/charts'
 import { InlineChartColorSettings } from '@/components/chart-color-settings'
+import { formatCurrency } from '@/lib/utils'
 
 interface TrendData {
   date: string
   amount: number
+  categories?: Array<{ name: string; color: string; amount: number }>
 }
 
 interface SpendingTrendResponse {
@@ -42,6 +44,7 @@ interface SpendingTrendCardProps {
 export function SpendingTrendCard({ initialData }: SpendingTrendCardProps) {
   const [selectedPeriod, setSelectedPeriod] = useState('last-7-days')
   const [data, setData] = useState<TrendData[]>(initialData || [])
+  const [summary, setSummary] = useState<SpendingTrendResponse['summary'] | null>(null)
   const [loading, setLoading] = useState(false)
   const [aggregationType, setAggregationType] = useState<'daily' | 'weekly' | 'monthly'>('daily')
 
@@ -54,6 +57,7 @@ export function SpendingTrendCard({ initialData }: SpendingTrendCardProps) {
           const result: SpendingTrendResponse = await response.json()
           setData(result.data)
           setAggregationType(result.aggregationType)
+          setSummary(result.summary)
         }
       } catch (error) {
         console.error('Error fetching spending trend:', error)
@@ -77,6 +81,9 @@ export function SpendingTrendCard({ initialData }: SpendingTrendCardProps) {
         return 'Spending trend over the selected period'
     }
   }
+
+  const periodLabel = TIME_PERIODS.find((p) => p.value === selectedPeriod)?.label ?? selectedPeriod
+  const total = summary?.totalSpending ?? data.reduce((s, d) => s + d.amount, 0)
 
   return (
     <Card>
@@ -103,7 +110,7 @@ export function SpendingTrendCard({ initialData }: SpendingTrendCardProps) {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         {loading ? (
           <div className="flex items-center justify-center h-[300px]">
             <p className="text-muted-foreground">Loading...</p>
@@ -114,6 +121,64 @@ export function SpendingTrendCard({ initialData }: SpendingTrendCardProps) {
           </div>
         ) : (
           <SpendingTrendChart data={data} />
+        )}
+
+        {/* Per-period detail table */}
+        {!loading && data.some((d) => d.amount > 0) && (
+          <div className="border rounded-lg overflow-hidden text-sm">
+            {/* Header */}
+            <div className="grid bg-muted/50 border-b font-medium text-muted-foreground px-3 py-2"
+              style={{ gridTemplateColumns: '1fr auto' }}>
+              <span>{periodLabel} — daily detail</span>
+              <span className="text-right">{formatCurrency(total)} total</span>
+            </div>
+
+            {/* Rows — only days with spend */}
+            <div className="divide-y max-h-64 overflow-y-auto">
+              {data
+                .filter((d) => d.amount > 0)
+                .map((d) => {
+                  const [year, month, day] = d.date.split('-').map(Number)
+                  const label = new Date(year, month - 1, day).toLocaleDateString('en-AU', {
+                    weekday: 'short', day: 'numeric', month: 'short',
+                  })
+                  return (
+                    <div key={d.date} className="px-3 py-2.5">
+                      {/* Date + total */}
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-medium text-foreground">{label}</span>
+                        <span className="font-semibold">{formatCurrency(d.amount)}</span>
+                      </div>
+                      {/* Category breakdown for this day */}
+                      {(d.categories ?? []).length > 0 && (
+                        <div className="space-y-1 pl-1">
+                          {(d.categories ?? []).map((cat) => {
+                            const pct = d.amount > 0 ? (cat.amount / d.amount) * 100 : 0
+                            return (
+                              <div key={cat.name} className="flex items-center gap-2">
+                                <div
+                                  className="w-2 h-2 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: cat.color }}
+                                />
+                                <span className="flex-1 text-muted-foreground truncate">{cat.name}</span>
+                                <div className="hidden sm:block w-16 h-1 rounded-full bg-muted overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{ width: `${pct}%`, backgroundColor: cat.color }}
+                                  />
+                                </div>
+                                <span className="text-muted-foreground w-9 text-right text-xs">{pct.toFixed(0)}%</span>
+                                <span className="text-foreground w-18 text-right font-medium">{formatCurrency(cat.amount)}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
