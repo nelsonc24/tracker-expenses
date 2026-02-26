@@ -1,4 +1,5 @@
 import { currentUser } from '@clerk/nextjs/server'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
@@ -261,8 +262,8 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      {/* Primary KPI Cards */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <InsightCard
           title="Total Balance"
           value={`$${dashboardData.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -271,20 +272,32 @@ export default async function DashboardPage() {
             type: balanceChange >= 0 ? 'increase' : 'decrease', 
             period: 'this month' 
           }}
-          icon={<DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
+          icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
           description={`Across ${dashboardData.accounts.length} connected accounts`}
           href="/accounts"
         />
         <InsightCard
-          title="This Month"
+          title="Monthly Spending"
           value={`$${dashboardData.thisMonthSummary.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           change={{ 
             value: Number(Math.abs(monthlyChange).toFixed(1)), 
             type: monthlyChange >= 0 ? 'increase' : 'decrease', 
             period: 'last month' 
           }}
-          icon={<TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
-          description="Total expenses"
+          icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+          description="Total expenses this month"
+          href="/transactions"
+        />
+        <InsightCard
+          title="Net Income"
+          value={`$${dashboardData.thisMonthSummary.netAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          change={dashboardData.thisMonthSummary.totalIncome > 0 && dashboardData.thisMonthSummary.totalExpenses > 0 ? { 
+            value: Number(((dashboardData.thisMonthSummary.totalExpenses / dashboardData.thisMonthSummary.totalIncome) * 100).toFixed(1)), 
+            type: dashboardData.thisMonthSummary.netAmount >= 0 ? 'increase' : 'decrease', 
+            period: 'spending rate' 
+          } : undefined}
+          icon={<CreditCard className="h-4 w-4 text-muted-foreground" />}
+          description={`In: $${dashboardData.thisMonthSummary.totalIncome.toLocaleString()} · Out: $${dashboardData.thisMonthSummary.totalExpenses.toLocaleString()}`}
           href="/transactions"
         />
         <InsightCard
@@ -294,54 +307,79 @@ export default async function DashboardPage() {
           description={`This month: ${dashboardData.budgetProgress > 80 ? "Over budget target" : "On track"}`}
           href="/budgets"
         />
-        <InsightCard
-          title="Recurring"
-          value={`${dashboardData.recurringSummary.active}/${dashboardData.recurringSummary.total}`}
-          change={dashboardData.recurringSummary.due > 0 ? { 
-            value: dashboardData.recurringSummary.due, 
-            type: 'decrease', 
-            period: 'due now' 
-          } : undefined}
-          icon={<Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
-          description={`$${dashboardData.recurringSummary.monthlyTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} monthly total`}
-          href="/bills"
-        />
-        <InsightCard
-          title="Bills & Projections"
-          value={`$${dashboardData.billsSummary.monthlyTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          change={dashboardData.billsSummary.upcomingDue > 0 ? { 
-            value: dashboardData.billsSummary.upcomingDue, 
-            type: 'decrease', 
-            period: 'due this week' 
-          } : undefined}
-          icon={<Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
-          description={`${dashboardData.billsSummary.activeBills} active bills tracked`}
-          href="/bills"
-        />
-        <InsightCard
-          title="Debt Tracking"
-          value={`$${dashboardData.debtsSummary.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          change={dashboardData.debtsSummary.totalDebts > 0 ? { 
-            value: Number(dashboardData.debtsSummary.avgInterestRate.toFixed(1)), 
-            type: 'decrease', 
-            period: 'avg rate' 
-          } : undefined}
-          icon={<Landmark className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
-          description={`$${dashboardData.debtsSummary.monthlyPayments.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} monthly payments`}
-          href="/debts"
-        />
-        <InsightCard
-          title="Income vs Expenses"
-          value={`$${dashboardData.thisMonthSummary.netAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          change={dashboardData.thisMonthSummary.totalIncome > 0 && dashboardData.thisMonthSummary.totalExpenses > 0 ? { 
-            value: Number(((dashboardData.thisMonthSummary.totalExpenses / dashboardData.thisMonthSummary.totalIncome) * 100).toFixed(1)), 
-            type: dashboardData.thisMonthSummary.netAmount >= 0 ? 'increase' : 'decrease', 
-            period: 'spending rate' 
-          } : undefined}
-          icon={<CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />}
-          description={`Income: $${dashboardData.thisMonthSummary.totalIncome.toLocaleString()} | Expenses: $${dashboardData.thisMonthSummary.totalExpenses.toLocaleString()}`}
-          href="/transactions"
-        />
+      </div>
+
+      {/* Secondary Financial Snapshot */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+        {/* Recurring */}
+        <Card className="bg-muted/30 border-dashed transition-all duration-200 hover:shadow-sm hover:bg-muted/50">
+          <Link href="/bills" className="block">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background border">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Recurring</p>
+                <p className="text-xl font-bold leading-tight">
+                  {dashboardData.recurringSummary.active}
+                  <span className="text-sm font-normal text-muted-foreground">/{dashboardData.recurringSummary.total}</span>
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  ${dashboardData.recurringSummary.monthlyTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / mo
+                  {dashboardData.recurringSummary.due > 0 && (
+                    <span className="ml-1 text-amber-600 dark:text-amber-400 font-medium">· {dashboardData.recurringSummary.due} due</span>
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Link>
+        </Card>
+
+        {/* Bills */}
+        <Card className="bg-muted/30 border-dashed transition-all duration-200 hover:shadow-sm hover:bg-muted/50">
+          <Link href="/bills" className="block">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background border">
+                <Receipt className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Bills & Projections</p>
+                <p className="text-xl font-bold leading-tight">
+                  ${dashboardData.billsSummary.monthlyTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {dashboardData.billsSummary.activeBills} active bills
+                  {dashboardData.billsSummary.upcomingDue > 0 && (
+                    <span className="ml-1 text-red-500 font-medium">· {dashboardData.billsSummary.upcomingDue} due this week</span>
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Link>
+        </Card>
+
+        {/* Debt */}
+        <Card className="bg-muted/30 border-dashed transition-all duration-200 hover:shadow-sm hover:bg-muted/50">
+          <Link href="/debts" className="block">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background border">
+                <Landmark className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Debt Tracking</p>
+                <p className="text-xl font-bold leading-tight">
+                  ${dashboardData.debtsSummary.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  ${dashboardData.debtsSummary.monthlyPayments.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / mo
+                  {dashboardData.debtsSummary.avgInterestRate > 0 && (
+                    <span className="ml-1">· {dashboardData.debtsSummary.avgInterestRate.toFixed(1)}% avg rate</span>
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Link>
+        </Card>
       </div>
 
       {/* Charts and Analytics */}
