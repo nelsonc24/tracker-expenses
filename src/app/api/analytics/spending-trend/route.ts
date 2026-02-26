@@ -72,10 +72,9 @@ export async function GET(request: NextRequest) {
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
       }
 
-      // Only count expenses (negative amounts), not income
-      // Spending trend should show how much was spent, not total transaction volume
+      // Only count expenses (negative amounts), not income, and exclude transfers
       const amount = parseFloat(transaction.amount)
-      if (amount < 0) {
+      if (amount < 0 && !transaction.isTransfer) {
         const expense = Math.abs(amount)
         if (!spendingMap.has(key)) {
           spendingMap.set(key, { total: 0, categories: new Map() })
