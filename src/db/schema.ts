@@ -9,6 +9,7 @@ export const users = pgTable('users', {
   firstName: text('first_name'),
   lastName: text('last_name'),
   imageUrl: text('image_url'),
+  geminiApiKey: text('gemini_api_key'), // AES-256-GCM encrypted Gemini API key
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   preferences: jsonb('preferences').$type<{

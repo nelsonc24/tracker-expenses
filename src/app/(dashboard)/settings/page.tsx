@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useUser } from '@clerk/nextjs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,7 +38,11 @@ import {
   Download,
   Upload,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  Bot,
+  Eye,
+  EyeOff,
+  KeyRound,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { toast } from 'sonner'
@@ -82,9 +86,63 @@ export default function SettingsPage() {
     duplicateDetection: true,
   })
 
-  // State for clear transactions confirmation dialog
   const [clearTransactionsDialogOpen, setClearTransactionsDialogOpen] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
+
+  // AI Assistant — per-user Gemini API key state
+  const [geminiKey, setGeminiKey] = useState('')
+  const [geminiMasked, setGeminiMasked] = useState<string | null>(null)
+  const [geminiHasKey, setGeminiHasKey] = useState(false)
+  const [showGeminiKey, setShowGeminiKey] = useState(false)
+  const [geminiSaving, setGeminiSaving] = useState(false)
+  const [geminiDeleting, setGeminiDeleting] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/user/gemini-key')
+      .then(r => r.json())
+      .then((data: { hasKey: boolean; maskedKey: string | null }) => {
+        setGeminiHasKey(data.hasKey)
+        setGeminiMasked(data.maskedKey)
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleSaveGeminiKey = async () => {
+    if (!geminiKey.trim()) return
+    setGeminiSaving(true)
+    try {
+      const res = await fetch('/api/user/gemini-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: geminiKey }),
+      })
+      const data = await res.json() as { error?: string; maskedKey?: string }
+      if (!res.ok) throw new Error(data.error ?? 'Failed')
+      setGeminiHasKey(true)
+      setGeminiMasked(data.maskedKey ?? null)
+      setGeminiKey('')
+      toast.success('API key saved securely')
+    } catch {
+      toast.error('Failed to save API key')
+    } finally {
+      setGeminiSaving(false)
+    }
+  }
+
+  const handleRemoveGeminiKey = async () => {
+    setGeminiDeleting(true)
+    try {
+      await fetch('/api/user/gemini-key', { method: 'DELETE' })
+      setGeminiHasKey(false)
+      setGeminiMasked(null)
+      setGeminiKey('')
+      toast.success('API key removed')
+    } catch {
+      toast.error('Failed to remove API key')
+    } finally {
+      setGeminiDeleting(false)
+    }
+  }
 
   // Function to handle clearing all transactions
   const handleClearAllTransactions = async () => {
@@ -127,12 +185,13 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4 sm:space-y-6">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
           <TabsTrigger value="general" className="text-xs sm:text-sm">General</TabsTrigger>
           <TabsTrigger value="notifications" className="text-xs sm:text-sm">Notify</TabsTrigger>
           <TabsTrigger value="categories" className="text-xs sm:text-sm">Categories</TabsTrigger>
           <TabsTrigger value="security" className="text-xs sm:text-sm hidden sm:block">Security</TabsTrigger>
           <TabsTrigger value="data" className="text-xs sm:text-sm">Data</TabsTrigger>
+          <TabsTrigger value="ai" className="text-xs sm:text-sm">AI</TabsTrigger>
         </TabsList>
 
         {/* General Settings */}
@@ -609,9 +668,119 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* AI Assistant */}
+        <TabsContent value="ai" className="space-y-4 sm:space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
+                <Bot className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span>AI Finance Assistant</span>
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Connect your own Google Gemini API key. Your key is encrypted with AES-256-GCM
+                before storage — it cannot be read by anyone, including admins.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Current key status */}
+              {geminiHasKey && geminiMasked ? (
+                <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/40">
+                  <KeyRound className="h-4 w-4 text-green-600 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Personal API key active</p>
+                    <p className="text-xs text-muted-foreground font-mono">{geminiMasked}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive shrink-0"
+                    onClick={handleRemoveGeminiKey}
+                    disabled={geminiDeleting}
+                  >
+                    {geminiDeleting
+                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      : <Trash2 className="h-3 w-3" />}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/20">
+                  <KeyRound className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    Using shared system key — add your own key below for dedicated access.
+                  </p>
+                </div>
+              )}
+
+              {/* Key input */}
+              <div className="space-y-3">
+                <Label htmlFor="geminiKey" className="text-sm font-medium">
+                  {geminiHasKey ? 'Replace API Key' : 'Add Your API Key'}
+                </Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      id="geminiKey"
+                      type={showGeminiKey ? 'text' : 'password'}
+                      placeholder="AIzaSy..."
+                      value={geminiKey}
+                      onChange={e => setGeminiKey(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveGeminiKey() }}
+                      className="pr-10 font-mono text-sm"
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowGeminiKey(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showGeminiKey
+                        ? <EyeOff className="h-4 w-4" />
+                        : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <Button
+                    onClick={handleSaveGeminiKey}
+                    disabled={!geminiKey.trim() || geminiSaving}
+                    className="shrink-0"
+                  >
+                    {geminiSaving
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : 'Save'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Get a free key at{' '}
+                  <a
+                    href="https://aistudio.google.com/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2 hover:opacity-80"
+                  >
+                    aistudio.google.com/apikey
+                  </a>
+                </p>
+              </div>
+
+              <Separator />
+
+              {/* Security explanation */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium">How your key is protected</p>
+                <ul className="space-y-1.5 text-xs text-muted-foreground list-disc pl-4">
+                  <li>Encrypted with AES-256-GCM before being written to the database</li>
+                  <li>The GCM authentication tag detects any tampering with the stored value</li>
+                  <li>Decryption requires a server-side secret key that is never exposed to users or logs</li>
+                  <li>Only the masked form <code className="bg-muted px-1 rounded font-mono">AIzaSyCgpw...oO0</code> is ever sent to your browser</li>
+                  <li>If someone dumps the database, they get ciphertext that is useless without the server key</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
-      {/* Clear Transactions Confirmation Dialog */}
+        {/* Clear Transactions Confirmation Dialog */}
       <Dialog open={clearTransactionsDialogOpen} onOpenChange={setClearTransactionsDialogOpen}>
         <DialogContent>
           <DialogHeader>

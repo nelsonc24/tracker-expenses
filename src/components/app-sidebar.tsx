@@ -16,6 +16,7 @@ import {
   ChevronUp,
   CreditCardIcon,
   Sparkles,
+  Bot,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useUser } from '@clerk/nextjs'
@@ -62,6 +63,10 @@ const analyticsItems = [
 const settingsItems = [
   { name: 'Import', href: '/import', icon: Upload },
   { name: 'Settings', href: '/settings', icon: Settings },
+]
+
+const aiItems = [
+  { name: 'Finance Assistant', href: '/chat', icon: Bot },
 ]
 
 export function AppSidebar() {
@@ -144,6 +149,29 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.name}>
                   <SidebarMenuButton 
                     asChild 
+                    isActive={pathname === item.href}
+                    tooltip={item.name}
+                  >
+                    <Link href={item.href}>
+                      <item.icon />
+                      <span>{item.name}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* AI Assistant Section */}
+        <SidebarGroup>
+          <SidebarGroupLabel>AI</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {aiItems.map((item) => (
+                <SidebarMenuItem key={item.name}>
+                  <SidebarMenuButton
+                    asChild
                     isActive={pathname === item.href}
                     tooltip={item.name}
                   >

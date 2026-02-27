@@ -6,6 +6,7 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { ClientErrorBoundary } from '@/components/error-boundary'
 import { MobileLayoutWrapper } from '@/components/mobile-layout-wrapper'
 import { MobileFloatingActionButton } from '@/components/mobile-floating-action-button'
+import { FinanceChatButton } from '@/components/finance-chat-button'
 import { cookies } from 'next/headers'
 
 export default async function DashboardLayout({
@@ -55,6 +56,9 @@ export default async function DashboardLayout({
         
         {/* Mobile Floating Action Button */}
         <MobileFloatingActionButton />
+
+        {/* AI Finance Chat Button */}
+        <FinanceChatButton />
       </SidebarProvider>
     </ClientErrorBoundary>
   )
