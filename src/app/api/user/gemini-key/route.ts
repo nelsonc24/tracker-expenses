@@ -54,12 +54,30 @@ export async function POST(req: Request) {
   }
 
   const trimmed = apiKey.trim()
-  const encrypted = encrypt(trimmed)
 
-  await db
-    .update(users)
-    .set({ geminiApiKey: encrypted, updatedAt: new Date() })
-    .where(eq(users.id, user.id))
+  let encrypted: string
+  try {
+    encrypted = encrypt(trimmed)
+  } catch (err) {
+    console.error('[gemini-key POST] encrypt() failed:', err)
+    return Response.json(
+      { error: 'Server encryption configuration error. Contact support.' },
+      { status: 500 }
+    )
+  }
+
+  try {
+    await db
+      .update(users)
+      .set({ geminiApiKey: encrypted, updatedAt: new Date() })
+      .where(eq(users.id, user.id))
+  } catch (err) {
+    console.error('[gemini-key POST] DB update failed:', err)
+    return Response.json(
+      { error: 'Database error while saving key.' },
+      { status: 500 }
+    )
+  }
 
   return Response.json({ success: true, maskedKey: maskApiKey(trimmed) })
 }

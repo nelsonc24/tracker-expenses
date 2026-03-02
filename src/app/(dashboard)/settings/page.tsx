@@ -116,14 +116,16 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: geminiKey }),
       })
-      const data = await res.json() as { error?: string; maskedKey?: string }
-      if (!res.ok) throw new Error(data.error ?? 'Failed')
+      let data: { error?: string; maskedKey?: string } = {}
+      try { data = await res.json() } catch { /* non-JSON response */ }
+      if (!res.ok) throw new Error(data.error ?? `Server error ${res.status}`)
       setGeminiHasKey(true)
       setGeminiMasked(data.maskedKey ?? null)
       setGeminiKey('')
       toast.success('API key saved securely')
-    } catch {
-      toast.error('Failed to save API key')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to save API key'
+      toast.error(msg)
     } finally {
       setGeminiSaving(false)
     }
