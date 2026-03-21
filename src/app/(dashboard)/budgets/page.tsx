@@ -212,6 +212,44 @@ export default function BudgetsPage() {
     return typeof amount === 'string' ? parseFloat(amount) : amount
   }
 
+  // Compute the actual current period dates dynamically, ignoring potentially stale DB values
+  const computeCurrentPeriod = (budget: Budget | BudgetWithProgress): { start: Date; end: Date } => {
+    const now = new Date()
+    const start = new Date(budget.startDate)
+    const period = budget.period as 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+
+    // Walk forward from startDate by one period at a time until we find the period containing now
+    let periodStart = new Date(start)
+    while (true) {
+      const periodEnd = new Date(periodStart)
+      switch (period) {
+        case 'weekly':
+          periodEnd.setDate(periodEnd.getDate() + 7)
+          break
+        case 'monthly':
+          periodEnd.setMonth(periodEnd.getMonth() + 1)
+          break
+        case 'quarterly':
+          periodEnd.setMonth(periodEnd.getMonth() + 3)
+          break
+        case 'yearly':
+          periodEnd.setFullYear(periodEnd.getFullYear() + 1)
+          break
+      }
+      // If now falls within this period, return it
+      if (now < periodEnd) {
+        // Set end-of-day on periodEnd minus 1ms so it's inclusive
+        periodEnd.setMilliseconds(periodEnd.getMilliseconds() - 1)
+        return { start: periodStart, end: periodEnd }
+      }
+      periodStart = periodEnd
+      // Safety: prevent infinite loop for non-recurring (one-time) budgets
+      if (budget.endDate && periodStart > new Date(budget.endDate)) {
+        return { start: new Date(budget.startDate), end: new Date(budget.endDate) }
+      }
+    }
+  }
+
   // Fetch data function (separated for reusability)
   const fetchData = useCallback(async () => {
     if (!user) return
@@ -240,15 +278,8 @@ export default function BudgetsPage() {
           // Calculate spent amount for this budget's categories and time period
           const now = new Date()
           
-          // Use current period dates if available, otherwise fall back to original dates
-          const budgetStart = budget.currentPeriodStart 
-            ? new Date(budget.currentPeriodStart)
-            : new Date(budget.startDate)
-          const budgetEnd = budget.currentPeriodEnd
-            ? new Date(budget.currentPeriodEnd)
-            : budget.endDate 
-              ? new Date(budget.endDate) 
-              : new Date(budgetStart.getFullYear(), budgetStart.getMonth() + 1, 0)
+          // Dynamically compute the current period to avoid stale DB values
+          const { start: budgetStart, end: budgetEnd } = computeCurrentPeriod(budget)
 
           // Get transactions for these categories in the budget period
           let spentAmount = 0
@@ -625,15 +656,8 @@ export default function BudgetsPage() {
 
     try {
       // Fetch transactions for this budget's categories within the current budget period
-      // Use currentPeriodStart/End to match the spending calculation date range
-      const periodStart = budget.currentPeriodStart
-        ? new Date(budget.currentPeriodStart)
-        : new Date(budget.startDate)
-      const periodEnd = budget.currentPeriodEnd
-        ? new Date(budget.currentPeriodEnd)
-        : budget.endDate
-          ? new Date(budget.endDate)
-          : new Date(new Date(budget.startDate).getFullYear(), new Date(budget.startDate).getMonth() + 1, 0)
+      // Dynamically compute the current period to avoid stale DB values
+      const { start: periodStart, end: periodEnd } = computeCurrentPeriod(budget)
       const budgetStart = periodStart.toISOString().split('T')[0]
       const budgetEnd = periodEnd.toISOString().split('T')[0]
       
