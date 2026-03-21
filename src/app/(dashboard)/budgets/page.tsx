@@ -262,8 +262,8 @@ export default function BudgetsPage() {
                 
                 const categorySpent = transactions.reduce((sum: number, t: Transaction) => {
                   const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount
-                  const spendingAmount = amount < 0 ? Math.abs(amount) : amount
-                  return sum + spendingAmount
+                  // Only count expenses (negative amounts = debits), skip credits/refunds
+                  return sum + (amount < 0 ? Math.abs(amount) : 0)
                 }, 0)
                 
                 spentAmount += categorySpent
@@ -624,11 +624,18 @@ export default function BudgetsPage() {
     setLoadingTransactions(true)
 
     try {
-      // Fetch transactions for this budget's categories within the budget period
-      const budgetStart = new Date(budget.startDate).toISOString().split('T')[0]
-      const budgetEnd = budget.endDate 
-        ? new Date(budget.endDate).toISOString().split('T')[0] 
-        : new Date(new Date(budget.startDate).getFullYear(), new Date(budget.startDate).getMonth() + 1, 0).toISOString().split('T')[0]
+      // Fetch transactions for this budget's categories within the current budget period
+      // Use currentPeriodStart/End to match the spending calculation date range
+      const periodStart = budget.currentPeriodStart
+        ? new Date(budget.currentPeriodStart)
+        : new Date(budget.startDate)
+      const periodEnd = budget.currentPeriodEnd
+        ? new Date(budget.currentPeriodEnd)
+        : budget.endDate
+          ? new Date(budget.endDate)
+          : new Date(new Date(budget.startDate).getFullYear(), new Date(budget.startDate).getMonth() + 1, 0)
+      const budgetStart = periodStart.toISOString().split('T')[0]
+      const budgetEnd = periodEnd.toISOString().split('T')[0]
       
       const allTransactions = []
       for (const categoryId of budget.categoryIds) {
