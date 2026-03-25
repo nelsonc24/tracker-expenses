@@ -97,6 +97,21 @@ export default function SettingsPage() {
   const [geminiSaving, setGeminiSaving] = useState(false)
   const [geminiDeleting, setGeminiDeleting] = useState(false)
 
+  // AI model selection
+  const [geminiModel, setGeminiModel] = useState('gemini-2.5-flash')
+  const [geminiModelSaving, setGeminiModelSaving] = useState(false)
+
+  const GEMINI_MODELS = [
+    // Stable
+    { value: 'gemini-2.5-pro',              label: 'Gemini 2.5 Pro',              description: 'Most advanced, stable' },
+    { value: 'gemini-2.5-flash',            label: 'Gemini 2.5 Flash',            description: 'Best price-performance — recommended' },
+    { value: 'gemini-2.5-flash-lite',       label: 'Gemini 2.5 Flash-Lite',       description: 'Fastest & cheapest, stable' },
+    // Preview
+    { value: 'gemini-3.1-pro-preview',      label: 'Gemini 3.1 Pro (Preview)',    description: 'Advanced intelligence, agentic' },
+    { value: 'gemini-3-flash-preview',      label: 'Gemini 3 Flash (Preview)',    description: 'Frontier-class, fast' },
+    { value: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash-Lite (Preview)', description: 'Lightweight preview' },
+  ]
+
   useEffect(() => {
     fetch('/api/user/gemini-key')
       .then(r => r.json())
@@ -105,7 +120,29 @@ export default function SettingsPage() {
         setGeminiMasked(data.maskedKey)
       })
       .catch(() => {})
+    fetch('/api/user/gemini-model')
+      .then(r => r.json())
+      .then((data: { model: string }) => setGeminiModel(data.model))
+      .catch(() => {})
   }, [])
+
+  const handleSaveGeminiModel = async (model: string) => {
+    setGeminiModel(model)
+    setGeminiModelSaving(true)
+    try {
+      const res = await fetch('/api/user/gemini-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      toast.success('Model preference saved')
+    } catch {
+      toast.error('Failed to save model preference')
+    } finally {
+      setGeminiModelSaving(false)
+    }
+  }
 
   const handleSaveGeminiKey = async () => {
     if (!geminiKey.trim()) return
@@ -707,9 +744,9 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/20">
-                  <KeyRound className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <KeyRound className="h-4 w-4 text-destructive shrink-0" />
                   <p className="text-sm text-muted-foreground">
-                    Using shared system key — add your own key below for dedicated access.
+                    No API key configured — the AI assistant won&apos;t work until you add your Gemini key below.
                   </p>
                 </div>
               )}
@@ -761,6 +798,30 @@ export default function SettingsPage() {
                   >
                     aistudio.google.com/apikey
                   </a>
+                </p>
+              </div>
+
+              <Separator />
+
+              {/* Model selector */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Gemini Model</Label>
+                <Select value={geminiModel} onValueChange={handleSaveGeminiModel} disabled={geminiModelSaving}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GEMINI_MODELS.map(m => (
+                      <SelectItem key={m.value} value={m.value}>
+                        <span className="font-medium">{m.label}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">{m.description}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Choose the Gemini model to use for the AI assistant. If a model isn&apos;t available on your API key, try a different one.
+                  {geminiModelSaving && <span className="ml-1 italic">Saving…</span>}
                 </p>
               </div>
 

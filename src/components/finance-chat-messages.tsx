@@ -221,8 +221,12 @@ export function FinanceChatMessages({ showSuggestions = true, className }: Finan
 
           {/* Error state */}
           {error && (
-            <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-lg px-4 py-3">
-              <span className="flex-1">Something went wrong. Please try again.</span>
+            <div className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-lg px-4 py-3">
+              <span className="flex-1">
+                {(error as { message?: string })?.message?.includes('402') || (error as { cause?: { statusCode?: number } })?.cause?.statusCode === 402
+                  ? 'Please add your Gemini API key in Settings to use the AI assistant.'
+                  : 'Something went wrong. Please try again.'}
+              </span>
               <Button
                 size="sm"
                 variant="ghost"

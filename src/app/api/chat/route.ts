@@ -59,15 +59,24 @@ export async function POST(req: Request) {
     ? ((dbUser.preferences as unknown) as Record<string, string>)?.currency ?? 'AUD'
     : 'AUD'
 
-  // Use the user's own Gemini key if stored; fall back to the shared system key
-  let googleApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-  if (dbUser?.geminiApiKey) {
-    try {
-      googleApiKey = decrypt(dbUser.geminiApiKey)
-    } catch {
-      // Decryption failed (e.g. key rotation) — continue with system key
-    }
+  // Require the user's own Gemini API key — no shared system key fallback
+  if (!dbUser?.geminiApiKey) {
+    return Response.json(
+      { error: 'no_api_key', message: 'Please add your Gemini API key in Settings to use the AI assistant.' },
+      { status: 402 }
+    )
   }
+
+  let googleApiKey: string
+  try {
+    googleApiKey = decrypt(dbUser.geminiApiKey)
+  } catch {
+    return Response.json(
+      { error: 'decrypt_failed', message: 'Your Gemini API key could not be decrypted. Please re-enter it in Settings.' },
+      { status: 400 }
+    )
+  }
+
   const googleClient = createGoogleGenerativeAI({ apiKey: googleApiKey })
 
   const { messages } = await req.json()
@@ -75,8 +84,10 @@ export async function POST(req: Request) {
   // Convert UIMessages (from @ai-sdk/react useChat) to ModelMessages for streamText
   const modelMessages = await convertToModelMessages(messages)
 
+  const geminiModel = (dbUser?.preferences as Record<string, string> | null)?.geminiModel ?? 'gemini-2.5-flash'
+
   const result = streamText({
-    model: googleClient('gemini-2.0-flash'),
+    model: googleClient(geminiModel),
     system: `You are a smart, friendly personal finance assistant for a budgeting and expense tracking app called ExpenseTracker.
 The user's preferred currency is ${currency}.
 

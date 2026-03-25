@@ -17,6 +17,7 @@ export const users = pgTable('users', {
     theme: 'light' | 'dark' | 'system'
     notifications: boolean
     timezone: string
+    geminiModel?: string
   }>().default({
     currency: 'AUD',
     theme: 'system',
