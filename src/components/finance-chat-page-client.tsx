@@ -16,7 +16,7 @@ export function FinanceChatPageClient() {
             <h1 className="text-xl font-semibold">Finance Assistant</h1>
             <p className="text-sm text-muted-foreground flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
-              Powered by Google Gemini 2.0 Flash
+              Powered by Google Gemini
             </p>
           </div>
         </div>

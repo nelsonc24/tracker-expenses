@@ -67,7 +67,7 @@ export function FinanceChatMessages({ showSuggestions = true, className }: Finan
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* Message list */}
-      <ScrollArea className="flex-1 min-h-0 px-4">
+      <ScrollArea className="flex-1 min-h-0 px-3 sm:px-4">
         <div className="py-4 space-y-4">
           {messages.length === 0 && showSuggestions ? (
             <div className="space-y-4">
@@ -244,7 +244,7 @@ export function FinanceChatMessages({ showSuggestions = true, className }: Finan
       </ScrollArea>
 
       {/* Input area */}
-      <div className="border-t bg-background px-4 py-3 shrink-0">
+      <div className="border-t bg-background px-3 sm:px-4 py-3 shrink-0">
         <div className="flex items-end gap-2">
           <Textarea
             ref={textareaRef}

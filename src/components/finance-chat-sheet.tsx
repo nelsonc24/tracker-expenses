@@ -14,7 +14,7 @@ export function FinanceChatSheet({ open, onOpenChange }: FinanceChatSheetProps) 
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-[400px] sm:w-[440px] p-0 flex flex-col gap-0"
+        className="w-full sm:w-[440px] p-0 flex flex-col gap-0"
       >
         <SheetHeader className="px-4 pt-4 pb-3 border-b shrink-0">
           <div className="flex items-center gap-2">
@@ -24,7 +24,7 @@ export function FinanceChatSheet({ open, onOpenChange }: FinanceChatSheetProps) 
             <div>
               <SheetTitle className="text-base leading-tight">Finance Assistant</SheetTitle>
               <SheetDescription className="text-xs leading-tight">
-                Powered by Gemini 2.0 Flash
+                Powered by Gemini
               </SheetDescription>
             </div>
           </div>
