@@ -14,7 +14,7 @@ import {
   getCurrentUser,
 } from '@/lib/db-utils'
 import { db } from '@/db'
-import { goals } from '@/db/schema'
+import { goals, categories as categoriesTable } from '@/db/schema'
 import { eq, and, desc } from 'drizzle-orm'
 import { subDays, subMonths, startOfMonth, endOfMonth, startOfYear, format } from 'date-fns'
 
@@ -103,12 +103,13 @@ Guidelines:
 - When showing lists, keep them brief (top 5 max unless asked for more)
 - If the user asks about a specific period, use the matching period key: 7d, 30d, 3m, 6m, 1y, this_month, last_month, ytd
 - Default to "this_month" for general spending questions unless the user specifies otherwise
+- When asked about a specific category (e.g. "utilities", "groceries", "rent"), ALWAYS call listCategories first to find the exact category name, then call getCategoryBreakdown with the categorySearch param
 - Proactively highlight anomalies, overspending, or savings opportunities
 - Do NOT make up data — always fetch it using tools
 - Today is ${format(new Date(), 'EEEE, d MMMM yyyy')}`,
 
     messages: modelMessages,
-    stopWhen: stepCountIs(5),
+    stopWhen: stepCountIs(8),
 
     tools: {
       getTransactionSummary: tool({
@@ -133,7 +134,7 @@ Guidelines:
 
       getCategoryBreakdown: tool({
         description:
-          'Get spending broken down by category for a given period. Use this to answer questions like "what did I spend most on?" or "how much did I spend on groceries?"',
+          'Get spending broken down by category for a given period. Use this to answer questions like "what did I spend most on?" or "how much did I spend on groceries?" or "how much on utilities?". When the user asks about a specific category, provide the categorySearch param to filter results to that category (partial, case-insensitive match).',
         inputSchema: z.object({
           period: z
             .enum(['7d', '30d', '3m', '6m', '1y', 'this_month', 'last_month', 'ytd'])
@@ -142,28 +143,45 @@ Guidelines:
             .number()
             .int()
             .min(1)
-            .max(20)
+            .max(50)
             .optional()
-            .describe('Return only the top N categories by spending. Defaults to 10.'),
+            .describe('Return only the top N categories by spending. Defaults to 10. Ignored when categorySearch is provided.'),
+          categorySearch: z
+            .string()
+            .optional()
+            .describe('Filter to categories whose name contains this string (case-insensitive). Use this when the user asks about a specific category like "utilities", "rent", "groceries".'),
         }),
-        execute: async ({ period, topN = 10 }) => {
+        execute: async ({ period, topN = 10, categorySearch }) => {
           const { startDate, endDate } = parseDateRange(period)
-          const categories = await getCategorySpending(userId, startDate, endDate)
-          const top = categories.slice(0, topN).map((c) => ({
+          const allCategories = await getCategorySpending(userId, startDate, endDate)
+
+          let filtered = allCategories
+          if (categorySearch) {
+            const search = categorySearch.toLowerCase()
+            filtered = allCategories.filter(
+              (c) => c.categoryName?.toLowerCase().includes(search)
+            )
+          }
+
+          const top = (categorySearch ? filtered : filtered.slice(0, topN)).map((c) => ({
             category: c.categoryName ?? 'Uncategorised',
             amount: parseFloat(c.totalAmount ?? '0'),
             transactions: c.transactionCount,
           }))
-          const total = top.reduce((s, c) => s + c.amount, 0)
+          const totalAll = allCategories.reduce((s, c) => s + parseFloat(c.totalAmount ?? '0'), 0)
           return {
             period,
             startDate: format(startDate, 'dd MMM yyyy'),
             endDate: format(endDate, 'dd MMM yyyy'),
             categories: top.map((c) => ({
               ...c,
-              percentage: total > 0 ? ((c.amount / total) * 100).toFixed(1) + '%' : '0%',
+              percentage: totalAll > 0 ? ((c.amount / totalAll) * 100).toFixed(1) + '%' : '0%',
             })),
-            totalSpending: total,
+            totalSpending: top.reduce((s, c) => s + c.amount, 0),
+            matchedSearch: categorySearch ?? null,
+            notFound: categorySearch && filtered.length === 0
+              ? `No transactions found for a category matching "${categorySearch}" in this period. Try calling listCategories to see available category names.`
+              : null,
           }
         },
       }),
@@ -308,6 +326,35 @@ Guidelines:
               institution: a.institution ?? null,
               balance: a.calculatedBalance,
               currency: a.currency ?? currency,
+            })),
+          }
+        },
+      }),
+
+      listCategories: tool({
+        description:
+          'List all category names available for this user. Call this first when the user asks about a specific category to discover the exact name before searching. Also shows spending amount for the current month for each category.',
+        inputSchema: z.object({}),
+        execute: async () => {
+          // Get all user categories
+          const userCategories = await db
+            .select({ id: categoriesTable.id, name: categoriesTable.name })
+            .from(categoriesTable)
+            .where(eq(categoriesTable.userId, userId))
+            .orderBy(categoriesTable.name)
+
+          // Get this month spending for each category
+          const { startDate, endDate } = parseDateRange('this_month')
+          const spending = await getCategorySpending(userId, startDate, endDate)
+          const spendingMap = Object.fromEntries(
+            spending.map((s) => [s.categoryName?.toLowerCase() ?? '', parseFloat(s.totalAmount ?? '0')])
+          )
+
+          return {
+            totalCategories: userCategories.length,
+            categories: userCategories.map((c) => ({
+              name: c.name,
+              spentThisMonth: spendingMap[c.name.toLowerCase()] ?? 0,
             })),
           }
         },
