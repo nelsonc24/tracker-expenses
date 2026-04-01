@@ -20,6 +20,8 @@ const updateTransactionSchema = z.object({
   billId: z.string().uuid().optional(),
   isTransfer: z.boolean().optional(),
   receiptNumber: z.string().optional(),
+  taxDeductible: z.boolean().optional(),
+  taxCategory: z.string().nullable().optional(),
 })
 
 export async function PUT(
@@ -141,6 +143,12 @@ export async function PUT(
     }
     if (validatedData.receiptNumber !== undefined) {
       updateData.receiptNumber = validatedData.receiptNumber
+    }
+    if (validatedData.taxDeductible !== undefined) {
+      updateData.taxDeductible = validatedData.taxDeductible
+    }
+    if (validatedData.taxCategory !== undefined) {
+      updateData.taxCategory = validatedData.taxCategory
     }
 
     // Update the transaction

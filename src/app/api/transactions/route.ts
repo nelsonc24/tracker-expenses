@@ -62,7 +62,9 @@ export async function GET(request: NextRequest) {
       tags: transaction.tags,
       notes: transaction.notes,
       isTransfer: transaction.isTransfer || false,
-      transferPairId: transaction.transferPairId || null
+      transferPairId: transaction.transferPairId || null,
+      taxDeductible: transaction.taxDeductible || false,
+      taxCategory: transaction.taxCategory || null,
     }))
 
     return NextResponse.json(transformedTransactions)

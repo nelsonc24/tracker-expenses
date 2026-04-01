@@ -74,7 +74,8 @@ import {
   ArrowLeftRight,
   CheckCircle,
   Receipt,
-  Plus
+  Plus,
+  FileText
 } from 'lucide-react'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { BulkOperationsBar } from '@/components/bulk-operations-bar'
@@ -114,6 +115,8 @@ type Transaction = {
   transferPairId?: string | null
   isBill?: boolean
   billId?: string | null
+  taxDeductible?: boolean
+  taxCategory?: string | null
 }
 
 type Activity = {
@@ -917,6 +920,33 @@ export function TransactionsPageClient({
       
     } catch (error) {
       console.error('Error toggling transfer status:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to update transaction')
+    }
+  }
+
+  const handleToggleTaxDeductible = async (transaction: Transaction) => {
+    try {
+      const newValue = !transaction.taxDeductible
+      const response = await fetch(`/api/transactions/${transaction.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taxDeductible: newValue,
+          // Clear category when removing deductible flag
+          taxCategory: newValue ? (transaction.taxCategory ?? 'other_work') : null,
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Failed to update transaction')
+      setTransactions(prev =>
+        prev.map(t =>
+          t.id === transaction.id
+            ? { ...t, taxDeductible: newValue, taxCategory: newValue ? (t.taxCategory ?? 'other_work') : null }
+            : t
+        )
+      )
+      toast.success(newValue ? 'Tagged as tax-deductible' : 'Removed tax-deductible tag')
+    } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to update transaction')
     }
   }
@@ -1859,6 +1889,19 @@ export function TransactionsPageClient({
                               <>
                                 <ArrowLeftRight className="h-4 w-4 mr-2" />
                                 Mark as Transfer
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleTaxDeductible(transaction)}>
+                            {transaction.taxDeductible ? (
+                              <>
+                                <CheckCircle className="h-4 w-4 mr-2 text-emerald-600" />
+                                Remove Tax Tag
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="h-4 w-4 mr-2" />
+                                Tag as Tax Deductible
                               </>
                             )}
                           </DropdownMenuItem>

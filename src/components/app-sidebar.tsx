@@ -17,6 +17,7 @@ import {
   CreditCardIcon,
   Sparkles,
   Bot,
+  FileText,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useUser } from '@clerk/nextjs'
@@ -53,6 +54,7 @@ const navigation = [
   { name: 'Budgets', href: '/budgets', icon: Target },
   { name: 'Bills', href: '/bills', icon: Receipt },
   { name: 'Recurring', href: '/recurring', icon: Calendar },
+  { name: 'Tax Return', href: '/tax', icon: FileText },
 ]
 
 const analyticsItems = [

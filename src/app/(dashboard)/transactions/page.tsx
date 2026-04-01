@@ -20,6 +20,8 @@ interface Transaction {
   notes?: string
   isTransfer?: boolean
   transferPairId?: string | null
+  taxDeductible?: boolean
+  taxCategory?: string | null
 }
 
 interface Account {

@@ -224,6 +224,8 @@ export const transactions = pgTable('transactions', {
   billId: uuid('bill_id').references(() => bills.id, { onDelete: 'set null' }),
   isTransfer: boolean('is_transfer').default(false).notNull(), // Mark income transactions as transfers between accounts
   transferPairId: uuid('transfer_pair_id'), // UUID linking two transfer transactions together
+  taxDeductible: boolean('tax_deductible').default(false).notNull(), // Australian tax deduction flag
+  taxCategory: text('tax_category'), // ATO deduction category: 'work_from_home'|'vehicle_travel'|'tools_equipment'|'phone_internet'|'self_education'|'clothing_uniform'|'professional_fees'|'other_work'|'investment'
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -238,6 +240,7 @@ export const transactions = pgTable('transactions', {
   isBillIdx: index('transactions_is_bill_idx').on(table.isBill),
   billIdIdx: index('transactions_bill_id_idx').on(table.billId),
   transferPairIdIdx: index('transactions_transfer_pair_id_idx').on(table.transferPairId),
+  taxDeductibleIdx: index('transactions_tax_deductible_idx').on(table.taxDeductible),
 }))
 
 // Import sessions table (for CSV uploads)
@@ -834,3 +837,45 @@ export const insertGoalContributionSchema = createInsertSchema(goalContributions
 export const selectGoalContributionSchema = createSelectSchema(goalContributions)
 export type InsertGoalContribution = z.infer<typeof insertGoalContributionSchema>
 export type SelectGoalContribution = z.infer<typeof selectGoalContributionSchema>
+
+// WFH Logs table - daily work-from-home hours for ATO 70c/hr fixed rate
+export const wfhLogs = pgTable('wfh_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  logDate: text('log_date').notNull(), // ISO date string YYYY-MM-DD
+  hours: decimal('hours', { precision: 5, scale: 2 }).notNull(),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('wfh_logs_user_id_idx').on(table.userId),
+  logDateIdx: index('wfh_logs_log_date_idx').on(table.logDate),
+  uniqueUserDate: unique('wfh_logs_user_date_unique').on(table.userId, table.logDate),
+}))
+
+export const insertWfhLogSchema = createInsertSchema(wfhLogs)
+export const selectWfhLogSchema = createSelectSchema(wfhLogs)
+export type InsertWfhLog = z.infer<typeof insertWfhLogSchema>
+export type SelectWfhLog = z.infer<typeof selectWfhLogSchema>
+
+// Tax Settings table - per-user ATO return settings per financial year
+export const taxSettings = pgTable('tax_settings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  financialYear: text('financial_year').default('2025-26').notNull(),
+  annualSalary: decimal('annual_salary', { precision: 15, scale: 2 }),
+  employerSuperRate: decimal('employer_super_rate', { precision: 5, scale: 2 }).default('11.5').notNull(),
+  salarySacrificeAmount: decimal('salary_sacrifice_amount', { precision: 15, scale: 2 }).default('0').notNull(),
+  personalSuperContributions: decimal('personal_super_contributions', { precision: 15, scale: 2 }).default('0').notNull(),
+  hasPrivateHealthInsurance: boolean('has_private_health_insurance').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('tax_settings_user_id_idx').on(table.userId),
+  uniqueUserFY: unique('tax_settings_user_fy_unique').on(table.userId, table.financialYear),
+}))
+
+export const insertTaxSettingsSchema = createInsertSchema(taxSettings)
+export const selectTaxSettingsSchema = createSelectSchema(taxSettings)
+export type InsertTaxSettings = z.infer<typeof insertTaxSettingsSchema>
+export type SelectTaxSettings = z.infer<typeof selectTaxSettingsSchema>
