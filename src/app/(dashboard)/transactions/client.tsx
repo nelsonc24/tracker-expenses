@@ -73,7 +73,8 @@ import {
   CreditCard,
   ArrowLeftRight,
   CheckCircle,
-  Receipt
+  Receipt,
+  Plus
 } from 'lucide-react'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { BulkOperationsBar } from '@/components/bulk-operations-bar'
@@ -260,6 +261,21 @@ export function TransactionsPageClient({
   const [isLinkTransfersDialogOpen, setIsLinkTransfersDialogOpen] = useState(false)
   const [isMarkAsBillDialogOpen, setIsMarkAsBillDialogOpen] = useState(false)
   const [markAsBillTransaction, setMarkAsBillTransaction] = useState<Transaction | null>(null)
+
+  // Add transaction state
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [newTransactionForm, setNewTransactionForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    description: '',
+    amount: '',
+    amountType: 'debit' as 'debit' | 'credit',
+    category: '',
+    accountId: '',
+    merchant: '',
+    notes: '',
+    isTransfer: false,
+  })
+  const [isAddingTransaction, setIsAddingTransaction] = useState(false)
   
   // Advanced search state
   const [activeFilters, setActiveFilters] = useState<any>(null)
@@ -1044,6 +1060,77 @@ export function TransactionsPageClient({
     }
   }
 
+  // Add new transaction
+  const handleAddTransaction = async () => {
+    if (!newTransactionForm.description.trim()) {
+      toast.error('Please enter a description')
+      return
+    }
+    const parsedAmount = parseFloat(newTransactionForm.amount)
+    if (!newTransactionForm.amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      toast.error('Please enter a valid amount greater than 0')
+      return
+    }
+    if (!newTransactionForm.accountId) {
+      toast.error('Please select an account')
+      return
+    }
+
+    try {
+      setIsAddingTransaction(true)
+      const finalAmount = newTransactionForm.amountType === 'debit' ? -parsedAmount : parsedAmount
+      const selectedCategory = propCategories.find(c => c.name === newTransactionForm.category)
+
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: newTransactionForm.accountId,
+          categoryId: selectedCategory?.id || null,
+          amount: finalAmount,
+          description: newTransactionForm.description.trim(),
+          merchant: newTransactionForm.merchant.trim() || null,
+          notes: newTransactionForm.notes.trim() || null,
+          transactionDate: new Date(newTransactionForm.date).toISOString(),
+          type: newTransactionForm.amountType,
+          isTransfer: newTransactionForm.isTransfer,
+          tags: [],
+        }),
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to create transaction')
+      }
+
+      const created = await response.json()
+      setTransactions(prev => [created, ...prev])
+      if (onTransactionCreate) onTransactionCreate(created)
+
+      window.dispatchEvent(new CustomEvent('transactionUpdated', {
+        detail: { transactionId: created.id, categoryId: created.categoryId, amount: created.amount, type: 'created' }
+      }))
+
+      toast.success('Transaction added successfully')
+      setIsAddDialogOpen(false)
+      setNewTransactionForm({
+        date: new Date().toISOString().split('T')[0],
+        description: '',
+        amount: '',
+        amountType: 'debit',
+        category: '',
+        accountId: '',
+        merchant: '',
+        notes: '',
+        isTransfer: false,
+      })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add transaction')
+    } finally {
+      setIsAddingTransaction(false)
+    }
+  }
+
   // Duplicate transaction
   const handleDuplicateTransaction = (transaction: Transaction) => {
     const duplicatedTransaction = {
@@ -1246,6 +1333,15 @@ export function TransactionsPageClient({
             <Button onClick={handleImport} className="flex-1 sm:flex-none">
               <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
               <span className="hidden sm:inline">Import</span>
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => setIsAddDialogOpen(true)}
+              className="flex-1 sm:flex-none"
+            >
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              <span className="hidden sm:inline">Add Transaction</span>
+              <span className="sm:hidden">Add</span>
             </Button>
             <Button 
               variant="default" 
@@ -1860,6 +1956,147 @@ export function TransactionsPageClient({
       </Card>
 
       {/* Edit Transaction Dialog */}
+      {/* Add Transaction Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Transaction</DialogTitle>
+            <DialogDescription>
+              Manually enter a new transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="add-date">Date</Label>
+                <Input
+                  id="add-date"
+                  type="date"
+                  value={newTransactionForm.date}
+                  onChange={(e) => setNewTransactionForm(prev => ({ ...prev, date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="add-amount">Amount</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={newTransactionForm.amountType}
+                    onValueChange={(v: 'debit' | 'credit') => setNewTransactionForm(prev => ({ ...prev, amountType: v }))}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="debit">Debit</SelectItem>
+                      <SelectItem value="credit">Credit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="add-amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={newTransactionForm.amount}
+                    onChange={(e) => setNewTransactionForm(prev => ({ ...prev, amount: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-description">Description</Label>
+              <Input
+                id="add-description"
+                placeholder="e.g. Grocery shopping"
+                value={newTransactionForm.description}
+                onChange={(e) => setNewTransactionForm(prev => ({ ...prev, description: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Account</Label>
+                <Select
+                  value={newTransactionForm.accountId}
+                  onValueChange={(v) => setNewTransactionForm(prev => ({ ...prev, accountId: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {propAccounts.map(account => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select
+                  value={newTransactionForm.category}
+                  onValueChange={(v) => setNewTransactionForm(prev => ({ ...prev, category: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {propCategories.map(category => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-merchant">Merchant <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input
+                id="add-merchant"
+                placeholder="e.g. Woolworths"
+                value={newTransactionForm.merchant}
+                onChange={(e) => setNewTransactionForm(prev => ({ ...prev, merchant: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-notes">Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <Input
+                id="add-notes"
+                placeholder="Add a note..."
+                value={newTransactionForm.notes}
+                onChange={(e) => setNewTransactionForm(prev => ({ ...prev, notes: e.target.value }))}
+              />
+            </div>
+            <div className="flex items-start space-x-2 p-3 rounded-lg border bg-muted/50">
+              <Checkbox
+                id="add-is-transfer"
+                checked={newTransactionForm.isTransfer}
+                onCheckedChange={(checked) => setNewTransactionForm(prev => ({ ...prev, isTransfer: checked === true }))}
+                className="mt-1"
+              />
+              <div className="space-y-1">
+                <Label htmlFor="add-is-transfer" className="text-sm font-medium cursor-pointer flex items-center gap-2">
+                  <ArrowLeftRight className="h-4 w-4" />
+                  Transfer between accounts
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Exclude from income/expense calculations
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={isAddingTransaction}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddTransaction} disabled={isAddingTransaction}>
+              {isAddingTransaction ? 'Adding...' : 'Add Transaction'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
