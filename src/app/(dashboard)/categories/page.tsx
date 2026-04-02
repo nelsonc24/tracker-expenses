@@ -197,7 +197,7 @@ export default function CategoriesPage() {
 
       const [categoriesRes, statsRes] = await Promise.all([
         fetch('/api/categories'),
-        fetch('/api/analytics/categories')
+        fetch(`/api/analytics/categories?period=${selectedPeriod}`)
       ])
 
       if (!categoriesRes.ok) {
@@ -222,7 +222,7 @@ export default function CategoriesPage() {
     } finally {
       setLoading(false)
     }
-  }, [buildCategoryTree])
+  }, [buildCategoryTree, selectedPeriod])
 
   useEffect(() => {
     if (!isLoaded || !user) return

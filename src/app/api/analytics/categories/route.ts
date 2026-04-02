@@ -1,15 +1,52 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@clerk/nextjs/server'
 import { db } from '@/db'
-import { transactions, categories } from '@/db/schema'
-import { eq, sql, and } from 'drizzle-orm'
+import { transactions } from '@/db/schema'
+import { eq, sql, and, gte, lte } from 'drizzle-orm'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const user = await currentUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const period = request.nextUrl.searchParams.get('period') || 'all'
+    const now = new Date()
+    let startDate: Date | undefined
+    let endDate: Date | undefined
+
+    switch (period) {
+      case '1m':
+      case 'current-month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+        break
+      case '3m':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+        endDate = now
+        break
+      case '6m':
+      case 'last-6-months':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+        endDate = now
+        break
+      case '1y':
+      case 'last-year':
+        startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+        endDate = now
+        break
+      default:
+        // No date filters for all-time
+        break
+    }
+
+    const dateConditions = [
+      eq(transactions.userId, user.id),
+      sql`${transactions.categoryId} IS NOT NULL`,
+      ...(startDate ? [gte(transactions.transactionDate, startDate)] : []),
+      ...(endDate ? [lte(transactions.transactionDate, endDate)] : []),
+    ]
 
     // Get category statistics
     const categoryStats = await db
@@ -19,12 +56,7 @@ export async function GET() {
         totalAmount: sql<number>`sum(${transactions.amount})`.as('total_amount')
       })
       .from(transactions)
-      .where(
-        and(
-          eq(transactions.userId, user.id),
-          sql`${transactions.categoryId} IS NOT NULL`
-        )
-      )
+      .where(and(...dateConditions))
       .groupBy(transactions.categoryId)
 
     // Convert to object for easy lookup
