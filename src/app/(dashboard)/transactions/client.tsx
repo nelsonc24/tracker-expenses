@@ -10,7 +10,10 @@ import { Input } from '@/components/ui/input'
 import { 
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -63,6 +66,7 @@ import {
   Trash2,
   DollarSign,
   ArrowUpDown,
+  RefreshCw,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -195,6 +199,7 @@ export function TransactionsPageClient({
   const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([])
+  const [isRefreshing, setIsRefreshing] = useState(false)
   
   // Update local state when propTransactions changes
   useEffect(() => {
@@ -231,7 +236,8 @@ export function TransactionsPageClient({
     } else {
       setTransactions([])
     }
-  }, [propTransactions])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(propTransactions.map(t => t?.id + '|' + (t?.category ?? '')))])
   
   // Filter states
   const [categoryFilter, setCategoryFilter] = useState('All Categories')
@@ -339,10 +345,44 @@ export function TransactionsPageClient({
         const startOfYear = new Date(now.getFullYear(), 0, 1)
         return { start: startOfYear, end: null }
       }
-      case 'all':
-      default:
+      default: {
+        // Financial year: value format 'fy_YYYY_YYYY' e.g. 'fy_2025_2026'
+        if (range.startsWith('fy_')) {
+          const parts = range.split('_')
+          const startYear = parseInt(parts[1])
+          const endYear = parseInt(parts[2])
+          const fyStart = new Date(startYear, 6, 1) // 1 Jul
+          const fyEnd = new Date(endYear, 5, 30, 23, 59, 59) // 30 Jun
+          return { start: fyStart, end: fyEnd }
+        }
         return { start: null, end: null }
+      }
     }
+  }
+
+  // Generate financial year options (current FY + last 2)
+  const getFinancialYears = () => {
+    const now = new Date()
+    // Current FY: if before Jul, we're in FY ending this calendar year
+    const currentFYStartYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1
+    return Array.from({ length: 3 }, (_, i) => {
+      const startYear = currentFYStartYear - i
+      const endYear = startYear + 1
+      return {
+        value: `fy_${startYear}_${endYear}`,
+        label: `FY ${startYear}-${String(endYear).slice(2)}`,
+      }
+    })
+  }
+
+  const financialYears = getFinancialYears()
+  const dateRangeLabel: Record<string, string> = {
+    'current_month': 'This Month',
+    'last_month': 'Last Month',
+    'last_3_months': 'Last 3 Months',
+    'last_6_months': 'Last 6 Months',
+    'year_to_date': 'YTD',
+    ...Object.fromEntries(financialYears.map(fy => [fy.value, fy.label]))
   }
 
   // Helper function to get active filters description
@@ -350,13 +390,15 @@ export function TransactionsPageClient({
     const filters: string[] = []
     
     // Date range filter
+    const fyLabels = Object.fromEntries(getFinancialYears().map(fy => [fy.value, fy.label]))
     const dateRangeLabels: Record<string, string> = {
       'current_month': 'This Month',
       'last_month': 'Last Month',
       'last_3_months': 'Last 3 Months',
       'last_6_months': 'Last 6 Months',
       'year_to_date': 'Year to Date',
-      'all': 'All Time'
+      'all': 'All Time',
+      ...fyLabels
     }
     const dateLabel = dateRangeLabels[dateRange] || dateRange
     if (dateRange !== 'all') {
@@ -1338,6 +1380,14 @@ export function TransactionsPageClient({
     console.log('Open bulk actions')
   }
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    router.refresh()
+    // Give Next.js a moment to revalidate then clear the spinner
+    await new Promise(resolve => setTimeout(resolve, 800))
+    setIsRefreshing(false)
+  }
+
   // Calculate summary statistics - exclude transfers to avoid double counting
   const totalIncome = filteredTransactions.filter(t => t.amount > 0 && !t.isTransfer).reduce((sum, t) => sum + t.amount, 0)
   const totalExpenses = filteredTransactions.filter(t => t.amount < 0 && !t.isTransfer).reduce((sum, t) => sum + Math.abs(t.amount), 0)
@@ -1356,6 +1406,10 @@ export function TransactionsPageClient({
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
           <div className="flex space-x-2">
+            <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing} className="flex-1 sm:flex-none">
+              <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 ${isRefreshing ? 'animate-spin' : ''} sm:mr-2`} />
+              <span className="hidden sm:inline">{isRefreshing ? 'Refreshing…' : 'Refresh'}</span>
+            </Button>
             <Button variant="outline" onClick={handleExport} className="flex-1 sm:flex-none">
               <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
               <span className="hidden sm:inline">Export</span>
@@ -1436,10 +1490,7 @@ export function TransactionsPageClient({
               Total Income
               {dateRange !== 'all' && (
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  ({dateRange === 'current_month' ? 'This Month' : 
-                    dateRange === 'last_month' ? 'Last Month' : 
-                    dateRange === 'last_3_months' ? 'Last 3 Months' : 
-                    dateRange === 'last_6_months' ? 'Last 6 Months' : 'YTD'})
+                  ({dateRangeLabel[dateRange] ?? dateRange})
                 </span>
               )}
             </CardTitle>
@@ -1461,10 +1512,7 @@ export function TransactionsPageClient({
               Total Expenses
               {dateRange !== 'all' && (
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  ({dateRange === 'current_month' ? 'This Month' : 
-                    dateRange === 'last_month' ? 'Last Month' : 
-                    dateRange === 'last_3_months' ? 'Last 3 Months' : 
-                    dateRange === 'last_6_months' ? 'Last 6 Months' : 'YTD'})
+                  ({dateRangeLabel[dateRange] ?? dateRange})
                 </span>
               )}
             </CardTitle>
@@ -1486,10 +1534,7 @@ export function TransactionsPageClient({
               Net Amount
               {dateRange !== 'all' && (
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  ({dateRange === 'current_month' ? 'This Month' : 
-                    dateRange === 'last_month' ? 'Last Month' : 
-                    dateRange === 'last_3_months' ? 'Last 3 Months' : 
-                    dateRange === 'last_6_months' ? 'Last 6 Months' : 'YTD'})
+                  ({dateRangeLabel[dateRange] ?? dateRange})
                 </span>
               )}
             </CardTitle>
@@ -1518,12 +1563,22 @@ export function TransactionsPageClient({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="current_month">This Month</SelectItem>
-              <SelectItem value="last_month">Last Month</SelectItem>
-              <SelectItem value="last_3_months">Last 3 Months</SelectItem>
-              <SelectItem value="last_6_months">Last 6 Months</SelectItem>
-              <SelectItem value="year_to_date">Year to Date</SelectItem>
-              <SelectItem value="all">All Time</SelectItem>
+              <SelectGroup>
+                <SelectLabel className="text-xs text-muted-foreground">Calendar</SelectLabel>
+                <SelectItem value="current_month">This Month</SelectItem>
+                <SelectItem value="last_month">Last Month</SelectItem>
+                <SelectItem value="last_3_months">Last 3 Months</SelectItem>
+                <SelectItem value="last_6_months">Last 6 Months</SelectItem>
+                <SelectItem value="year_to_date">Year to Date</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectGroup>
+              <SelectSeparator />
+              <SelectGroup>
+                <SelectLabel className="text-xs text-muted-foreground">Financial Year (Jul–Jun)</SelectLabel>
+                {financialYears.map(fy => (
+                  <SelectItem key={fy.value} value={fy.value}>{fy.label}</SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
@@ -1631,10 +1686,7 @@ export function TransactionsPageClient({
       <BulkOperationsBar
         selectedTransactionIds={selectedTransactions}
         onClearSelection={() => setSelectedTransactions([])}
-        onOperationComplete={() => {
-          // Trigger a refresh of transactions data
-          router.refresh()
-        }}
+        onOperationComplete={handleRefresh}
         categories={propCategories}
         accounts={propAccounts}
         transactions={filteredTransactions}
