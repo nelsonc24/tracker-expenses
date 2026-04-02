@@ -1849,6 +1849,16 @@ export function TransactionsPageClient({
                             </TooltipContent>
                           </Tooltip>
                         )}
+                        {transaction.taxDeductible && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0 h-4 bg-green-50 text-green-700 border-green-200 whitespace-nowrap flex items-center gap-0.5"
+                            title={transaction.taxCategory ? `Tax deductible — ${transaction.taxCategory.replace(/_/g, ' ')}` : 'Tax deductible'}
+                          >
+                            <FileText className="h-2.5 w-2.5" />
+                            Tax
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="w-12">
