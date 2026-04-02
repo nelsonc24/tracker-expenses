@@ -39,8 +39,10 @@ import {
   Loader2,
   CheckCircle,
   AlertTriangle,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Receipt
 } from 'lucide-react'
+import { TAX_CATEGORIES } from '@/lib/tax-utils'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -82,6 +84,8 @@ type BulkOperation =
   | 'assign_activity'
   | 'mark_transfer'
   | 'unmark_transfer'
+  | 'tag_tax_deductible'
+  | 'untag_tax_deductible'
 
 interface BulkOperationConfig {
   name: string
@@ -147,6 +151,20 @@ const operationConfigs: Record<BulkOperation, BulkOperationConfig> = {
     icon: ArrowLeftRight,
     destructive: false,
     requiresConfirmation: true
+  },
+  tag_tax_deductible: {
+    name: 'Tag as Tax Deductible',
+    description: 'Mark selected transactions as ATO tax deductible',
+    icon: Receipt,
+    destructive: false,
+    requiresConfirmation: false
+  },
+  untag_tax_deductible: {
+    name: 'Remove Tax Tag',
+    description: 'Remove tax deductible flag from selected transactions',
+    icon: Receipt,
+    destructive: false,
+    requiresConfirmation: true
   }
 }
 
@@ -170,6 +188,7 @@ export function BulkOperationsBar({
   const [activityId, setActivityId] = useState('')
   const [notes, setNotes] = useState('')
   const [appendNotes, setAppendNotes] = useState(false)
+  const [taxCategory, setTaxCategory] = useState<string>('')
   const [duplicateModifications, setDuplicateModifications] = useState({
     descriptionRaw: '',
     amountMinor: '',
@@ -283,6 +302,7 @@ export function BulkOperationsBar({
     setActivityId('')
     setNotes('')
     setAppendNotes(false)
+    setTaxCategory('')
     setDuplicateModifications({
       descriptionRaw: '',
       amountMinor: '',
@@ -315,6 +335,9 @@ export function BulkOperationsBar({
         break
       case 'unmark_transfer':
         performBulkOperation('unmark_transfer', {})
+        break
+      case 'untag_tax_deductible':
+        performBulkOperation('untag_tax_deductible', {})
         break
     }
   }
@@ -354,6 +377,10 @@ export function BulkOperationsBar({
           notes: { userNote: notes },
           appendNotes 
         }
+        break
+
+      case 'tag_tax_deductible':
+        payload = { taxCategory: taxCategory || null }
         break
 
       case 'duplicate':
@@ -491,6 +518,30 @@ export function BulkOperationsBar({
               <Label htmlFor="append-notes" className="text-sm">
                 Append to existing notes (instead of replacing)
               </Label>
+            </div>
+          </div>
+        )
+
+      case 'tag_tax_deductible':
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Optionally assign an ATO deduction category. You can also leave it blank and categorise later from the Tax Return page.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="tax-category-select">ATO Deduction Category (optional)</Label>
+              <Select value={taxCategory} onValueChange={setTaxCategory}>
+                <SelectTrigger id="tax-category-select">
+                  <SelectValue placeholder="Select a category (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TAX_CATEGORIES.map(cat => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         )
