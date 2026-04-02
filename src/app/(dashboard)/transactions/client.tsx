@@ -1944,6 +1944,7 @@ export function TransactionsPageClient({
                   onCategoryClick={() => handleCategoryClick(transaction)}
                   onAssignActivity={() => handleActivityAssignClick(transaction)}
                   onBreakdown={() => handleBreakdownClick(transaction)}
+                  onToggleTaxDeductible={() => handleToggleTaxDeductible(transaction)}
                 />
               ))}
             </div>

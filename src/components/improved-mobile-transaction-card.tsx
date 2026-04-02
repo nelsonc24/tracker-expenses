@@ -24,6 +24,8 @@ import {
   Eye,
   Activity,
   BarChart3,
+  FileText,
+  CheckCircle,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 
@@ -41,6 +43,8 @@ type Transaction = {
   tags?: string[]
   notes?: string
   isTransfer?: boolean
+  taxDeductible?: boolean
+  taxCategory?: string | null
 }
 
 type ImprovedMobileTransactionCardProps = {
@@ -54,6 +58,7 @@ type ImprovedMobileTransactionCardProps = {
   onCategoryClick?: () => void
   onAssignActivity?: () => void
   onBreakdown?: () => void
+  onToggleTaxDeductible?: () => void
   showDetails?: boolean
 }
 
@@ -68,6 +73,7 @@ export function ImprovedMobileTransactionCard({
   onCategoryClick,
   onAssignActivity,
   onBreakdown,
+  onToggleTaxDeductible,
   showDetails = false
 }: ImprovedMobileTransactionCardProps) {
   const [isExpanded, setIsExpanded] = useState(showDetails)
@@ -149,6 +155,11 @@ export function ImprovedMobileTransactionCard({
                     Transfer
                   </Badge>
                 )}
+                {transaction.taxDeductible && (
+                  <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                    Tax
+                  </Badge>
+                )}
               </div>
               
               {/* Action buttons */}
@@ -198,6 +209,21 @@ export function ImprovedMobileTransactionCard({
                       <DropdownMenuItem onClick={onViewDetails} className="text-xs">
                         <Eye className="h-3.5 w-3.5 mr-2" />
                         View Details
+                      </DropdownMenuItem>
+                    )}
+                    {onToggleTaxDeductible && (
+                      <DropdownMenuItem onClick={onToggleTaxDeductible} className="text-xs">
+                        {transaction.taxDeductible ? (
+                          <>
+                            <CheckCircle className="h-3.5 w-3.5 mr-2 text-emerald-600" />
+                            Remove Tax Tag
+                          </>
+                        ) : (
+                          <>
+                            <FileText className="h-3.5 w-3.5 mr-2" />
+                            Tag as Tax Deductible
+                          </>
+                        )}
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem 
