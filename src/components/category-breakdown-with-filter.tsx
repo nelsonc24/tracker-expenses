@@ -205,7 +205,8 @@ export function CategoryBreakdownWithFilter({ initialData }: { initialData?: Cat
                     />
                   ))}
                 </Pie>
-                <Tooltip content={renderTooltip} />
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                <Tooltip content={renderTooltip as any} />
               </PieChart>
             </ResponsiveContainer>
             

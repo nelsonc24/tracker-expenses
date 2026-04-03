@@ -546,7 +546,7 @@ export default function BillsPage() {
                       <BarChart data={frequencyBreakdown} margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
                         <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                         <YAxis hide />
-                        <Tooltip formatter={(v: number) => [fmtCurrency(v), 'Total amount']} labelStyle={{ fontSize: 12 }} />
+                        <Tooltip formatter={(v) => [fmtCurrency(Number(v)), 'Total amount']} labelStyle={{ fontSize: 12 }} />
                         <Bar dataKey="total" radius={[4, 4, 0, 0]}>
                           {frequencyBreakdown.map(entry => <Cell key={entry.freq} fill={entry.color} />)}
                         </Bar>

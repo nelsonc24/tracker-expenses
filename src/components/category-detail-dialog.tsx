@@ -279,7 +279,7 @@ export function CategoryDetailDialog({
                       />
                       <YAxis tick={{ fontSize: 12 }} />
                       <Tooltip
-                        formatter={(value: number) => [`$${value.toLocaleString()}`, 'Amount']}
+                        formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Amount']}
                         labelFormatter={(label) => new Date(label).toLocaleDateString()}
                       />
                       <Line
@@ -311,7 +311,7 @@ export function CategoryDetailDialog({
                       <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                       <YAxis tick={{ fontSize: 12 }} />
                       <Tooltip
-                        formatter={(value: number) => [`$${value.toLocaleString()}`, 'Amount']}
+                        formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Amount']}
                       />
                       <Bar dataKey="amount" fill={categoryColor} radius={[4, 4, 0, 0]} />
                     </BarChart>

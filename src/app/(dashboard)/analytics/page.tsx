@@ -335,7 +335,7 @@ export default function AnalyticsPage() {
                     <XAxis dataKey="month" />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                      formatter={(value) => [`$${Number(value).toLocaleString()}`, '']}
                       labelFormatter={(label) => `Month: ${label}`}
                     />
                     <Legend />
@@ -358,7 +358,7 @@ export default function AnalyticsPage() {
                     <XAxis dataKey="month" />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value: number) => [`$${value.toLocaleString()}`, 'Savings']}
+                      formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Savings']}
                     />
                     <Area 
                       type="monotone" 
@@ -387,7 +387,7 @@ export default function AnalyticsPage() {
                     <XAxis dataKey="week" />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value: number) => [`$${value.toLocaleString()}`, 'Spending']}
+                      formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Spending']}
                     />
                     <Bar dataKey="spending" fill="#3b82f6" />
                   </BarChart>
@@ -412,7 +412,7 @@ export default function AnalyticsPage() {
                     <XAxis dataKey="month" />
                     <YAxis />
                     <Tooltip 
-                      formatter={(value: number, name: string) => [`$${value.toLocaleString()}`, name]}
+                      formatter={(value, name) => [`$${Number(value).toLocaleString()}`, name]}
                     />
                     <Legend />
                     <Area 
@@ -504,7 +504,7 @@ export default function AnalyticsPage() {
                           <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, 'Amount']} />
+                      <Tooltip formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Amount']} />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (

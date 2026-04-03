@@ -11,6 +11,7 @@ import { EditDebtDialog } from '@/components/edit-debt-dialog'
 import { PaymentHistoryDialog } from '@/components/payment-history-dialog'
 import { DebtTable } from '@/components/debt-table'
 import { DebtStats } from '@/components/debt-stats'
+import { DebtPayoffProjection } from '@/components/debt-payoff-projection'
 import { toast } from 'sonner'
 
 interface DebtStats {
@@ -248,6 +249,11 @@ export default function DebtsPage() {
       {/* Detailed Stats */}
       {stats && debts.length > 0 && (
         <DebtStats stats={stats} debts={debts} />
+      )}
+
+      {/* Payoff Projections */}
+      {debts.length > 0 && (
+        <DebtPayoffProjection debts={debts} />
       )}
 
       {/* Add Debt Dialog */}

@@ -491,7 +491,7 @@ export default function AdvancedAnalyticsPage() {
                         />
                         <YAxis />
                         <Tooltip 
-                          formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                          formatter={(value) => [`$${Number(value).toLocaleString()}`, '']}
                         />
                         <Legend />
                         <Bar dataKey="budget" fill="#3b82f6" name="Budget" fillOpacity={0.6} />
@@ -714,7 +714,7 @@ export default function AdvancedAnalyticsPage() {
                       />
                       <YAxis />
                       <Tooltip 
-                        formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                        formatter={(value) => [`$${Number(value).toLocaleString()}`, '']}
                       />
                       <Legend />
                       <Bar dataKey="budget" fill="#3b82f6" name="Budget" fillOpacity={0.6} />
@@ -782,11 +782,13 @@ export default function AdvancedAnalyticsPage() {
                           <XAxis dataKey="month" />
                           <YAxis />
                           <Tooltip 
-                            formatter={(value: number, name: string) => {
-                              if (name.includes('forecast')) {
-                                return [`$${value.toLocaleString()} (forecast)`, name]
+                            formatter={(value, name) => {
+                              const v = Number(value)
+                              const n = String(name)
+                              if (n.includes('forecast')) {
+                                return [`$${v.toLocaleString()} (forecast)`, n]
                               }
-                              return [`$${value.toLocaleString()}`, name]
+                              return [`$${v.toLocaleString()}`, n]
                             }}
                           />
                           <Legend />

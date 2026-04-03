@@ -18,7 +18,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useChartColors } from '@/contexts/chart-color-context'
 import { formatCurrency } from '@/lib/utils'
-import { PieLabelProps } from 'recharts/types/polar/Pie'
+type PieLabelProps = { percent?: number; cx?: number; cy?: number; midAngle?: number; innerRadius?: number; outerRadius?: number; x?: number; y?: number; name?: string; percentage?: string }
 
 interface ChartData {
   name: string
@@ -160,7 +160,7 @@ export function CategoryBreakdownChart({ data }: { data: CategoryData[] }) {
   }
 
   const renderCustomLabel = (entry: PieLabelProps) => {
-    const percentage = parseFloat(entry.percentage)
+    const percentage = parseFloat(entry.percentage ?? '0')
     // Only show label if percentage is greater than 5%
     return percentage > 5 ? `${percentage}%` : ''
   }
@@ -222,7 +222,8 @@ export function CategoryBreakdownChart({ data }: { data: CategoryData[] }) {
               />
             ))}
           </Pie>
-          <Tooltip content={renderTooltip} />
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <Tooltip content={renderTooltip as any} />
         </PieChart>
       </ResponsiveContainer>
       

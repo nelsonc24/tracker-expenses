@@ -47,7 +47,7 @@ import {
   Tooltip,
   Legend
 } from 'recharts'
-import { PieLabelProps } from 'recharts/types/polar/Pie'
+type PieLabelProps = { percent?: number; cx?: number; cy?: number; midAngle?: number; innerRadius?: number; outerRadius?: number; x?: number; y?: number }
 import { 
   Plus, 
   MoreHorizontal, 
@@ -882,7 +882,7 @@ export default function CategoriesPage() {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value: number) => `$${value.toLocaleString()}`}
+                        formatter={(value) => (`$${Number(value).toLocaleString()}`)}
                       />
                       <Legend
                         wrapperStyle={{ paddingTop: '20px' }}
@@ -914,7 +914,7 @@ export default function CategoriesPage() {
                         tick={{ fontSize: 12 }}
                       />
                       <Tooltip
-                        formatter={(value: number) => `$${value.toLocaleString()}`}
+                        formatter={(value) => (`$${Number(value).toLocaleString()}`)}
                         labelStyle={{ color: '#000', fontWeight: 'bold' }}
                       />
                       <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
