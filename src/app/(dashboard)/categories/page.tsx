@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MobileNavigationHeader } from '@/components/mobile-navigation-header'
 import { InsightCard } from '@/components/dashboard-insights'
 import { 
@@ -58,7 +59,9 @@ import {
   TrendingUp,
   DollarSign,
   Activity,
-  Target
+  Target,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getIconComponent } from '@/lib/category-icons'
@@ -122,9 +125,12 @@ export default function CategoriesPage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [selectedPeriod, setSelectedPeriod] = useState('1m')
   const [categorySpendingData, setCategorySpendingData] = useState<CategorySpendingData[]>([])
-  const [insightsLoading, setInsightsLoading] = useState(false)
+  const [, setInsightsLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('categories')
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
   const [selectedCategoryForDetail, setSelectedCategoryForDetail] = useState<CategoryWithStats | null>(null)
+  const [editingTableCategoryId, setEditingTableCategoryId] = useState<string | null>(null)
+  const [editingTableName, setEditingTableName] = useState('')
 
   // Form state
   const [formData, setFormData] = useState({
@@ -179,9 +185,12 @@ export default function CategoriesPage() {
       setInsightsLoading(true)
       const response = await fetch(`/api/analytics/category-spending?period=${selectedPeriod}`)
       
-      if (response.ok) {
-        const data = await response.json()
-        setCategorySpendingData(data.data || [])
+      const data = await response.json()
+      const spendingData = data.data || []
+      setCategorySpendingData(spendingData)
+      // Auto-switch to overview tab when data is available
+      if (spendingData.length > 0) {
+        setActiveTab('overview')
       }
     } catch (err) {
       console.error('Error fetching category spending:', err)
@@ -353,6 +362,23 @@ export default function CategoriesPage() {
     }
   }
 
+  async function handleInlineRenameCategory(categoryId: string) {
+    const trimmed = editingTableName.trim()
+    if (!trimmed) return
+    try {
+      const response = await fetch(`/api/categories/${categoryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      })
+      if (!response.ok) throw new Error('Failed to rename category')
+      setEditingTableCategoryId(null)
+      await fetchCategories()
+    } catch (err) {
+      console.error('Error renaming category:', err)
+    }
+  }
+
   async function handleDeleteCategory(categoryId: string) {
     if (!confirm('Are you sure you want to delete this category? This action cannot be undone.')) {
       return
@@ -474,66 +500,130 @@ export default function CategoriesPage() {
     const hasChildren = category.children.length > 0
     const isExpanded = expandedCategories.has(category.id)
 
-    return (
-      <div key={category.id} className={cn("border-l-2 border-muted", depth > 0 && "ml-4")}>
-        <Card className="mb-2 transition-all hover:shadow-md">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div 
-                className="flex items-center space-x-3 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => openDetailDialog(category)}
-              >
-                {hasChildren && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleCategoryExpansion(category.id)
-                    }}
-                    className="p-1 h-6 w-6"
-                  >
-                    {isExpanded ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                  </Button>
-                )}
-                
+    if (depth === 0) {
+      // Grid card for top-level categories
+      return (
+        <div key={category.id} className="flex flex-col">
+          <Card
+            className="cursor-pointer hover:shadow-md transition-all group relative overflow-hidden flex-1"
+            onClick={() => openDetailDialog(category)}
+          >
+            {/* Color accent bar */}
+            <div className="h-1 w-full" style={{ backgroundColor: category.color || '#6b7280' }} />
+
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between mb-3">
                 {renderCategoryIcon(category.icon, category.customIconUrl || null, category.color)}
-                
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <h3 className="font-medium">{category.name}</h3>
-                    {category.isDefault && (
-                      <Badge variant="secondary" className="text-xs">System</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-4 text-sm text-muted-foreground mt-1">
-                    <span>{category.transactionCount} transactions</span>
-                    <span>${Math.abs(category.totalAmount).toLocaleString()}</span>
-                    {hasChildren && (
-                      <span>{category.children.length} subcategories</span>
-                    )}
-                  </div>
+                <div className="flex items-center gap-1">
+                  {hasChildren && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => { e.stopPropagation(); toggleCategoryExpansion(category.id) }}
+                    >
+                      {isExpanded
+                        ? <ChevronDown className="h-3.5 w-3.5" />
+                        : <ChevronRight className="h-3.5 w-3.5" />}
+                    </Button>
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditDialog(category) }}>
+                        <Edit className="h-4 w-4 mr-2" />Edit
+                      </DropdownMenuItem>
+                      {!category.isDefault && (
+                        <DropdownMenuItem
+                          onClick={(e) => { e.stopPropagation(); handleDeleteCategory(category.id) }}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />Delete
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-medium text-sm leading-tight">{category.name}</h3>
+                  {category.isDefault && (
+                    <Badge variant="secondary" className="text-xs h-4 px-1">System</Badge>
+                  )}
+                </div>
+                <p className="text-xl font-semibold">
+                  ${Math.abs(category.totalAmount).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {category.transactionCount} transaction{category.transactionCount !== 1 ? 's' : ''}
+                  {hasChildren && ` · ${category.children.length} subcategor${category.children.length !== 1 ? 'ies' : 'y'}`}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {hasChildren && isExpanded && (
+            <div className="mt-2 ml-4 space-y-1.5">
+              {category.children.map(child => renderCategory(child, depth + 1))}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    // Compact row for sub-categories
+    return (
+      <div key={category.id}>
+        <Card className="hover:shadow-sm transition-all">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between">
+              <div
+                className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
+                onClick={() => openDetailDialog(category)}
+              >
+                <div className="flex-shrink-0">
+                  {renderCategoryIcon(category.icon, category.customIconUrl || null, category.color)}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium truncate">{category.name}</span>
+                    {category.isDefault && (
+                      <Badge variant="secondary" className="text-xs h-4 px-1 flex-shrink-0">System</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {category.transactionCount} txn{category.transactionCount !== 1 ? 's' : ''} ·{' '}
+                    ${Math.abs(category.totalAmount).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 flex-shrink-0">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => openEditDialog(category)}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
+                    <Edit className="h-4 w-4 mr-2" />Edit
                   </DropdownMenuItem>
                   {!category.isDefault && (
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={() => handleDeleteCategory(category.id)}
                       className="text-red-600"
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
+                      <Trash2 className="h-4 w-4 mr-2" />Delete
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -541,9 +631,8 @@ export default function CategoriesPage() {
             </div>
           </CardContent>
         </Card>
-
-        {hasChildren && isExpanded && (
-          <div className="ml-4">
+        {hasChildren && expandedCategories.has(category.id) && (
+          <div className="ml-4 mt-1.5 space-y-1.5">
             {category.children.map(child => renderCategory(child, depth + 1))}
           </div>
         )}
@@ -717,295 +806,361 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Insights Summary Section */}
-      {!loading && !insightsLoading && categorySpendingData.length > 0 && (
-        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-          <InsightCard
-            title="Top Category"
-            value={insights.topCategory ? insights.topCategory.category : 'N/A'}
-            icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
-            description={insights.topCategory ? `$${insights.topCategory.amount.toLocaleString()}` : 'No spending'}
-          />
-          <InsightCard
-            title="Total Spending"
-            value={`$${insights.totalSpending.toLocaleString()}`}
-            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-            description={`Across ${insights.categoriesWithSpending} categories`}
-          />
-          <InsightCard
-            title="Average per Category"
-            value={`$${insights.avgPerCategory.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-            icon={<Activity className="h-4 w-4 text-muted-foreground" />}
-            description="Mean spending amount"
-          />
-          <InsightCard
-            title="Active Categories"
-            value={`${insights.categoriesWithSpending}/${insights.totalCategories}`}
-            icon={<Target className="h-4 w-4 text-muted-foreground" />}
-            description="Categories with spending"
-          />
-        </div>
-      )}
+      {/* Tabs: Overview / Categories */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview" disabled={categorySpendingData.length === 0}>
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="categories">
+            Categories
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Overview Charts Section */}
-      {!loading && !insightsLoading && categorySpendingData.length > 0 && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* Pie Chart - Category Breakdown */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Spending Distribution</CardTitle>
-              <CardDescription>
-                Breakdown by category for selected period
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <PieChart>
-                  <Pie
-                    data={pieChartData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(props: PieLabelProps) => {
-                      const percent = props.percent ?? 0
-                      if (percent < 0.05) return '' // Hide labels for tiny slices
-                      return `${(percent * 100).toFixed(1)}%`
-                    }}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="amount"
-                  >
-                    {pieChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value: number) => `$${value.toLocaleString()}`}
-                  />
-                  <Legend 
-                    wrapperStyle={{ paddingTop: '20px' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Bar Chart - Top Spending Categories */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Spending Categories</CardTitle>
-              <CardDescription>
-                Highest spending categories for selected period
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={topCategoriesData} layout="vertical" margin={{ left: 20 }}>
-                  <XAxis 
-                    type="number" 
-                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                  />
-                  <YAxis 
-                    dataKey="category" 
-                    type="category" 
-                    width={120}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <Tooltip 
-                    formatter={(value: number) => `$${value.toLocaleString()}`}
-                    labelStyle={{ color: '#000', fontWeight: 'bold' }}
-                  />
-                  <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
-                    {topCategoriesData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Detailed Expense Table by Category */}
-      {!loading && !insightsLoading && categorySpendingData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Category Expenses Breakdown</CardTitle>
-            <CardDescription>
-              Detailed view of all category expenses for the selected period
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
-                        Category
-                      </th>
-                      <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">
-                        Amount
-                      </th>
-                      <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground hidden sm:table-cell">
-                        Transactions
-                      </th>
-                      <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground hidden md:table-cell">
-                        % of Total
-                      </th>
-                      <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground hidden md:table-cell">
-                        Avg per Transaction
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categorySpendingData
-                      .sort((a, b) => b.amount - a.amount)
-                      .map((category) => {
-                        const percentOfTotal = insights.totalSpending > 0 
-                          ? (category.amount / insights.totalSpending) * 100 
-                          : 0
-                        const avgPerTransaction = category.transactionCount > 0
-                          ? category.amount / category.transactionCount
-                          : 0
-                        
-                        return (
-                          <tr 
-                            key={category.category}
-                            className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
-                            onClick={() => {
-                              const cat = categories.find(c => c.name === category.category)
-                              if (cat) openDetailDialog(cat)
-                            }}
-                          >
-                            <td className="p-4">
-                              <div className="flex items-center gap-3">
-                                <div 
-                                  className="w-3 h-3 rounded-full flex-shrink-0" 
-                                  style={{ backgroundColor: category.color }}
-                                />
-                                <span className="font-medium">{category.category}</span>
-                              </div>
-                            </td>
-                            <td className="p-4 text-right font-semibold">
-                              ${category.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                            <td className="p-4 text-right text-muted-foreground hidden sm:table-cell">
-                              {category.transactionCount}
-                            </td>
-                            <td className="p-4 text-right text-muted-foreground hidden md:table-cell">
-                              {percentOfTotal.toFixed(1)}%
-                            </td>
-                            <td className="p-4 text-right text-muted-foreground hidden md:table-cell">
-                              ${avgPerTransaction.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 bg-muted/30 font-bold">
-                      <td className="p-4">Total</td>
-                      <td className="p-4 text-right">
-                        ${insights.totalSpending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="p-4 text-right hidden sm:table-cell">
-                        {categorySpendingData.reduce((sum, cat) => sum + cat.transactionCount, 0)}
-                      </td>
-                      <td className="p-4 text-right hidden md:table-cell">
-                        100%
-                      </td>
-                      <td className="p-4 text-right hidden md:table-cell">
-                        ${insights.avgPerCategory.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Filters and Search */}
-      <Card>
-        <CardContent className="p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Search categories..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full sm:max-w-sm"
+        {/* ── OVERVIEW TAB ─────────────────────────────────── */}
+        <TabsContent value="overview" className="space-y-4 sm:space-y-6 mt-4">
+          {/* Insights Summary Section */}
+          {!loading && categorySpendingData.length > 0 && (
+            <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+              <InsightCard
+                title="Top Category"
+                value={insights.topCategory ? insights.topCategory.category : 'N/A'}
+                icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+                description={insights.topCategory ? `$${insights.topCategory.amount.toLocaleString()}` : 'No spending'}
+              />
+              <InsightCard
+                title="Total Spending"
+                value={`$${insights.totalSpending.toLocaleString()}`}
+                icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+                description={`Across ${insights.categoriesWithSpending} categories`}
+              />
+              <InsightCard
+                title="Average per Category"
+                value={`$${insights.avgPerCategory.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                icon={<Activity className="h-4 w-4 text-muted-foreground" />}
+                description="Mean spending amount"
+              />
+              <InsightCard
+                title="Active Categories"
+                value={`${insights.categoriesWithSpending}/${insights.totalCategories}`}
+                icon={<Target className="h-4 w-4 text-muted-foreground" />}
+                description="Categories with spending"
               />
             </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={showSystemCategories ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowSystemCategories(!showSystemCategories)}
-                className="text-xs sm:text-sm"
-              >
-                <span className="hidden sm:inline">
-                  {showSystemCategories ? "Hide" : "Show"} System Categories
-                </span>
-                <span className="sm:hidden">
-                  {showSystemCategories ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                </span>
-              </Button>
+          )}
+
+          {/* Overview Charts Section */}
+          {!loading && categorySpendingData.length > 0 && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {/* Pie Chart - Category Breakdown */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Spending Distribution</CardTitle>
+                  <CardDescription>
+                    Breakdown by category for selected period
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={350}>
+                    <PieChart>
+                      <Pie
+                        data={pieChartData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={(props: PieLabelProps) => {
+                          const percent = props.percent ?? 0
+                          if (percent < 0.05) return ''
+                          return `${(percent * 100).toFixed(1)}%`
+                        }}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="amount"
+                      >
+                        {pieChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number) => `$${value.toLocaleString()}`}
+                      />
+                      <Legend
+                        wrapperStyle={{ paddingTop: '20px' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Bar Chart - Top Spending Categories */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Spending Categories</CardTitle>
+                  <CardDescription>
+                    Highest spending categories for selected period
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={350}>
+                    <BarChart data={topCategoriesData} layout="vertical" margin={{ left: 20 }}>
+                      <XAxis
+                        type="number"
+                        tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                      />
+                      <YAxis
+                        dataKey="category"
+                        type="category"
+                        width={120}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip
+                        formatter={(value: number) => `$${value.toLocaleString()}`}
+                        labelStyle={{ color: '#000', fontWeight: 'bold' }}
+                      />
+                      <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
+                        {topCategoriesData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          )}
 
-      {/* Error Display */}
-      {error && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-4">
-            <p className="text-red-600">{error}</p>
-          </CardContent>
-        </Card>
-      )}
+          {/* Detailed Expense Table by Category */}
+          {!loading && categorySpendingData.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Category Expenses Breakdown</CardTitle>
+                <CardDescription>
+                  Detailed view of all category expenses for the selected period
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-md border">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                            Category
+                          </th>
+                          <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">
+                            Amount
+                          </th>
+                          <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground hidden sm:table-cell">
+                            Transactions
+                          </th>
+                          <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground hidden md:table-cell">
+                            % of Total
+                          </th>
+                          <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground hidden md:table-cell">
+                            Avg per Transaction
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {categorySpendingData
+                          .sort((a, b) => b.amount - a.amount)
+                          .map((category) => {
+                            const cat = categories.find(c => c.name === category.category)
+                            const isEditing = editingTableCategoryId === cat?.id
+                            const percentOfTotal = insights.totalSpending > 0
+                              ? (category.amount / insights.totalSpending) * 100
+                              : 0
+                            const avgPerTransaction = category.transactionCount > 0
+                              ? category.amount / category.transactionCount
+                              : 0
 
-      {/* Categories List */}
-      {loading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <Skeleton className="h-8 w-8 rounded-lg" />
-                  <div className="flex-1">
-                    <Skeleton className="h-5 w-24 mb-2" />
-                    <Skeleton className="h-4 w-32" />
+                            return (
+                              <tr
+                                key={category.category}
+                                className="group border-b transition-colors hover:bg-muted/50"
+                              >
+                                <td className="p-4">
+                                  <div className="flex items-center gap-3">
+                                    <div
+                                      className="w-3 h-3 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: category.color }}
+                                    />
+                                    {isEditing ? (
+                                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                        <Input
+                                          autoFocus
+                                          value={editingTableName}
+                                          onChange={(e) => setEditingTableName(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && cat) handleInlineRenameCategory(cat.id)
+                                            if (e.key === 'Escape') setEditingTableCategoryId(null)
+                                          }}
+                                          className="h-7 w-40 text-sm"
+                                        />
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-7 w-7 p-0 text-green-600 hover:text-green-700"
+                                          onClick={() => cat && handleInlineRenameCategory(cat.id)}
+                                        >
+                                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                          onClick={() => setEditingTableCategoryId(null)}
+                                        >
+                                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div
+                                        className="flex items-center gap-2 cursor-pointer"
+                                        onClick={() => cat && openDetailDialog(cat)}
+                                      >
+                                        <span className="font-medium">{category.category}</span>
+                                        {cat && !cat.isDefault && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={(e) => {
+                                              e.stopPropagation()
+                                              setEditingTableCategoryId(cat.id)
+                                              setEditingTableName(cat.name)
+                                            }}
+                                          >
+                                            <Edit className="h-3 w-3" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="p-4 text-right font-semibold">
+                                  ${category.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="p-4 text-right text-muted-foreground hidden sm:table-cell">
+                                  {category.transactionCount}
+                                </td>
+                                <td className="p-4 text-right text-muted-foreground hidden md:table-cell">
+                                  {percentOfTotal.toFixed(1)}%
+                                </td>
+                                <td className="p-4 text-right text-muted-foreground hidden md:table-cell">
+                                  ${avgPerTransaction.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 bg-muted/30 font-bold">
+                          <td className="p-4">Total</td>
+                          <td className="p-4 text-right">
+                            ${insights.totalSpending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-4 text-right hidden sm:table-cell">
+                            {categorySpendingData.reduce((sum, cat) => sum + cat.transactionCount, 0)}
+                          </td>
+                          <td className="p-4 text-right hidden md:table-cell">
+                            100%
+                          </td>
+                          <td className="p-4 text-right hidden md:table-cell">
+                            ${insights.avgPerCategory.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      ) : filteredCategories.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <FolderPlus className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No Categories Found</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchTerm ? 'No categories match your search.' : 'Get started by creating your first category.'}
-            </p>
-            {!searchTerm && (
-              <Button onClick={() => setIsCreateDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Category
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-2">
-          {filteredCategories.map(category => renderCategory(category))}
-        </div>
-      )}
+          )}
+        </TabsContent>
+
+        {/* ── CATEGORIES TAB ───────────────────────────────── */}
+        <TabsContent value="categories" className="space-y-4 mt-4">
+          {/* Filters and Search */}
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Search categories..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full sm:max-w-sm"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant={showSystemCategories ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowSystemCategories(!showSystemCategories)}
+                    className="text-xs sm:text-sm"
+                  >
+                    <span className="hidden sm:inline">
+                      {showSystemCategories ? "Hide" : "Show"} System Categories
+                    </span>
+                    <span className="sm:hidden">
+                      {showSystemCategories ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    </span>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Error Display */}
+          {error && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <p className="text-red-600">{error}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Categories Grid */}
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Card key={i}>
+                  <div className="h-1 w-full bg-muted" />
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <Skeleton className="h-9 w-9 rounded-lg" />
+                    </div>
+                    <Skeleton className="h-5 w-24 mb-2" />
+                    <Skeleton className="h-7 w-20 mb-1" />
+                    <Skeleton className="h-4 w-32" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : filteredCategories.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <FolderPlus className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Categories Found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchTerm ? 'No categories match your search.' : 'Get started by creating your first category.'}
+                </p>
+                {!searchTerm && (
+                  <Button onClick={() => setIsCreateDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Category
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCategories.map(category => renderCategory(category))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
