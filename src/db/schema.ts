@@ -879,3 +879,28 @@ export const insertTaxSettingsSchema = createInsertSchema(taxSettings)
 export const selectTaxSettingsSchema = createSelectSchema(taxSettings)
 export type InsertTaxSettings = z.infer<typeof insertTaxSettingsSchema>
 export type SelectTaxSettings = z.infer<typeof selectTaxSettingsSchema>
+
+// Investment Scenarios table - saved projection calculator scenarios
+export const investmentScenarios = pgTable('investment_scenarios', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(),
+  // 'stocks' | 'etf' | 'bonds' | 'savings' | 'crypto' | 'custom'
+  investmentType: text('investment_type').default('custom').notNull(),
+  initialAmount: decimal('initial_amount', { precision: 15, scale: 2 }).default('0.00').notNull(),
+  monthlyContribution: decimal('monthly_contribution', { precision: 15, scale: 2 }).default('0.00').notNull(),
+  annualReturnRate: decimal('annual_return_rate', { precision: 6, scale: 4 }).notNull(), // e.g. 8.0000 = 8%
+  years: integer('years').notNull(),
+  inflationRate: decimal('inflation_rate', { precision: 6, scale: 4 }).default('2.5000').notNull(),
+  contributionIncreaseRate: decimal('contribution_increase_rate', { precision: 6, scale: 4 }).default('0.0000').notNull(),
+  taxRate: decimal('tax_rate', { precision: 6, scale: 4 }).default('0.0000').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('investment_scenarios_user_id_idx').on(table.userId),
+}))
+
+export const insertInvestmentScenarioSchema = createInsertSchema(investmentScenarios)
+export const selectInvestmentScenarioSchema = createSelectSchema(investmentScenarios)
+export type InsertInvestmentScenario = z.infer<typeof insertInvestmentScenarioSchema>
+export type SelectInvestmentScenario = z.infer<typeof selectInvestmentScenarioSchema>

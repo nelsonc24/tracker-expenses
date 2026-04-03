@@ -18,6 +18,7 @@ import {
   Sparkles,
   Bot,
   FileText,
+  PiggyBank,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useUser } from '@clerk/nextjs'
@@ -60,6 +61,10 @@ const navigation = [
 const analyticsItems = [
   { name: 'Analytics', href: '/analytics', icon: TrendingUp },
   { name: 'Advanced Analytics', href: '/advanced-analytics', icon: LineChart },
+]
+
+const planningItems = [
+  { name: 'Investments', href: '/investments', icon: PiggyBank },
 ]
 
 const settingsItems = [
@@ -105,6 +110,29 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.name}>
                   <SidebarMenuButton 
                     asChild 
+                    isActive={pathname === item.href}
+                    tooltip={item.name}
+                  >
+                    <Link href={item.href}>
+                      <item.icon />
+                      <span>{item.name}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Planning Section */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Planning</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {planningItems.map((item) => (
+                <SidebarMenuItem key={item.name}>
+                  <SidebarMenuButton
+                    asChild
                     isActive={pathname === item.href}
                     tooltip={item.name}
                   >
