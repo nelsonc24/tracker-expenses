@@ -317,14 +317,10 @@ export function mergeSchedulesForChart(
 ): ChartPoint[] {
   // Build a map from label → values for both schedules
   const minMap = new Map<string, number>()
-  for (const p of minSchedule) {
-    minMap.set(p.label, p.balance)
-  }
+  for (const p of minSchedule) minMap.set(p.label, p.balance)
 
   const extraMap = new Map<string, number>()
-  for (const p of extraSchedule) {
-    extraMap.set(p.label, p.balance)
-  }
+  for (const p of extraSchedule) extraMap.set(p.label, p.balance)
 
   // Collect all unique labels ordered by month index
   const allLabels = new Map<string, number>()
@@ -333,9 +329,18 @@ export function mergeSchedulesForChart(
 
   const sorted = Array.from(allLabels.entries()).sort((a, b) => a[1] - b[1])
 
-  return sorted.map(([label]) => ({
-    label,
-    minBalance: minMap.get(label) ?? 0,
-    extraBalance: extraMap.get(label) ?? 0,
-  }))
+  // Forward-fill: when one schedule is sampled more sparsely than the other,
+  // carry the last known balance forward rather than defaulting to 0.
+  // This prevents artificial zero-dips on the chart where a densely-sampled
+  // schedule (e.g. 16-month extra payoff) has data points that fall between
+  // the sparse points of a long schedule (e.g. 360-month min-only downsampled
+  // to every 5th month).
+  let lastMin = minSchedule.length > 0 ? minSchedule[0].balance : 0
+  let lastExtra = extraSchedule.length > 0 ? extraSchedule[0].balance : 0
+
+  return sorted.map(([label]) => {
+    if (minMap.has(label)) lastMin = minMap.get(label)!
+    if (extraMap.has(label)) lastExtra = extraMap.get(label)!
+    return { label, minBalance: lastMin, extraBalance: lastExtra }
+  })
 }
