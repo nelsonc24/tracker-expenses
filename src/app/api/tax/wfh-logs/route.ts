@@ -8,8 +8,19 @@ import { z } from 'zod'
 const FY_START_STR = '2025-07-01'
 const FY_END_STR = '2026-06-30'
 
+const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+
 const createSchema = z.object({
-  logDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
+  logDate: z.string().regex(dateRegex, 'Date must be YYYY-MM-DD'),
+  hours: z.number().min(0.5).max(24),
+  notes: z.string().max(500).optional(),
+})
+
+const bulkSchema = z.object({
+  dates: z
+    .array(z.string().regex(dateRegex, 'Date must be YYYY-MM-DD'))
+    .min(1, 'At least one date required')
+    .max(366, 'Too many dates'),
   hours: z.number().min(0.5).max(24),
   notes: z.string().max(500).optional(),
 })
@@ -44,9 +55,46 @@ export async function POST(request: NextRequest) {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
+
+    // ── Bulk path: { dates: string[], hours, notes? } ────────────────────────
+    if (Array.isArray(body.dates)) {
+      const { dates, hours, notes } = bulkSchema.parse(body)
+
+      const outOfRange = dates.filter((d) => d < FY_START_STR || d > FY_END_STR)
+      if (outOfRange.length > 0) {
+        return NextResponse.json(
+          { error: 'All dates must be within FY 2025-26 (1 Jul 2025 – 30 Jun 2026)' },
+          { status: 400 }
+        )
+      }
+
+      const hoursStr = hours.toString()
+      const notesVal = notes ?? null
+      const now = new Date()
+
+      const rows = dates.map((d) => ({
+        userId,
+        logDate: d,
+        hours: hoursStr,
+        notes: notesVal,
+        updatedAt: now,
+      }))
+
+      const upserted = await db
+        .insert(wfhLogs)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: [wfhLogs.userId, wfhLogs.logDate],
+          set: { hours: hoursStr, notes: notesVal, updatedAt: now },
+        })
+        .returning()
+
+      return NextResponse.json(upserted, { status: 201 })
+    }
+
+    // ── Single path: { logDate: string, hours, notes? } ──────────────────────
     const { logDate, hours, notes } = createSchema.parse(body)
 
-    // Validate date is within the FY
     if (logDate < FY_START_STR || logDate > FY_END_STR) {
       return NextResponse.json(
         { error: 'Date must be within FY 2025-26 (1 Jul 2025 – 30 Jun 2026)' },
@@ -54,7 +102,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Upsert by (userId, logDate)
     const existing = await db
       .select({ id: wfhLogs.id })
       .from(wfhLogs)
