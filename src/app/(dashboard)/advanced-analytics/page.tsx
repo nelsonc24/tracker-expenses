@@ -13,11 +13,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
-  ComposedChart, Legend, ReferenceLine
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Line, PieChart, Pie, Cell,
+  ComposedChart,
 } from 'recharts'
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from '@/components/ui/chart'
 import { 
   TrendingUp, 
   TrendingDown,
@@ -145,10 +153,32 @@ interface PredictiveAnalyticsResponse {
 
 const COLORS = {
   under: '#22c55e',
-  'on-track': '#3b82f6', 
+  'on-track': '#3b82f6',
   over: '#f59e0b',
-  critical: '#ef4444'
+  critical: '#ef4444',
 }
+
+const budgetPerformanceConfig = {
+  budget: { label: 'Budget', color: 'hsl(217 91% 60%)' },
+  actual: { label: 'Actual', color: 'hsl(0 72% 51%)' },
+} satisfies ChartConfig
+
+const projectionsConfig = {
+  budget: { label: 'Budget', color: 'hsl(217 91% 60%)' },
+  actual: { label: 'Current Spending', color: 'hsl(142 71% 45%)' },
+  projected: { label: 'Projected Total', color: 'hsl(0 72% 51%)' },
+} satisfies ChartConfig
+
+const forecastConfig = {
+  expenses: { label: 'Historical Expenses', color: 'hsl(0 72% 51%)' },
+  income: { label: 'Historical Income', color: 'hsl(142 71% 45%)' },
+  forecastExpenses: { label: 'Forecast Expenses', color: 'hsl(38 92% 50%)' },
+  forecastIncome: { label: 'Forecast Income', color: 'hsl(189 94% 43%)' },
+} satisfies ChartConfig
+
+const varianceDistributionConfig = {
+  value: { label: 'Budgets' },
+} satisfies ChartConfig
 
 export default function AdvancedAnalyticsPage() {
   const { user, isLoaded } = useUser()
@@ -448,26 +478,37 @@ export default function AdvancedAnalyticsPage() {
                       How your budgets are performing this period
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
+                  <CardContent className="flex flex-col items-center">
+                    <ChartContainer config={varianceDistributionConfig} className="mx-auto aspect-square max-h-[280px] w-full">
                       <PieChart>
+                        <ChartTooltip
+                          cursor={false}
+                          content={<ChartTooltipContent hideLabel />}
+                        />
                         <Pie
                           data={varianceDistributionData}
                           cx="50%"
                           cy="50%"
-                          labelLine={false}
-                          label={({ name, value }) => `${name}: ${value}`}
-                          outerRadius={80}
-                          fill="#8884d8"
+                          innerRadius={65}
+                          outerRadius={100}
+                          paddingAngle={3}
                           dataKey="value"
+                          nameKey="name"
                         >
                           {varianceDistributionData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
+                            <Cell key={`cell-${index}`} fill={entry.color} stroke={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip />
                       </PieChart>
-                    </ResponsiveContainer>
+                    </ChartContainer>
+                    <div className="flex flex-wrap justify-center gap-3 mt-2">
+                      {varianceDistributionData.map((entry) => (
+                        <div key={entry.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: entry.color }} />
+                          {entry.name}: <span className="font-medium text-foreground">{entry.value}</span>
+                        </div>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -480,24 +521,37 @@ export default function AdvancedAnalyticsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={budgetPerformanceData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="name" 
-                          angle={-45}
+                    <ChartContainer config={budgetPerformanceConfig} className="w-full" style={{ height: 300 }}>
+                      <BarChart data={budgetPerformanceData} margin={{ top: 4, right: 8, left: 8, bottom: 60 }}>
+                        <CartesianGrid vertical={false} />
+                        <XAxis
+                          dataKey="name"
+                          tickLine={false}
+                          axisLine={false}
+                          angle={-40}
                           textAnchor="end"
-                          height={60}
+                          tick={{ fontSize: 11 }}
                         />
-                        <YAxis />
-                        <Tooltip 
-                          formatter={(value) => [`$${Number(value).toLocaleString()}`, '']}
+                        <YAxis
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(v) => `$${Number(v).toLocaleString()}`}
+                          tick={{ fontSize: 11 }}
+                          width={70}
                         />
-                        <Legend />
-                        <Bar dataKey="budget" fill="#3b82f6" name="Budget" fillOpacity={0.6} />
-                        <Bar dataKey="actual" fill="#ef4444" name="Actual" />
+                        <ChartTooltip
+                          cursor={{ fill: 'hsl(var(--muted))' }}
+                          content={
+                            <ChartTooltipContent
+                              formatter={(value) => `$${Number(value).toLocaleString()}`}
+                            />
+                          }
+                        />
+                        <ChartLegend content={<ChartLegendContent />} />
+                        <Bar dataKey="budget" fill="var(--color-budget)" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="actual" fill="var(--color-actual)" radius={[4, 4, 0, 0]} />
                       </BarChart>
-                    </ResponsiveContainer>
+                    </ChartContainer>
                   </CardContent>
                 </Card>
               </div>
@@ -703,32 +757,44 @@ export default function AdvancedAnalyticsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <ComposedChart data={budgetPerformanceData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="name" 
-                        angle={-45}
+                  <ChartContainer config={projectionsConfig} className="w-full" style={{ height: 400 }}>
+                    <ComposedChart data={budgetPerformanceData} margin={{ top: 4, right: 8, left: 8, bottom: 80 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis
+                        dataKey="name"
+                        tickLine={false}
+                        axisLine={false}
+                        angle={-40}
                         textAnchor="end"
-                        height={80}
+                        tick={{ fontSize: 11 }}
                       />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value) => [`$${Number(value).toLocaleString()}`, '']}
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => `$${Number(v).toLocaleString()}`}
+                        tick={{ fontSize: 11 }}
+                        width={70}
                       />
-                      <Legend />
-                      <Bar dataKey="budget" fill="#3b82f6" name="Budget" fillOpacity={0.6} />
-                      <Bar dataKey="actual" fill="#22c55e" name="Current Spending" />
-                      <Line 
-                        type="monotone" 
-                        dataKey="projected" 
-                        stroke="#ef4444" 
-                        strokeWidth={3}
-                        name="Projected Total"
-                        dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }}
+                      <ChartTooltip
+                        cursor={{ fill: 'hsl(var(--muted))' }}
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value) => `$${Number(value).toLocaleString()}`}
+                          />
+                        }
+                      />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar dataKey="budget" fill="var(--color-budget)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="actual" fill="var(--color-actual)" radius={[4, 4, 0, 0]} />
+                      <Line
+                        type="monotone"
+                        dataKey="projected"
+                        stroke="var(--color-projected)"
+                        strokeWidth={2}
+                        dot={{ fill: 'var(--color-projected)', strokeWidth: 2, r: 4 }}
                       />
                     </ComposedChart>
-                  </ResponsiveContainer>
+                  </ChartContainer>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -776,44 +842,57 @@ export default function AdvancedAnalyticsPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <ResponsiveContainer width="100%" height={400}>
-                        <ComposedChart data={[...predictiveData.historicalData.slice(-6), ...predictiveData.forecasts]}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="month" />
-                          <YAxis />
-                          <Tooltip 
-                            formatter={(value, name) => {
-                              const v = Number(value)
-                              const n = String(name)
-                              if (n.includes('forecast')) {
-                                return [`$${v.toLocaleString()} (forecast)`, n]
-                              }
-                              return [`$${v.toLocaleString()}`, n]
-                            }}
+                      <ChartContainer config={forecastConfig} className="w-full" style={{ height: 400 }}>
+                        <ComposedChart
+                          data={[...predictiveData.historicalData.slice(-6), ...predictiveData.forecasts]}
+                          margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
+                        >
+                          <CartesianGrid vertical={false} />
+                          <XAxis
+                            dataKey="month"
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 11 }}
                           />
-                          <Legend />
-                          <Bar dataKey="expenses" fill="#ef4444" name="Historical Expenses" />
-                          <Bar dataKey="income" fill="#22c55e" name="Historical Income" />
-                          <Line 
-                            type="monotone" 
-                            dataKey="forecastExpenses" 
-                            stroke="#f59e0b" 
-                            strokeWidth={3}
-                            strokeDasharray="5 5"
-                            name="Forecast Expenses"
-                            dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }}
+                          <YAxis
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={(v) => `$${Number(v).toLocaleString()}`}
+                            tick={{ fontSize: 11 }}
+                            width={75}
                           />
-                          <Line 
-                            type="monotone" 
-                            dataKey="forecastIncome" 
-                            stroke="#06b6d4" 
-                            strokeWidth={3}
+                          <ChartTooltip
+                            cursor={{ fill: 'hsl(var(--muted))' }}
+                            content={
+                              <ChartTooltipContent
+                                formatter={(value, name) => {
+                                  const label = String(name).includes('forecast') ? ` (forecast)` : ''
+                                  return `$${Number(value).toLocaleString()}${label}`
+                                }}
+                              />
+                            }
+                          />
+                          <ChartLegend content={<ChartLegendContent />} />
+                          <Bar dataKey="expenses" fill="var(--color-expenses)" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="income" fill="var(--color-income)" radius={[4, 4, 0, 0]} />
+                          <Line
+                            type="monotone"
+                            dataKey="forecastExpenses"
+                            stroke="var(--color-forecastExpenses)"
+                            strokeWidth={2}
                             strokeDasharray="5 5"
-                            name="Forecast Income"
-                            dot={{ fill: '#06b6d4', strokeWidth: 2, r: 4 }}
+                            dot={{ fill: 'var(--color-forecastExpenses)', strokeWidth: 2, r: 4 }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="forecastIncome"
+                            stroke="var(--color-forecastIncome)"
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            dot={{ fill: 'var(--color-forecastIncome)', strokeWidth: 2, r: 4 }}
                           />
                         </ComposedChart>
-                      </ResponsiveContainer>
+                      </ChartContainer>
                     </CardContent>
                   </Card>
 
