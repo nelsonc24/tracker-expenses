@@ -158,6 +158,7 @@ export async function GET(request: NextRequest) {
 
     // Process category data for pie chart
     const processedCategoryData = categorySpending.map((cat) => ({
+      id: cat.categoryId || null,
       name: cat.categoryName || 'Uncategorized',
       value: Number(cat.totalAmount || 0),
       color: cat.categoryColor || `#${Math.floor(Math.random()*16777215).toString(16)}`,

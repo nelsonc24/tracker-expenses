@@ -32,6 +32,7 @@ import {
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ExportDialog } from '@/components/export-dialog'
+import { AnalyticsTransactionsDialog } from '@/components/analytics-transactions-dialog'
 
 interface AnalyticsData {
   period: string
@@ -56,6 +57,7 @@ interface AnalyticsData {
     net: number
   }>
   categoryData: Array<{
+    id: string | null
     name: string
     value: number
     color: string
@@ -82,6 +84,13 @@ export default function AnalyticsPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [txDialog, setTxDialog] = useState<{
+    open: boolean
+    type: 'category' | 'merchant'
+    id: string | null
+    label: string
+    color?: string
+  }>({ open: false, type: 'category', id: null, label: '' })
 
   const fetchAnalyticsData = useCallback(async () => {
     try {
@@ -519,15 +528,25 @@ export default function AnalyticsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Category Details</CardTitle>
-                <CardDescription>Detailed breakdown with transaction counts</CardDescription>
+                <CardDescription>Click a row to see the transactions</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {categoryData.slice(0, 8).map((category, index) => (
-                    <div key={index} className="flex items-center justify-between">
+                    <button
+                      key={index}
+                      onClick={() => setTxDialog({
+                        open: true,
+                        type: 'category',
+                        id: category.id,
+                        label: category.name,
+                        color: category.color || COLORS[index % COLORS.length],
+                      })}
+                      className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-muted/60 transition-colors text-left"
+                    >
                       <div className="flex items-center space-x-3">
                         <div 
-                          className="w-4 h-4 rounded-full"
+                          className="w-4 h-4 rounded-full flex-shrink-0"
                           style={{ backgroundColor: category.color || COLORS[index % COLORS.length] }}
                         />
                         <div>
@@ -543,7 +562,7 @@ export default function AnalyticsPage() {
                           {((category.value / summary.totalExpenses) * 100).toFixed(1)}%
                         </p>
                       </div>
-                    </div>
+                    </button>
                   ))}
                   {categoryData.length === 0 && (
                     <p className="text-center text-muted-foreground py-4">
@@ -561,15 +580,24 @@ export default function AnalyticsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Top Merchants</CardTitle>
-              <CardDescription>Your most frequent spending destinations</CardDescription>
+              <CardDescription>Click a merchant to see its transactions</CardDescription>
             </CardHeader>
             <CardContent>
               {topMerchants.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {topMerchants.map((merchant, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                    <button
+                      key={index}
+                      onClick={() => setTxDialog({
+                        open: true,
+                        type: 'merchant',
+                        id: merchant.name,
+                        label: merchant.name,
+                      })}
+                      className="w-full flex items-center justify-between p-4 border rounded-lg hover:bg-muted/60 transition-colors text-left"
+                    >
                       <div className="flex items-center space-x-4">
-                        <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-full">
+                        <div className="flex items-center justify-center w-10 h-10 bg-primary/10 rounded-full flex-shrink-0">
                           <span className="font-medium text-primary">#{index + 1}</span>
                         </div>
                         <div>
@@ -585,7 +613,7 @@ export default function AnalyticsPage() {
                           {((merchant.amount / summary.totalExpenses) * 100).toFixed(1)}% of expenses
                         </p>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               ) : (
@@ -598,6 +626,16 @@ export default function AnalyticsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AnalyticsTransactionsDialog
+        open={txDialog.open}
+        onOpenChange={(open) => setTxDialog((prev) => ({ ...prev, open }))}
+        type={txDialog.type}
+        id={txDialog.id}
+        label={txDialog.label}
+        color={txDialog.color}
+        period={selectedPeriod}
+      />
     </div>
   )
 }
