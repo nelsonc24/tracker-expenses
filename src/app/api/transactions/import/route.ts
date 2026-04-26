@@ -78,8 +78,18 @@ export async function POST(request: NextRequest) {
       existingHashes.map(row => row.hash).filter((hash): hash is string => Boolean(hash))
     )
 
-    // Get or create default category for imports (we still need this for categorization)
+    // Get or create default category for imports (fallback when category not found)
     const defaultCategory = await getOrCreateDefaultCategory(userId)
+
+    // Fetch all user categories to match detected category names from CSV preview
+    const userCategories = await db
+      .select({ id: categoriesTable.id, name: categoriesTable.name })
+      .from(categoriesTable)
+      .where(eq(categoriesTable.userId, userId))
+
+    const categoryNameToId = new Map<string, string>(
+      userCategories.map(cat => [cat.name.toLowerCase(), cat.id])
+    )
 
     // Process transactions and check for duplicates
     const newTransactions: any[] = []
@@ -105,11 +115,16 @@ export async function POST(request: NextRequest) {
           reason: 'Duplicate transaction already exists'
         })
       } else {
+        // Resolve category: match by name (case-insensitive), fallback to default
+        const resolvedCategoryId = tx.category
+          ? (categoryNameToId.get(tx.category.toLowerCase()) ?? defaultCategory.id)
+          : defaultCategory.id
+
         newTransactions.push({
           id: crypto.randomUUID(),
           userId,
           accountId: accountId, // Use the selected account ID
-          categoryId: defaultCategory.id,
+          categoryId: resolvedCategoryId,
           amount: amount.toFixed(2),
           description: tx.description.trim(),
           merchant: tx.merchant || extractMerchant(tx.description),
