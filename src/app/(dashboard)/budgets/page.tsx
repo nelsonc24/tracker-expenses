@@ -347,6 +347,25 @@ export default function BudgetsPage() {
     }
   }, [user])
 
+  // Helper to dynamically calculate spending for a budget period from transactions
+  const calculatePeriodSpending = async (categoryIds: string[], periodStart: Date | string, periodEnd: Date | string): Promise<number> => {
+    if (!categoryIds || categoryIds.length === 0) return 0
+    const startStr = new Date(periodStart).toISOString().split('T')[0]
+    const endStr = new Date(periodEnd).toISOString().split('T')[0]
+    let total = 0
+    for (const categoryId of categoryIds) {
+      const res = await fetch(`/api/transactions?categoryId=${categoryId}&startDate=${startStr}&endDate=${endStr}`)
+      if (res.ok) {
+        const txns: Transaction[] = await res.json()
+        total += txns.reduce((sum, t) => {
+          const amt = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount
+          return sum + (amt < 0 ? Math.abs(amt) : 0)
+        }, 0)
+      }
+    }
+    return total
+  }
+
   // Fetch budget periods for previous month and all history
   const fetchBudgetPeriods = useCallback(async () => {
     if (!user) return
@@ -365,17 +384,29 @@ export default function BudgetsPage() {
           }
         })
         
-        // Enrich with category data
-        const enrichedPrevious = Array.from(budgetMap.values()).map((period) => {
-          const categoryId = period.budgetCategoryIds?.[0]
-          const category = categories.find((c: Category) => c.id === categoryId)
-          return {
-            ...period,
-            categoryName: category?.name,
-            categoryColor: category?.color,
-            categoryIcon: category?.icon
-          }
-        })
+        // Enrich with category data and dynamically calculate spending
+        const enrichedPrevious = await Promise.all(
+          Array.from(budgetMap.values()).map(async (period) => {
+            const categoryId = period.budgetCategoryIds?.[0]
+            const category = categories.find((c: Category) => c.id === categoryId)
+            // Dynamically calculate spending in case stored spentAmount is stale/zero
+            const dynamicSpent = await calculatePeriodSpending(
+              period.budgetCategoryIds || [],
+              period.periodStart,
+              period.periodEnd
+            )
+            const spentAmount = dynamicSpent > 0
+              ? dynamicSpent.toFixed(2)
+              : period.spentAmount
+            return {
+              ...period,
+              spentAmount,
+              categoryName: category?.name,
+              categoryColor: category?.color,
+              categoryIcon: category?.icon
+            }
+          })
+        )
         
         setPreviousBudgets(enrichedPrevious)
       }
@@ -385,17 +416,28 @@ export default function BudgetsPage() {
       if (allRes.ok) {
         const allData = await allRes.json()
         
-        // Enrich with category data
-        const enrichedAll = allData.map((period: typeof allData[0]) => {
-          const categoryId = period.budgetCategoryIds?.[0]
-          const category = categories.find((c: Category) => c.id === categoryId)
-          return {
-            ...period,
-            categoryName: category?.name,
-            categoryColor: category?.color,
-            categoryIcon: category?.icon
-          }
-        })
+        // Enrich with category data and dynamically calculate spending
+        const enrichedAll = await Promise.all(
+          allData.map(async (period: typeof allData[0]) => {
+            const categoryId = period.budgetCategoryIds?.[0]
+            const category = categories.find((c: Category) => c.id === categoryId)
+            const dynamicSpent = await calculatePeriodSpending(
+              period.budgetCategoryIds || [],
+              period.periodStart,
+              period.periodEnd
+            )
+            const spentAmount = dynamicSpent > 0
+              ? dynamicSpent.toFixed(2)
+              : period.spentAmount
+            return {
+              ...period,
+              spentAmount,
+              categoryName: category?.name,
+              categoryColor: category?.color,
+              categoryIcon: category?.icon
+            }
+          })
+        )
         
         setAllBudgetHistory(enrichedAll)
       }
