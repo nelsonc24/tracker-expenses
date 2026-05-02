@@ -212,6 +212,14 @@ export default function BudgetsPage() {
     return typeof amount === 'string' ? parseFloat(amount) : amount
   }
 
+  // Format a Date to YYYY-MM-DD using local timezone (avoids UTC offset shifting the date)
+  const toLocalDateStr = (date: Date): string => {
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    const d = String(date.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+
   // Compute the actual current period dates dynamically, ignoring potentially stale DB values
   const computeCurrentPeriod = (budget: Budget | BudgetWithProgress): { start: Date; end: Date } => {
     const now = new Date()
@@ -285,7 +293,7 @@ export default function BudgetsPage() {
           let spentAmount = 0
           if (budget.categoryIds.length > 0) {
             for (const categoryId of budget.categoryIds) {
-              const apiUrl = `/api/transactions?categoryId=${categoryId}&startDate=${budgetStart.toISOString().split('T')[0]}&endDate=${budgetEnd.toISOString().split('T')[0]}`
+              const apiUrl = `/api/transactions?categoryId=${categoryId}&startDate=${toLocalDateStr(budgetStart)}&endDate=${toLocalDateStr(budgetEnd)}`
               
               const spentResponse = await fetch(apiUrl)
               if (spentResponse.ok) {
@@ -347,28 +355,28 @@ export default function BudgetsPage() {
     }
   }, [user])
 
-  // Helper to dynamically calculate spending for a budget period from transactions
-  const calculatePeriodSpending = async (categoryIds: string[], periodStart: Date | string, periodEnd: Date | string): Promise<number> => {
-    if (!categoryIds || categoryIds.length === 0) return 0
-    const startStr = new Date(periodStart).toISOString().split('T')[0]
-    const endStr = new Date(periodEnd).toISOString().split('T')[0]
-    let total = 0
-    for (const categoryId of categoryIds) {
-      const res = await fetch(`/api/transactions?categoryId=${categoryId}&startDate=${startStr}&endDate=${endStr}`)
-      if (res.ok) {
-        const txns: Transaction[] = await res.json()
-        total += txns.reduce((sum, t) => {
-          const amt = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount
-          return sum + (amt < 0 ? Math.abs(amt) : 0)
-        }, 0)
-      }
-    }
-    return total
-  }
-
   // Fetch budget periods for previous month and all history
   const fetchBudgetPeriods = useCallback(async () => {
     if (!user) return
+
+    // Helper to dynamically calculate spending for a budget period from transactions
+    const calculatePeriodSpending = async (categoryIds: string[], periodStart: Date | string, periodEnd: Date | string): Promise<number> => {
+      if (!categoryIds || categoryIds.length === 0) return 0
+      const startStr = toLocalDateStr(new Date(periodStart))
+      const endStr = toLocalDateStr(new Date(periodEnd))
+      let total = 0
+      for (const categoryId of categoryIds) {
+        const res = await fetch(`/api/transactions?categoryId=${categoryId}&startDate=${startStr}&endDate=${endStr}`)
+        if (res.ok) {
+          const txns: Transaction[] = await res.json()
+          total += txns.reduce((sum, t) => {
+            const amt = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount
+            return sum + (amt < 0 ? Math.abs(amt) : 0)
+          }, 0)
+        }
+      }
+      return total
+    }
 
     try {
       // Fetch completed periods (last completed period = previous month)
@@ -700,8 +708,8 @@ export default function BudgetsPage() {
       // Fetch transactions for this budget's categories within the current budget period
       // Dynamically compute the current period to avoid stale DB values
       const { start: periodStart, end: periodEnd } = computeCurrentPeriod(budget)
-      const budgetStart = periodStart.toISOString().split('T')[0]
-      const budgetEnd = periodEnd.toISOString().split('T')[0]
+      const budgetStart = toLocalDateStr(periodStart)
+      const budgetEnd = toLocalDateStr(periodEnd)
       
       const allTransactions = []
       for (const categoryId of budget.categoryIds) {
