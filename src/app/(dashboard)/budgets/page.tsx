@@ -179,7 +179,7 @@ export default function BudgetsPage() {
     description: '',
     amount: '',
     period: 'monthly',
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}` })(),
     endDate: '',
     categoryIds: [] as string[],
     accountIds: [] as string[],
@@ -223,19 +223,43 @@ export default function BudgetsPage() {
   // Compute the actual current period dates dynamically, ignoring potentially stale DB values
   const computeCurrentPeriod = (budget: Budget | BudgetWithProgress): { start: Date; end: Date } => {
     const now = new Date()
-    const start = new Date(budget.startDate)
+    const budgetStart = new Date(budget.startDate)
     const period = budget.period as 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+    const resetDay: number = budget.resetDay ?? 1
 
-    // Walk forward from startDate by one period at a time until we find the period containing now
-    let periodStart = new Date(start)
+    // For monthly budgets, align period boundaries to the resetDay of the month
+    // so the period always starts on the same calendar day (e.g., 1st of every month).
+    if (period === 'monthly') {
+      const y = now.getFullYear()
+      const m = now.getMonth()
+      const d = now.getDate()
+
+      // Determine the start of the current calendar period based on resetDay
+      let calendarStart: Date
+      if (d >= resetDay) {
+        calendarStart = new Date(y, m, resetDay)
+      } else {
+        calendarStart = new Date(y, m - 1, resetDay)
+      }
+
+      // The period cannot start before the budget's own startDate
+      const periodStart = calendarStart < budgetStart ? budgetStart : calendarStart
+
+      // Period ends just before the next resetDay
+      const periodEnd = new Date(calendarStart)
+      periodEnd.setMonth(periodEnd.getMonth() + 1)
+      periodEnd.setMilliseconds(periodEnd.getMilliseconds() - 1)
+
+      return { start: periodStart, end: periodEnd }
+    }
+
+    // For weekly / quarterly / yearly budgets, walk forward from startDate
+    let periodStart = new Date(budgetStart)
     while (true) {
       const periodEnd = new Date(periodStart)
       switch (period) {
         case 'weekly':
           periodEnd.setDate(periodEnd.getDate() + 7)
-          break
-        case 'monthly':
-          periodEnd.setMonth(periodEnd.getMonth() + 1)
           break
         case 'quarterly':
           periodEnd.setMonth(periodEnd.getMonth() + 3)

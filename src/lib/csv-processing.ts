@@ -794,9 +794,14 @@ export function validateTransactionRow(
   const cleanedTransactionId = transactionId.replace(/^["\']+|["\']+$/g, '').trim()
   const cleanedReceiptNumber = receiptNumber.replace(/^["\']+|["\']+$/g, '').trim()
   
+  // Format date using local time components to avoid UTC shift for non-UTC timezones
+  const localDateStr = parsedDate
+    ? `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-${String(parsedDate.getDate()).padStart(2, '0')}`
+    : dateStr
+
   const transaction: ProcessedTransaction = {
     id,
-    date: parsedDate ? parsedDate.toISOString().split('T')[0] : dateStr,
+    date: localDateStr,
     description: cleanedDescription.trim(),
     amount,
     category,
