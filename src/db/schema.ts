@@ -768,6 +768,10 @@ export const notificationPreferences = pgTable('notification_preferences', {
   
   // Email Preferences
   preferredEmail: text('preferred_email'),
+
+  // Instagram DM Notifications
+  telegramNotificationsEnabled: boolean('telegram_notifications_enabled').default(false).notNull(),
+  telegramChatId: text('telegram_chat_id'), // Telegram Chat ID
   
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

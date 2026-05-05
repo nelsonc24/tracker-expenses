@@ -3,6 +3,7 @@ import { db } from '@/db'
 import { bills, debts, notificationPreferences } from '@/db/schema'
 import { and, eq, gte, lte, isNotNull } from 'drizzle-orm'
 import { sendBillReminderEmail, sendDebtReminderEmail, wasNotificationSentRecently } from '@/lib/notifications/email-service'
+import { sendTelegramBillReminder, sendTelegramDebtReminder } from '@/lib/notifications/telegram-service'
 import { format } from 'date-fns'
 
 /**
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
           )
 
           if (!alreadySent) {
-            const result = await sendBillReminderEmail({
+            const billPayload = {
               userId: bill.userId,
               billId: bill.id,
               billName: bill.name,
@@ -89,13 +90,21 @@ export async function GET(request: NextRequest) {
               dueDate: format(dueDate, 'MMM dd, yyyy'),
               daysUntilDue,
               isAutoPay: bill.isAutoPay,
-            })
+            }
+
+            const result = await sendBillReminderEmail(billPayload)
 
             if (result.success) {
               results.billsNotified++
               console.log(`Sent bill reminder for ${bill.name} to user ${bill.userId}`)
             } else {
               results.errors.push(`Failed to send bill reminder for ${bill.name}: ${result.error}`)
+            }
+
+            // Also send via Telegram if enabled
+            const tgResult = await sendTelegramBillReminder(billPayload)
+            if (!tgResult.success && tgResult.error !== 'Telegram notifications not configured or disabled') {
+              results.errors.push(`Telegram bill reminder failed for ${bill.name}: ${tgResult.error}`)
             }
           } else {
             console.log(`Skipping bill ${bill.name} - notification already sent recently`)
@@ -154,7 +163,7 @@ export async function GET(request: NextRequest) {
           )
 
           if (!alreadySent) {
-            const result = await sendDebtReminderEmail({
+            const debtPayload = {
               userId: debt.userId,
               debtId: debt.id,
               debtName: debt.name,
@@ -163,13 +172,21 @@ export async function GET(request: NextRequest) {
               currentBalance: `$${parseFloat(debt.currentBalance).toFixed(2)}`,
               dueDate: format(dueDate, 'MMM dd, yyyy'),
               daysUntilDue,
-            })
+            }
+
+            const result = await sendDebtReminderEmail(debtPayload)
 
             if (result.success) {
               results.debtsNotified++
               console.log(`Sent debt reminder for ${debt.name} to user ${debt.userId}`)
             } else {
               results.errors.push(`Failed to send debt reminder for ${debt.name}: ${result.error}`)
+            }
+
+            // Also send via Telegram if enabled
+            const tgResult = await sendTelegramDebtReminder(debtPayload)
+            if (!tgResult.success && tgResult.error !== 'Telegram notifications not configured or disabled') {
+              results.errors.push(`Telegram debt reminder failed for ${debt.name}: ${tgResult.error}`)
             }
           } else {
             console.log(`Skipping debt ${debt.name} - notification already sent recently`)

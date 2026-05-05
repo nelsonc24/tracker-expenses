@@ -21,6 +21,9 @@ const updatePreferencesSchema = z.object({
   quietHoursStart: z.string().optional(),
   quietHoursEnd: z.string().optional(),
   preferredEmail: z.string().email().optional(),
+  // Telegram notifications
+  telegramNotificationsEnabled: z.boolean().optional(),
+  telegramChatId: z.string().max(64).optional().nullable(),
 })
 
 // GET /api/notifications/preferences - Get user notification preferences

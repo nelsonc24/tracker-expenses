@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Bell, Mail, Smartphone } from 'lucide-react'
+import { Bell, Mail, Send, Smartphone } from 'lucide-react'
 
 interface NotificationPreferences {
   id: string
@@ -28,6 +28,8 @@ interface NotificationPreferences {
   quietHoursStart: string | null
   quietHoursEnd: string | null
   preferredEmail: string | null
+  telegramNotificationsEnabled: boolean
+  telegramChatId: string | null
 }
 
 export function NotificationSettings() {
@@ -170,6 +172,64 @@ export function NotificationSettings() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Telegram Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            Telegram Notifications
+          </CardTitle>
+          <CardDescription>
+            Receive payment, bill, and subscription alerts as Telegram messages
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Enable Telegram Notifications</Label>
+              <p className="text-sm text-muted-foreground">
+                Send reminders via Telegram
+              </p>
+            </div>
+            <Switch
+              checked={preferences.telegramNotificationsEnabled}
+              onCheckedChange={(checked) =>
+                updatePreference('telegramNotificationsEnabled', checked)
+              }
+            />
+          </div>
+
+          {preferences.telegramNotificationsEnabled && (
+            <div className="space-y-2">
+              <Label htmlFor="telegramChatId">Your Telegram Chat ID</Label>
+              <Input
+                id="telegramChatId"
+                placeholder="e.g. 123456789"
+                value={preferences.telegramChatId || ''}
+                onChange={(e) =>
+                  updatePreference('telegramChatId', e.target.value || null)
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                To find your Chat ID: message <code className="rounded bg-muted px-1">@userinfobot</code> on Telegram,
+                or start a chat with the expense tracker bot and forward a message to{' '}
+                <code className="rounded bg-muted px-1">@getidsbot</code>.
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm dark:border-blue-800 dark:bg-blue-950">
+            <p className="font-medium text-blue-800 dark:text-blue-200">Setup required</p>
+            <p className="mt-1 text-blue-700 dark:text-blue-300">
+              Telegram notifications require a Telegram Bot created via{' '}
+              <code className="rounded bg-blue-100 px-1 dark:bg-blue-900">@BotFather</code> and the{' '}
+              <code className="rounded bg-blue-100 px-1 dark:bg-blue-900">TELEGRAM_BOT_TOKEN</code>
+              {' '}environment variable set on the server. Start a chat with the bot before enabling.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
