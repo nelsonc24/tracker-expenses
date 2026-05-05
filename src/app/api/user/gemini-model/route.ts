@@ -3,14 +3,8 @@ import { db } from '@/db'
 import { users } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 
-const ALLOWED_MODELS = [
-  // Gemini 2.5 (stable)
-  'gemini-2.5-pro',
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
-  // Gemini 2.0 (stable)
-  'gemini-2.0-flash',
-]
+// Validates any Gemini model ID: lowercase alphanumeric with hyphens and dots, 3–100 chars
+const GEMINI_MODEL_PATTERN = /^[a-z0-9][a-z0-9._-]{2,99}$/
 
 /**
  * GET /api/user/gemini-model
@@ -46,7 +40,7 @@ export async function POST(req: Request) {
   }
 
   const { model } = body
-  if (!model || typeof model !== 'string' || !ALLOWED_MODELS.includes(model)) {
+  if (!model || typeof model !== 'string' || !GEMINI_MODEL_PATTERN.test(model)) {
     return Response.json({ error: 'Invalid model' }, { status: 400 })
   }
 

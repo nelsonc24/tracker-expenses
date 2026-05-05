@@ -100,16 +100,14 @@ export default function SettingsPage() {
   // AI model selection
   const [geminiModel, setGeminiModel] = useState('gemini-2.5-flash')
   const [geminiModelSaving, setGeminiModelSaving] = useState(false)
+  const [customModelInput, setCustomModelInput] = useState('')
 
   const GEMINI_MODELS = [
-    // Stable
-    { value: 'gemini-2.5-pro',              label: 'Gemini 2.5 Pro',              description: 'Most advanced, stable' },
-    { value: 'gemini-2.5-flash',            label: 'Gemini 2.5 Flash',            description: 'Best price-performance — recommended' },
-    { value: 'gemini-2.5-flash-lite',       label: 'Gemini 2.5 Flash-Lite',       description: 'Fastest & cheapest, stable' },
-    // Preview
-    { value: 'gemini-3.1-pro-preview',      label: 'Gemini 3.1 Pro (Preview)',    description: 'Advanced intelligence, agentic' },
-    { value: 'gemini-3-flash-preview',      label: 'Gemini 3 Flash (Preview)',    description: 'Frontier-class, fast' },
-    { value: 'gemini-3.1-flash-lite-preview', label: 'Gemini 3.1 Flash-Lite (Preview)', description: 'Lightweight preview' },
+    { value: 'gemini-2.5-pro',        label: 'Gemini 2.5 Pro',        description: 'Most capable, stable' },
+    { value: 'gemini-2.5-flash',      label: 'Gemini 2.5 Flash',      description: 'Best price-performance — recommended' },
+    { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite', description: 'Fastest & cheapest, stable' },
+    { value: 'gemini-2.0-flash',      label: 'Gemini 2.0 Flash',      description: 'Stable previous generation' },
+    { value: 'custom',                label: 'Custom…',                description: 'Enter a model ID manually' },
   ]
 
   useEffect(() => {
@@ -122,12 +120,40 @@ export default function SettingsPage() {
       .catch(() => {})
     fetch('/api/user/gemini-model')
       .then(r => r.json())
-      .then((data: { model: string }) => setGeminiModel(data.model))
+      .then((data: { model: string }) => {
+        const knownModels = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash']
+        if (knownModels.includes(data.model)) {
+          setGeminiModel(data.model)
+        } else {
+          setGeminiModel('custom')
+          setCustomModelInput(data.model)
+        }
+      })
       .catch(() => {})
   }, [])
 
   const handleSaveGeminiModel = async (model: string) => {
     setGeminiModel(model)
+    if (model === 'custom') return // wait for user to fill in the custom input
+    setGeminiModelSaving(true)
+    try {
+      const res = await fetch('/api/user/gemini-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      toast.success('Model preference saved')
+    } catch {
+      toast.error('Failed to save model preference')
+    } finally {
+      setGeminiModelSaving(false)
+    }
+  }
+
+  const handleSaveCustomModel = async () => {
+    const model = customModelInput.trim()
+    if (!model) return
     setGeminiModelSaving(true)
     try {
       const res = await fetch('/api/user/gemini-model', {
@@ -808,7 +834,11 @@ export default function SettingsPage() {
                 <Label className="text-sm font-medium">Gemini Model</Label>
                 <Select value={geminiModel} onValueChange={handleSaveGeminiModel} disabled={geminiModelSaving}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a model" />
+                    <SelectValue placeholder="Select a model">
+                      {geminiModel === 'custom' && customModelInput
+                        ? <span className="font-mono text-sm">{customModelInput}</span>
+                        : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {GEMINI_MODELS.map(m => (
@@ -819,8 +849,33 @@ export default function SettingsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {geminiModel === 'custom' && (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="e.g. gemini-2.5-pro-preview-05-06"
+                      value={customModelInput}
+                      onChange={e => setCustomModelInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveCustomModel() }}
+                      className="font-mono text-sm"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                    <Button
+                      onClick={handleSaveCustomModel}
+                      disabled={!customModelInput.trim() || geminiModelSaving}
+                      className="shrink-0"
+                    >
+                      {geminiModelSaving
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : 'Save'}
+                    </Button>
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Choose the Gemini model to use for the AI assistant. If a model isn&apos;t available on your API key, try a different one.
+                  {geminiModel === 'custom'
+                    ? <>Enter any Gemini model ID from <a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:opacity-80">Google AI Studio</a>.</>  
+                    : <>Choose the Gemini model for the AI assistant. If a model isn&apos;t available on your key, try another.</>}
                   {geminiModelSaving && <span className="ml-1 italic">Saving…</span>}
                 </p>
               </div>
