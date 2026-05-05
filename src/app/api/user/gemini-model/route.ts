@@ -8,10 +8,8 @@ const ALLOWED_MODELS = [
   'gemini-2.5-pro',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
-  // Gemini 3 (preview)
-  'gemini-3.1-pro-preview',
-  'gemini-3-flash-preview',
-  'gemini-3.1-flash-lite-preview',
+  // Gemini 2.0 (stable)
+  'gemini-2.0-flash',
 ]
 
 /**

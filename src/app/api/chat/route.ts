@@ -12,10 +12,11 @@ import {
   getDebtsSummary,
   getUserAccountsWithBalance,
   getCurrentUser,
+  getRecurringTransactionsSummary,
 } from '@/lib/db-utils'
 import { db } from '@/db'
-import { goals, categories as categoriesTable } from '@/db/schema'
-import { eq, and, desc } from 'drizzle-orm'
+import { goals, categories as categoriesTable, transactions as transactionsTable } from '@/db/schema'
+import { eq, and, desc, sql, count, gte, lte } from 'drizzle-orm'
 import { subDays, subMonths, startOfMonth, endOfMonth, startOfYear, format } from 'date-fns'
 
 export const maxDuration = 60
@@ -43,6 +44,37 @@ function parseDateRange(period: string): { startDate: Date; endDate: Date } {
       return { startDate: startOfYear(now), endDate: now }
     default:
       return { startDate: subDays(now, 30), endDate: now }
+  }
+}
+
+function getPreviousPeriodRange(period: string): { startDate: Date; endDate: Date; label: string } {
+  const now = new Date()
+  switch (period) {
+    case '7d':
+      return { startDate: subDays(now, 14), endDate: subDays(now, 7), label: 'Previous 7 days' }
+    case '30d':
+      return { startDate: subDays(now, 60), endDate: subDays(now, 30), label: 'Previous 30 days' }
+    case '3m':
+      return { startDate: subMonths(now, 6), endDate: subMonths(now, 3), label: 'Previous 3 months' }
+    case '6m':
+      return { startDate: subMonths(now, 12), endDate: subMonths(now, 6), label: 'Previous 6 months' }
+    case '1y':
+      return { startDate: subMonths(now, 24), endDate: subMonths(now, 12), label: 'Previous year' }
+    case 'this_month': {
+      const lastMonth = subMonths(now, 1)
+      return { startDate: startOfMonth(lastMonth), endDate: endOfMonth(lastMonth), label: format(lastMonth, 'MMMM yyyy') }
+    }
+    case 'last_month': {
+      const twoMonthsAgo = subMonths(now, 2)
+      return { startDate: startOfMonth(twoMonthsAgo), endDate: endOfMonth(twoMonthsAgo), label: format(twoMonthsAgo, 'MMMM yyyy') }
+    }
+    case 'ytd': {
+      const lastYearStart = new Date(now.getFullYear() - 1, 0, 1)
+      const lastYearSameDay = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+      return { startDate: lastYearStart, endDate: lastYearSameDay, label: `YTD ${now.getFullYear() - 1}` }
+    }
+    default:
+      return { startDate: subDays(now, 60), endDate: subDays(now, 30), label: 'Previous 30 days' }
   }
 }
 
@@ -90,26 +122,46 @@ export async function POST(req: Request) {
     model: googleClient(geminiModel),
     system: `You are a smart, friendly personal finance assistant for a budgeting and expense tracking app called ExpenseTracker.
 The user's preferred currency is ${currency}.
+Today is ${format(new Date(), 'EEEE, d MMMM yyyy')}.
 
 Your role:
 - Answer questions about the user's spending, income, budgets, debts, goals, and accounts
-- Provide actionable financial insights and suggestions
-- Help the user understand their financial health
-- Be concise, friendly, and data-driven
+- Identify spending trends, anomalies, and savings opportunities
+- Provide concise, data-driven, actionable insights — not generic advice
 
-Guidelines:
-- Always use the available tools to fetch live data before answering financial questions
-- Format currency values using ${currency} (e.g. "$1,234.56")
-- When showing lists, keep them brief (top 5 max unless asked for more)
-- If the user asks about a specific period, use the matching period key: 7d, 30d, 3m, 6m, 1y, this_month, last_month, ytd
-- Default to "this_month" for general spending questions unless the user specifies otherwise
-- When asked about a specific category (e.g. "utilities", "groceries", "rent"), ALWAYS call listCategories first to find the exact category name, then call getCategoryBreakdown with the categorySearch param
-- Proactively highlight anomalies, overspending, or savings opportunities
-- Do NOT make up data — always fetch it using tools
-- Today is ${format(new Date(), 'EEEE, d MMMM yyyy')}`,
+Data rules:
+- ALWAYS fetch live data with tools before answering — never invent numbers
+- When showing lists, show top 5 unless the user asks for more
+- Default to "this_month" for general spending questions unless specified
+
+Period keys: 7d, 30d, 3m, 6m, 1y, this_month, last_month, ytd
+
+Tool selection guide:
+- General financial summary → getTransactionSummary (also returns savings rate)
+- Category breakdown → getCategoryBreakdown (call listCategories first when looking for a specific category)
+- Month-over-month or trend comparison → getSpendingTrends
+- Top shops/merchants → getTopMerchants
+- Budget tracking → getBudgetStatus (includes projected end-of-period spending)
+- Savings goals → getGoalsSummary (includes monthly savings required)
+- Debt overview → getDebtSummary
+- Account balances/net worth → getAccountsSummary
+- Recurring bills/subscriptions → getRecurringExpenses
+- Recent or specific transactions → getRecentTransactions
+
+Proactive insights to offer:
+- Savings rate = (income − expenses) / income × 100. Flag if ≥ 20% (healthy) or < 10% (needs attention)
+- Flag overspent budgets and categories tracking high vs last month
+- Highlight goal progress — especially ones close to completion or falling behind
+- Point out large single transactions or merchants that dominate spending
+
+Format guidelines:
+- Use ${currency} for all monetary values (e.g. $1,234.56)
+- Bold key figures using **markdown**
+- Use bullet points for lists, tables for comparisons
+- Keep responses focused — lead with the most important insight`,
 
     messages: modelMessages,
-    stopWhen: stepCountIs(8),
+    stopWhen: stepCountIs(10),
 
     tools: {
       getTransactionSummary: tool({
@@ -123,11 +175,16 @@ Guidelines:
         execute: async ({ period }) => {
           const { startDate, endDate } = parseDateRange(period)
           const summary = await getTransactionSummary(userId, startDate, endDate)
+          const savingsRate =
+            summary.totalIncome > 0
+              ? parseFloat(((summary.netAmount / summary.totalIncome) * 100).toFixed(1))
+              : null
           return {
             period,
             startDate: format(startDate, 'dd MMM yyyy'),
             endDate: format(endDate, 'dd MMM yyyy'),
             ...summary,
+            savingsRate: savingsRate !== null ? savingsRate + '%' : 'N/A',
           }
         },
       }),
@@ -245,6 +302,14 @@ Guidelines:
               const allocated = parseFloat(budget.amount)
               const remaining = allocated - spent
               const percentUsed = allocated > 0 ? ((spent / allocated) * 100).toFixed(1) : '0'
+              // Project end-of-period spending based on daily run rate
+              const msPerDay = 86_400_000
+              const daysTotal = Math.max(1, Math.round((periodEnd.getTime() - periodStart.getTime()) / msPerDay))
+              const daysElapsed = Math.max(1, Math.round((now.getTime() - periodStart.getTime()) / msPerDay))
+              const dailyRate = spent / daysElapsed
+              const projectedTotal = parseFloat((dailyRate * daysTotal).toFixed(2))
+              const projectedStatus =
+                projectedTotal > allocated * 1.1 ? 'will_exceed' : projectedTotal > allocated ? 'at_risk' : 'on_track'
               return {
                 name: budget.name,
                 period: budget.period,
@@ -252,6 +317,10 @@ Guidelines:
                 spent,
                 remaining,
                 percentUsed: percentUsed + '%',
+                daysElapsed,
+                daysTotal,
+                projectedTotal,
+                projectedStatus,
                 status: spent > allocated ? 'over_budget' : spent / allocated >= 0.9 ? 'near_limit' : 'on_track',
               }
             })
@@ -288,12 +357,20 @@ Guidelines:
             .orderBy(desc(goals.createdAt))
             .limit(20)
 
+          const now = new Date()
           return {
             totalGoals: userGoals.length,
             goals: userGoals.map((g) => {
               const current = parseFloat(g.currentAmount ?? '0')
               const target = parseFloat(g.targetAmount)
               const progress = target > 0 ? ((current / target) * 100).toFixed(1) + '%' : '0%'
+              const remaining = Math.max(0, target - current)
+              let monthlyRequired: number | null = null
+              if (g.targetDate && remaining > 0 && g.status === 'active') {
+                const msLeft = new Date(g.targetDate).getTime() - now.getTime()
+                const monthsLeft = Math.max(0, msLeft / (30.44 * 24 * 60 * 60 * 1000))
+                monthlyRequired = monthsLeft > 0 ? parseFloat((remaining / monthsLeft).toFixed(2)) : remaining
+              }
               return {
                 name: g.name,
                 type: g.type,
@@ -302,7 +379,8 @@ Guidelines:
                 progress,
                 status: g.status,
                 targetDate: g.targetDate ? format(new Date(g.targetDate), 'dd MMM yyyy') : null,
-                remaining: Math.max(0, target - current),
+                remaining,
+                monthlyRequired,
               }
             }),
           }
@@ -357,6 +435,137 @@ Guidelines:
               spentThisMonth: spendingMap[c.name.toLowerCase()] ?? 0,
             })),
           }
+        },
+      }),
+
+      getSpendingTrends: tool({
+        description:
+          'Compare spending and income between the current period and the previous equivalent period. Use this when the user asks "how does my spending compare to last month?", "am I spending more than usual?", "show me my spending trends", or for month-over-month analysis.',
+        inputSchema: z.object({
+          period: z
+            .enum(['7d', '30d', '3m', '6m', '1y', 'this_month', 'last_month', 'ytd'])
+            .describe('The current period to analyse. The tool automatically compares it against the prior equivalent period.'),
+        }),
+        execute: async ({ period }) => {
+          const { startDate: currentStart, endDate: currentEnd } = parseDateRange(period)
+          const { startDate: prevStart, endDate: prevEnd, label: prevLabel } = getPreviousPeriodRange(period)
+
+          const [currentSummary, prevSummary, currentCategories, prevCategories] = await Promise.all([
+            getTransactionSummary(userId, currentStart, currentEnd),
+            getTransactionSummary(userId, prevStart, prevEnd),
+            getCategorySpending(userId, currentStart, currentEnd),
+            getCategorySpending(userId, prevStart, prevEnd),
+          ])
+
+          const pct = (curr: number, prev: number) =>
+            prev > 0 ? `${curr >= prev ? '+' : ''}${(((curr - prev) / prev) * 100).toFixed(1)}%` : 'N/A'
+
+          const prevCategoryMap = new Map(
+            prevCategories.map((c) => [c.categoryName?.toLowerCase() ?? '', parseFloat(c.totalAmount ?? '0')])
+          )
+          const categoryComparison = currentCategories.slice(0, 10).map((c) => {
+            const curr = parseFloat(c.totalAmount ?? '0')
+            const prev = prevCategoryMap.get(c.categoryName?.toLowerCase() ?? '') ?? 0
+            return {
+              category: c.categoryName ?? 'Uncategorised',
+              current: curr,
+              previous: prev,
+              change: pct(curr, prev),
+              trend: curr > prev * 1.1 ? 'increasing' : curr < prev * 0.9 ? 'decreasing' : 'stable',
+            }
+          })
+
+          const savingsRateFor = (s: { totalIncome: number; netAmount: number }) =>
+            s.totalIncome > 0 ? parseFloat(((s.netAmount / s.totalIncome) * 100).toFixed(1)) + '%' : 'N/A'
+
+          return {
+            currentPeriod: {
+              label: period === 'this_month' ? format(currentStart, 'MMMM yyyy') : period,
+              startDate: format(currentStart, 'dd MMM yyyy'),
+              endDate: format(currentEnd, 'dd MMM yyyy'),
+              totalIncome: currentSummary.totalIncome,
+              totalExpenses: currentSummary.totalExpenses,
+              netAmount: currentSummary.netAmount,
+              savingsRate: savingsRateFor(currentSummary),
+            },
+            previousPeriod: {
+              label: prevLabel,
+              startDate: format(prevStart, 'dd MMM yyyy'),
+              endDate: format(prevEnd, 'dd MMM yyyy'),
+              totalIncome: prevSummary.totalIncome,
+              totalExpenses: prevSummary.totalExpenses,
+              netAmount: prevSummary.netAmount,
+              savingsRate: savingsRateFor(prevSummary),
+            },
+            changes: {
+              expenses: pct(currentSummary.totalExpenses, prevSummary.totalExpenses),
+              income: pct(currentSummary.totalIncome, prevSummary.totalIncome),
+              netAmountDiff: currentSummary.netAmount - prevSummary.netAmount,
+            },
+            categoryComparison,
+          }
+        },
+      }),
+
+      getTopMerchants: tool({
+        description:
+          'Get the top merchants or places where the user spends money in a given period. Use this when asked "where do I spend most?", "which shops do I visit most?", "what are my biggest purchases?", or "where does my money go?".',
+        inputSchema: z.object({
+          period: z
+            .enum(['7d', '30d', '3m', '6m', '1y', 'this_month', 'last_month', 'ytd'])
+            .describe('The time period to analyse.'),
+          topN: z
+            .number()
+            .int()
+            .min(1)
+            .max(20)
+            .optional()
+            .describe('Number of top merchants to return. Defaults to 10.'),
+        }),
+        execute: async ({ period, topN = 10 }) => {
+          const { startDate, endDate } = parseDateRange(period)
+          const merchants = await db
+            .select({
+              name: sql<string>`COALESCE(NULLIF(${transactionsTable.merchant}, ''), ${transactionsTable.description})`,
+              total: sql<string>`abs(sum(${transactionsTable.amount}))`,
+              visits: count(),
+            })
+            .from(transactionsTable)
+            .where(
+              and(
+                eq(transactionsTable.userId, userId),
+                eq(transactionsTable.type, 'debit'),
+                eq(transactionsTable.isTransfer, false),
+                gte(transactionsTable.transactionDate, startDate),
+                lte(transactionsTable.transactionDate, endDate),
+              )
+            )
+            .groupBy(sql`COALESCE(NULLIF(${transactionsTable.merchant}, ''), ${transactionsTable.description})`)
+            .orderBy(desc(sql`abs(sum(${transactionsTable.amount}))`))
+            .limit(topN)
+
+          const totalSpend = merchants.reduce((s, m) => s + parseFloat(m.total), 0)
+          return {
+            period,
+            startDate: format(startDate, 'dd MMM yyyy'),
+            endDate: format(endDate, 'dd MMM yyyy'),
+            merchants: merchants.map((m) => ({
+              name: m.name,
+              total: parseFloat(m.total),
+              visits: m.visits,
+              shareOfSpend: totalSpend > 0 ? ((parseFloat(m.total) / totalSpend) * 100).toFixed(1) + '%' : '0%',
+              avgPerVisit: m.visits > 0 ? parseFloat((parseFloat(m.total) / m.visits).toFixed(2)) : 0,
+            })),
+          }
+        },
+      }),
+
+      getRecurringExpenses: tool({
+        description:
+          'Get a summary of the user\'s recurring expenses and subscriptions including their monthly cost. Use this when asked about bills, subscriptions, recurring payments, or fixed monthly costs.',
+        inputSchema: z.object({}),
+        execute: async () => {
+          return await getRecurringTransactionsSummary(userId)
         },
       }),
     },

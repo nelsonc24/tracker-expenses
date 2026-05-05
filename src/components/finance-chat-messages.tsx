@@ -8,18 +8,20 @@ import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Bot, Send, User, Loader2, RefreshCw, Wrench } from 'lucide-react'
+import { Bot, Send, User, Loader2, RefreshCw, Wrench, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 const SUGGESTED_PROMPTS = [
   'How much did I spend this month?',
-  "What are my top spending categories?",
+  'How does my spending compare to last month?',
+  'What are my top spending categories?',
+  'Where do I spend the most money?',
   'How are my budgets tracking?',
   "What's my total debt balance?",
   'Show me my savings goals progress',
-  'What were my biggest expenses last month?',
+  'What are my recurring expenses?',
 ]
 
 // One transport instance shared across renders
@@ -31,8 +33,10 @@ interface FinanceChatMessagesProps {
 }
 
 export function FinanceChatMessages({ showSuggestions = true, className }: FinanceChatMessagesProps) {
+  const [chatId, setChatId] = useState(() => `chat-${Date.now()}`)
   const { messages, sendMessage, regenerate, status, error, clearError } = useChat({
     transport: chatTransport,
+    id: chatId,
   })
 
   const [input, setInput] = useState('')
@@ -50,6 +54,11 @@ export function FinanceChatMessages({ showSuggestions = true, className }: Finan
     if (!text || isLoading) return
     setInput('')
     sendMessage({ text })
+  }
+
+  const handleClear = () => {
+    setChatId(`chat-${Date.now()}`)
+    setInput('')
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -254,8 +263,18 @@ export function FinanceChatMessages({ showSuggestions = true, className }: Finan
             onKeyDown={handleKeyDown}
             rows={1}
             className="resize-none min-h-[40px] max-h-[120px] overflow-y-auto"
-          />
-          <Button
+          />          {messages.length > 0 && (
+            <Button
+              onClick={handleClear}
+              size="icon"
+              variant="ghost"
+              className="shrink-0 h-10 w-10 text-muted-foreground hover:text-destructive"
+              title="Clear conversation"
+              disabled={isLoading}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}          <Button
             onClick={handleSend}
             size="icon"
             disabled={!input.trim() || isLoading}
