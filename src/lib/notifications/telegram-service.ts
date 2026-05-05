@@ -167,8 +167,6 @@ export async function sendTelegramBillReminder(
           amount: parseFloat(data.amount),
           dueDate: data.dueDate,
           daysUntilDue: data.daysUntilDue,
-          isAutoPay: data.isAutoPay,
-          channel: 'telegram',
         },
       })
       .returning()
@@ -195,10 +193,6 @@ export async function sendTelegramBillReminder(
       .set({
         status: 'sent',
         sentAt: new Date(),
-        metadata: {
-          ...(notification.metadata as Record<string, unknown>),
-          telegramMessageId: messageId,
-        },
         updatedAt: new Date(),
       })
       .where(eq(notifications.id, notification.id))
@@ -250,12 +244,9 @@ export async function sendTelegramDebtReminder(
         relatedEntityId: data.debtId,
         metadata: {
           debtName: data.debtName,
-          creditorName: data.creditorName,
-          minimumPayment: parseFloat(data.minimumPayment),
-          currentBalance: parseFloat(data.currentBalance),
+          amount: parseFloat(data.currentBalance),
           dueDate: data.dueDate,
           daysUntilDue: data.daysUntilDue,
-          channel: 'telegram',
         },
       })
       .returning()
@@ -282,10 +273,6 @@ export async function sendTelegramDebtReminder(
       .set({
         status: 'sent',
         sentAt: new Date(),
-        metadata: {
-          ...(notification.metadata as Record<string, unknown>),
-          telegramMessageId: messageId,
-        },
         updatedAt: new Date(),
       })
       .where(eq(notifications.id, notification.id))
