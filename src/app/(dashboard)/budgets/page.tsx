@@ -769,26 +769,26 @@ export default function BudgetsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Budgets</h1>
           <p className="text-muted-foreground mt-2">
             Set spending limits and track your progress toward financial goals
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button variant="outline" onClick={fetchData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+            <RefreshCw className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
           <Dialog open={isCreateBudgetOpen} onOpenChange={setIsCreateBudgetOpen}>
             <DialogTrigger asChild>
               <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Budget
+                <Plus className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Create Budget</span>
               </Button>
             </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Budget</DialogTitle>
               <DialogDescription>
@@ -995,7 +995,7 @@ export default function BudgetsPage() {
 
         {/* Edit Budget Dialog */}
         <Dialog open={isEditBudgetOpen} onOpenChange={setIsEditBudgetOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Budget</DialogTitle>
               <DialogDescription>
@@ -1525,7 +1525,7 @@ export default function BudgetsPage() {
 
       {/* View Budget Transactions Dialog */}
       <Dialog open={isViewTransactionsOpen} onOpenChange={setIsViewTransactionsOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <List className="h-5 w-5" />
@@ -1638,7 +1638,7 @@ export default function BudgetsPage() {
 
       {/* View Budget History Dialog */}
       <Dialog open={isViewHistoryOpen} onOpenChange={setIsViewHistoryOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Budget History</DialogTitle>
             <DialogDescription>

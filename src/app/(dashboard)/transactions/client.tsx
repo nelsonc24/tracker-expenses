@@ -1411,11 +1411,11 @@ export function TransactionsPageClient({
               <span className="hidden sm:inline">{isRefreshing ? 'Refreshing…' : 'Refresh'}</span>
             </Button>
             <Button variant="outline" onClick={handleExport} className="flex-1 sm:flex-none">
-              <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              <Download className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Export</span>
             </Button>
             <Button onClick={handleImport} className="flex-1 sm:flex-none">
-              <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              <Upload className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Import</span>
             </Button>
             <Button
@@ -1432,7 +1432,7 @@ export function TransactionsPageClient({
               onClick={() => setIsCreateTransferDialogOpen(true)} 
               className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700"
             >
-              <ArrowLeftRight className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              <ArrowLeftRight className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Transfer</span>
             </Button>
             <Button 
@@ -1440,7 +1440,7 @@ export function TransactionsPageClient({
               onClick={() => setIsLinkTransfersDialogOpen(true)} 
               className="flex-1 sm:flex-none"
             >
-              <ArrowLeftRight className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+              <ArrowLeftRight className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
               <span className="hidden sm:inline">Link</span>
             </Button>
           </div>
