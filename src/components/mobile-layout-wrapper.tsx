@@ -14,7 +14,7 @@ export function MobileLayoutWrapper({ children, className }: MobileLayoutWrapper
   if (isMobile) {
     return (
       <div className={cn(
-        "min-h-screen bg-background w-full max-w-full overflow-x-hidden",
+        "min-h-screen bg-background min-w-0 w-full max-w-full overflow-x-hidden",
         className
       )}>
         {children}

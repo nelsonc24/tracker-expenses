@@ -57,9 +57,10 @@ export function ChartColorSettings() {
       {/* Quick Dropdown Menu */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
+          <Button variant="outline" size="sm" className="gap-1 sm:gap-2 min-h-11 sm:min-h-9 w-full sm:w-auto max-w-full">
             <Palette className="w-4 h-4" />
-            Chart Colors
+            <span className="hidden sm:inline">Chart Colors</span>
+            <span className="sm:hidden">Colors</span>
             <ColorPreview scheme={currentScheme} size="sm" />
           </Button>
         </DropdownMenuTrigger>

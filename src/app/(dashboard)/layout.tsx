@@ -31,9 +31,9 @@ export default async function DashboardLayout({
         {/* Desktop Sidebar */}
         <AppSidebar />
         
-        <main className="flex flex-1 flex-col transition-all duration-300 ease-in-out">
+        <main className="flex flex-1 min-w-0 w-full max-w-full overflow-x-hidden flex-col transition-all duration-300 ease-in-out">
           {/* Mobile Header */}
-          <header className="flex md:hidden h-14 shrink-0 items-center gap-2 border-b px-4 bg-background">
+          <header className="flex md:hidden h-14 shrink-0 w-full items-center gap-2 border-b px-4 bg-background">
             <SidebarTrigger className="-ml-1" />
             <div className="ml-auto flex items-center gap-2">
               <ThemeToggle />
