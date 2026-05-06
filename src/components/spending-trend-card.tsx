@@ -112,14 +112,14 @@ export function SpendingTrendCard({ initialData }: SpendingTrendCardProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-lg">Spending Trend</CardTitle>
             <CardDescription className="text-sm">{getDescription()}</CardDescription>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger className="w-[150px]">
+              <SelectTrigger className="flex-1 sm:w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

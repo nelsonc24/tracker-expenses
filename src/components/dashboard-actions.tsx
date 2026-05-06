@@ -12,10 +12,10 @@ interface DashboardActionsProps {
 
 export function DashboardActions({ accounts, categories }: DashboardActionsProps) {
   return (
-    <>
+    <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:gap-2">
       <ExportDialog 
         trigger={
-          <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm min-h-11 sm:min-h-9 w-full">
             <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
             <span className="hidden sm:inline">Export</span>
             <span className="sm:hidden">Export</span>
@@ -24,13 +24,13 @@ export function DashboardActions({ accounts, categories }: DashboardActionsProps
         accounts={accounts}
         categories={categories}
       />
-      <Link href="/transactions">
-        <Button size="sm" className="text-xs sm:text-sm">
+      <Link href="/transactions" className="w-full sm:w-auto">
+        <Button size="sm" className="text-xs sm:text-sm min-h-11 sm:min-h-9 w-full">
           <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
           <span className="hidden sm:inline">Add Transaction</span>
           <span className="sm:hidden">Add</span>
         </Button>
       </Link>
-    </>
+    </div>
   )
 }

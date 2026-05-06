@@ -146,10 +146,10 @@ export function CategoryBreakdownWithFilter({ initialData }: { initialData?: Cat
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          Category Breakdown
+        <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 font-semibold">
+          <span>Category Breakdown</span>
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40 text-sm font-normal">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

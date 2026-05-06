@@ -137,10 +137,10 @@ export function RecentTransactionsCard({ transactions }: RecentTransactionProps)
         ) : (
           <div className="space-y-3">
             {transactions.slice(0, 5).map((transaction) => (
-              <div key={transaction.id} className="flex items-center justify-between">
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{transaction.description}</p>
-                  <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+              <div key={transaction.id} className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{transaction.description}</p>
+                  <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
                     <Badge variant="outline" className="text-xs">
                       {transaction.category}
                     </Badge>
@@ -150,7 +150,7 @@ export function RecentTransactionsCard({ transactions }: RecentTransactionProps)
                   </div>
                 </div>
                 <div className={cn(
-                  'font-medium',
+                  'font-medium shrink-0 whitespace-nowrap text-sm',
                   transaction.amount < 0 ? 'text-red-500' : 'text-green-500'
                 )}>
                   {transaction.amount < 0 ? '-' : '+'}${Math.abs(transaction.amount).toFixed(2)}
@@ -217,7 +217,7 @@ export function SpendingInsightsCard({ insights }: SpendingInsightsProps) {
         
         {insights.unusualSpending && (
           <div className="flex items-center space-x-2 p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg">
-            <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
             <p className="text-sm text-orange-700 dark:text-orange-300">
               Unusual spending detected this month. Review your transactions.
             </p>

@@ -237,7 +237,7 @@ export default async function DashboardPage() {
   })
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -246,7 +246,7 @@ export default async function DashboardPage() {
             Here&apos;s your financial overview for today
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex w-full sm:w-auto flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <ChartColorSettings />
           <DashboardActions 
             accounts={dashboardData.accounts.map(a => ({
@@ -263,7 +263,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Primary KPI Cards */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <InsightCard
           title="Total Balance"
           value={`$${dashboardData.totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -391,13 +391,13 @@ export default async function DashboardPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 lg:gap-6 lg:grid-cols-2">
             <SpendingTrendCard initialData={dashboardData.trendData} />
 
             <CategoryBreakdownWithFilter initialData={dashboardData.categoryData} />
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-3 sm:gap-4 lg:gap-6 lg:grid-cols-3 [&>*]:min-w-0">
             <BudgetProgressCard initialBudgets={transformedBudgets} />
             <RecentTransactionsCard transactions={transformedTransactions} />
             <SpendingInsightsCard insights={insights} />
@@ -405,7 +405,7 @@ export default async function DashboardPage() {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 lg:gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
