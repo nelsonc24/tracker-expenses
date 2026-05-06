@@ -301,8 +301,8 @@ export function AdvancedSearch({
           className="relative"
           onClick={() => setIsOpen(!isOpen)}
         >
-          <Filter className="h-4 w-4 mr-2" />
-          Advanced
+          <Filter className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Advanced</span>
           {activeFilterCount > 0 && (
             <Badge 
               variant="secondary" 
@@ -315,8 +315,8 @@ export function AdvancedSearch({
         
         {hasActiveFilters && (
           <Button variant="outline" onClick={handleClearFilters}>
-            <X className="h-4 w-4 mr-2" />
-            Clear
+            <X className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Clear</span>
           </Button>
         )}
       </div>
