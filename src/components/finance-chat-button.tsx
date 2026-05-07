@@ -16,7 +16,7 @@ export function FinanceChatButton() {
       */}
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-50 h-12 w-12 rounded-full shadow-lg shadow-primary/20 transition-transform hover:scale-105 active:scale-95 p-0"
+        className="fixed bottom-6 left-4 md:bottom-6 md:right-6 md:left-auto z-50 h-12 w-12 rounded-full shadow-lg shadow-primary/20 transition-transform hover:scale-105 active:scale-95 p-0"
         size="icon"
         aria-label="Open Finance Assistant"
       >

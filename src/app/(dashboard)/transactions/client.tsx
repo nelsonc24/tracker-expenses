@@ -180,6 +180,7 @@ interface TransactionsPageClientProps {
   }>
   loading: boolean
   initialAccountFilter?: string | null
+  initialOpenAdd?: boolean
   onTransactionUpdate: (transaction: any) => void
   onTransactionDelete: (id: string) => void
   onTransactionCreate: (transaction: any) => void
@@ -192,6 +193,7 @@ export function TransactionsPageClient({
   activities: propActivities,
   budgets: propBudgets,
   initialAccountFilter,
+  initialOpenAdd,
   onTransactionUpdate,
   onTransactionDelete,
   onTransactionCreate
@@ -272,7 +274,7 @@ export function TransactionsPageClient({
   const [markAsBillTransaction, setMarkAsBillTransaction] = useState<Transaction | null>(null)
 
   // Add transaction state
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(initialOpenAdd ?? false)
   const [newTransactionForm, setNewTransactionForm] = useState({
     date: new Date().toISOString().split('T')[0],
     description: '',

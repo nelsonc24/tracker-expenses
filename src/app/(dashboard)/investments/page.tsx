@@ -84,7 +84,7 @@ export default function InvestmentsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <p className="text-xl font-bold">{formatCurrency(summary.finalValue)}</p>
+            <p className="text-base sm:text-xl font-bold break-words">{formatCurrency(summary.finalValue)}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Nominal (base rate)</p>
           </CardContent>
         </Card>
@@ -97,7 +97,7 @@ export default function InvestmentsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <p className="text-xl font-bold text-green-600 dark:text-green-400">
+            <p className="text-base sm:text-xl font-bold text-green-600 dark:text-green-400 break-words">
               +{formatCurrency(summary.totalReturns)}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -114,7 +114,7 @@ export default function InvestmentsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
+            <p className="text-base sm:text-xl font-bold text-purple-600 dark:text-purple-400 break-words">
               {formatCurrency(summary.realFinalValue)}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">After inflation</p>
@@ -129,7 +129,7 @@ export default function InvestmentsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
-            <p className="text-xl font-bold">{formatCurrency(summary.afterTaxValue)}</p>
+            <p className="text-base sm:text-xl font-bold break-words">{formatCurrency(summary.afterTaxValue)}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Net of CGT on gains</p>
           </CardContent>
         </Card>

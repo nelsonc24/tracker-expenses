@@ -60,6 +60,7 @@ interface Budget {
 export default function TransactionsPage() {
   const searchParams = useSearchParams()
   const accountFilter = searchParams.get('account')
+  const actionOpenAdd = searchParams.get('action') === 'add'
   
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -183,6 +184,7 @@ export default function TransactionsPage() {
       budgets={budgets}
       loading={loading}
       initialAccountFilter={accountFilter}
+      initialOpenAdd={actionOpenAdd}
       onTransactionUpdate={handleTransactionUpdate}
       onTransactionDelete={handleTransactionDelete}
       onTransactionCreate={handleTransactionCreate}
