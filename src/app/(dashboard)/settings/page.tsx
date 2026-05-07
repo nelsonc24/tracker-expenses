@@ -250,13 +250,13 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4 sm:space-y-6">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
-          <TabsTrigger value="general" className="text-xs sm:text-sm">General</TabsTrigger>
-          <TabsTrigger value="notifications" className="text-xs sm:text-sm">Notify</TabsTrigger>
-          <TabsTrigger value="categories" className="text-xs sm:text-sm">Categories</TabsTrigger>
-          <TabsTrigger value="security" className="text-xs sm:text-sm hidden sm:block">Security</TabsTrigger>
-          <TabsTrigger value="data" className="text-xs sm:text-sm">Data</TabsTrigger>
-          <TabsTrigger value="ai" className="text-xs sm:text-sm">AI</TabsTrigger>
+        <TabsList className="flex w-full overflow-x-auto [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-6">
+          <TabsTrigger value="general" className="shrink-0 text-xs sm:text-sm">General</TabsTrigger>
+          <TabsTrigger value="notifications" className="shrink-0 text-xs sm:text-sm">Notify</TabsTrigger>
+          <TabsTrigger value="categories" className="shrink-0 text-xs sm:text-sm">Categories</TabsTrigger>
+          <TabsTrigger value="security" className="shrink-0 text-xs sm:text-sm hidden sm:block">Security</TabsTrigger>
+          <TabsTrigger value="data" className="shrink-0 text-xs sm:text-sm">Data</TabsTrigger>
+          <TabsTrigger value="ai" className="shrink-0 text-xs sm:text-sm">AI</TabsTrigger>
         </TabsList>
 
         {/* General Settings */}
@@ -519,14 +519,14 @@ export default function SettingsPage() {
         <TabsContent value="categories" className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle>Transaction Categories</CardTitle>
                   <CardDescription>
                     Manage categories for organizing your transactions
                   </CardDescription>
                 </div>
-                <Button>
+                <Button className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Category
                 </Button>
