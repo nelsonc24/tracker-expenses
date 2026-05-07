@@ -40,11 +40,11 @@ export function InsightCard({
   const cardContent = (
     <>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xs sm:text-sm font-medium truncate">{title}</CardTitle>
+        <CardTitle className="text-xs sm:text-sm font-medium leading-tight line-clamp-2">{title}</CardTitle>
         {icon}
       </CardHeader>
       <CardContent className="pb-3 flex-1 flex flex-col justify-between">
-        <div className="text-lg sm:text-2xl font-bold break-all mb-2">{value}</div>
+        <div className="text-lg sm:text-2xl font-bold break-words mb-2">{value}</div>
         <div className="space-y-1">
           {change && (
             <div className="flex items-center space-x-1 sm:space-x-2 text-xs">

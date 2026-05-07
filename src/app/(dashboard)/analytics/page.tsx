@@ -222,7 +222,7 @@ export default function AnalyticsPage() {
         </div>
         <div className="flex items-center space-x-2">
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-24 sm:w-32">
+            <SelectTrigger className="w-32 sm:w-36">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
