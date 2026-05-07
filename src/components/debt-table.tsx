@@ -459,8 +459,8 @@ export function DebtTable({ debts, onDelete, onEdit, onLogPayment, onViewPayment
                     className="flex-1"
                     onClick={() => onLogPayment?.(debt)}
                   >
-                    <DollarSign className="mr-1 h-3 w-3" />
-                    Log Payment
+                    <DollarSign className="sm:mr-1 h-3 w-3" />
+                    <span className="hidden sm:inline">Log Payment</span>
                   </Button>
                   <Button
                     variant="outline"
@@ -468,8 +468,8 @@ export function DebtTable({ debts, onDelete, onEdit, onLogPayment, onViewPayment
                     className="flex-1"
                     onClick={() => onViewPayments?.(debt)}
                   >
-                    <History className="mr-1 h-3 w-3" />
-                    View
+                    <History className="sm:mr-1 h-3 w-3" />
+                    <span className="hidden sm:inline">View</span>
                   </Button>
                   <Button
                     variant="outline"
@@ -477,8 +477,8 @@ export function DebtTable({ debts, onDelete, onEdit, onLogPayment, onViewPayment
                     className="flex-1"
                     onClick={() => onEdit?.(debt)}
                   >
-                    <Pencil className="mr-1 h-3 w-3" />
-                    Edit
+                    <Pencil className="sm:mr-1 h-3 w-3" />
+                    <span className="hidden sm:inline">Edit</span>
                   </Button>
                 </div>
               </CardContent>
