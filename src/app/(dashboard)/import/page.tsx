@@ -423,7 +423,8 @@ export default function ImportPage() {
           reference: transaction.reference || transaction.merchant,
           balance: transaction.balance || null,
           transactionId: transaction.transactionId || null,
-          receiptNumber: transaction.receiptNumber || null
+          receiptNumber: transaction.receiptNumber || null,
+          isTransfer: transaction.isTransfer === true
         }))
 
       const response = await fetch('/api/transactions/import', {

@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import { db } from '@/db'
 import { transactions as transactionsTable, accounts as accountsTable, categories as categoriesTable } from '@/db/schema'
 import { eq, and } from 'drizzle-orm'
+import { isTransferTransaction } from '@/lib/csv-processing'
 
 // Types for transaction processing
 interface TransactionData {
@@ -120,6 +121,11 @@ export async function POST(request: NextRequest) {
           ? (categoryNameToId.get(tx.category.toLowerCase()) ?? defaultCategory.id)
           : defaultCategory.id
 
+        const detectedTransfer = isTransferTransaction(
+          tx.description || '',
+          tx.reference || ''
+        )
+
         newTransactions.push({
           id: crypto.randomUUID(),
           userId,
@@ -133,7 +139,7 @@ export async function POST(request: NextRequest) {
           transactionDate: new Date(tx.date),
           type: amount < 0 ? 'debit' : 'credit',
           status: 'cleared',
-          isTransfer: tx.isTransfer || false, // Save the transfer flag from CSV processing
+          isTransfer: tx.isTransfer === true || detectedTransfer,
           duplicateCheckHash: transactionHash,
           originalData: tx,
           createdAt: new Date(),

@@ -629,8 +629,10 @@ export function generateUpdateSummary(updates: ExistingTransactionUpdate[]): Upd
 }
 
 // Detect if a transaction is a transfer between accounts
-export function isTransferTransaction(description: string): boolean {
+export function isTransferTransaction(description: string, reference?: string): boolean {
   const desc = description.toLowerCase()
+  const ref = (reference || '').toLowerCase()
+  const searchText = `${desc} ${ref}`
   
   // Common transfer patterns in bank statements
   const transferPatterns = [
@@ -644,9 +646,10 @@ export function isTransferTransaction(description: string): boolean {
     /account transfer/i,                 // "Account Transfer"
     /transfer - .* to .*/i,              // "Transfer - Account A to Account B"
     /own account transfer/i,             // "Own Account Transfer"
+    /\btransfer\b/i,                    // Generic fallback: "transfer"
   ]
   
-  return transferPatterns.some(pattern => pattern.test(desc))
+  return transferPatterns.some(pattern => pattern.test(searchText))
 }
 
 // Detect if a transaction is likely a recurring bill
@@ -767,12 +770,19 @@ export function validateTransactionRow(
     }
   }
   
+  // Extract optional reference for transfer detection and import payload
+  const rawReference =
+    (rowData as Record<string, string>).reference ||
+    (rowData as Record<string, string>).Reference ||
+    ''
+  const cleanedReference = rawReference.replace(/^["']|["']$/g, '').trim()
+
   // Extract merchant and categorize
   const merchant = extractMerchant(cleanedDescription)
   const category = categorizeTransaction(cleanedDescription, merchant, amount)
   
   // Detect if this is a transfer transaction
-  const isTransfer = isTransferTransaction(cleanedDescription)
+  const isTransfer = isTransferTransaction(cleanedDescription, cleanedReference)
   
   // Detect if this looks like a recurring bill (only for expenses/debits)
   const suggestedAsBill = amount < 0 && !isTransfer
@@ -807,7 +817,7 @@ export function validateTransactionRow(
     category,
     account: 'Imported Account', // Default, can be customized
     merchant,
-    reference: (rowData as Record<string, string>).reference || (rowData as Record<string, string>).Reference || '',
+    reference: cleanedReference,
     transactionId: cleanedTransactionId || undefined,
     receiptNumber: cleanedReceiptNumber || undefined,
     balance,
