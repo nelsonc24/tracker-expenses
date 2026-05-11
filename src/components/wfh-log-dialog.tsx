@@ -23,6 +23,7 @@ const FY_END = new Date('2026-06-30')
 const FY_START_STR = '2025-07-01'
 const FY_END_STR = '2026-06-30'
 
+// JS Date.getDay(): 0=Sun, 1=Mon, ..., 6=Sat
 const WEEKDAYS = [
   { key: 1, label: 'Mon' },
   { key: 2, label: 'Tue' },
@@ -34,7 +35,10 @@ const WEEKDAYS = [
 ]
 
 function toDateStr(d: Date): string {
-  return d.toISOString().split('T')[0]
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function getDatesBetween(start: string, end: string, allowedDays: Set<number>): string[] {
@@ -42,7 +46,12 @@ function getDatesBetween(start: string, end: string, allowedDays: Set<number>): 
   const result: string[] = []
   const cur = new Date(start + 'T00:00:00')
   const last = new Date(end + 'T00:00:00')
+  // Debug: log allowedDays and weekday for each date
+  // Remove or comment out after confirming fix
+  // console.log('Allowed days:', Array.from(allowedDays));
   while (cur <= last) {
+    // Debug: log current date and day
+    // console.log('Checking', toDateStr(cur), 'weekday', cur.getDay())
     if (allowedDays.has(cur.getDay())) {
       result.push(toDateStr(cur))
     }
@@ -132,6 +141,8 @@ export function WfhLogDialog({
       } else {
         next.add(key)
       }
+      // Debug: log the updated allowedDayKeys
+      // console.log('Toggled day', key, 'allowedDayKeys now:', Array.from(next))
       return next
     })
   }
