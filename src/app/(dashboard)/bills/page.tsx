@@ -667,20 +667,20 @@ export default function BillsPage() {
                                 <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">In {daysFrom} days</Badge>
                               )}
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
                               {group.items.map(item => (
                                 <button
                                   key={`${item.bill.id}-${format(item.dueDate, 'yyyyMMdd')}`}
                                   onClick={() => setEditingBill(item.bill)}
-                                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors hover:bg-muted/60 group ${
+                                  className={`w-full sm:w-auto flex items-center gap-2 px-3 py-2 rounded-lg border text-left transition-colors hover:bg-muted/60 group ${
                                     isPast ? 'opacity-50 bg-muted/20' : 'bg-card hover:border-primary/40'
                                   }`}
                                 >
-                                  <div className="min-w-0">
+                                  <div className="min-w-0 flex-1">
                                     <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">
                                       {item.bill.name}
                                     </div>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                                       <span className="text-sm font-semibold">{fmtCurrency(parseFloat(item.bill.amount))}</span>
                                       <Badge className={`text-xs py-0 ${FREQUENCY_BG[item.bill.frequency] ?? 'bg-gray-100 text-gray-800'}`}>
                                         {item.bill.frequency}
