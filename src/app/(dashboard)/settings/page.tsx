@@ -65,6 +65,8 @@ const colorOptions = [
 export default function SettingsPage() {
   const { user, isLoaded } = useUser()
   const [selectedTab, setSelectedTab] = useState('general')
+  const [notificationsLoading, setNotificationsLoading] = useState(true)
+  const [notificationsSaving, setNotificationsSaving] = useState(false)
   const [notifications, setNotifications] = useState({
     budgetAlerts: true,
     transactionAlerts: false,
@@ -131,6 +133,76 @@ export default function SettingsPage() {
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    const loadNotificationPreferences = async () => {
+      try {
+        const response = await fetch('/api/notifications/preferences')
+        if (!response.ok) {
+          throw new Error('Failed to load notification preferences')
+        }
+
+        const prefs = await response.json()
+        setNotifications((prev) => ({
+          ...prev,
+          budgetAlerts: !!prefs.budgetAlertsEnabled,
+          emailNotifications: !!prefs.emailNotificationsEnabled,
+          pushNotifications: !!prefs.pushNotificationsEnabled,
+          // Weekly/Monthly report controls are mapped to digest frequency.
+          weeklyReports: prefs.digestFrequency === 'weekly',
+          monthlyReports: prefs.digestFrequency === 'daily',
+          transactionAlerts: !!prefs.transactionAlertsEnabled,
+          unusualSpending: !!prefs.unusualSpendingEnabled,
+        }))
+      } catch (error) {
+        console.error('Failed to load notification preferences:', error)
+      } finally {
+        setNotificationsLoading(false)
+      }
+    }
+
+    loadNotificationPreferences()
+  }, [])
+
+  const handleSaveNotificationPreferences = async () => {
+    setNotificationsSaving(true)
+
+    try {
+      let digestFrequency: 'weekly' | 'daily' | 'never' = 'never'
+      if (notifications.weeklyReports) {
+        digestFrequency = 'weekly'
+      } else if (notifications.monthlyReports) {
+        digestFrequency = 'daily'
+      }
+
+      const response = await fetch('/api/notifications/preferences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          budgetAlertsEnabled: notifications.budgetAlerts,
+          emailNotificationsEnabled: notifications.emailNotifications,
+          pushNotificationsEnabled: notifications.pushNotifications,
+          digestFrequency,
+          transactionAlertsEnabled: notifications.transactionAlerts,
+          unusualSpendingEnabled: notifications.unusualSpending,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to save notification preferences')
+      }
+
+      toast.success('Notification preferences saved')
+    } catch (error) {
+      console.error('Failed to save notification preferences:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to save notification preferences')
+    } finally {
+      setNotificationsSaving(false)
+    }
+  }
 
   const handleSaveGeminiModel = async (model: string) => {
     setGeminiModel(model)
@@ -510,7 +582,10 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
-              <Button>Save Preferences</Button>
+              <Button onClick={handleSaveNotificationPreferences} disabled={notificationsLoading || notificationsSaving}>
+                {notificationsSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Preferences
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

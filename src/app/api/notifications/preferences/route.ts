@@ -24,6 +24,9 @@ const updatePreferencesSchema = z.object({
   // Telegram notifications
   telegramNotificationsEnabled: z.boolean().optional(),
   telegramChatId: z.string().max(64).optional().nullable(),
+  // Transaction & Spending Alerts
+  transactionAlertsEnabled: z.boolean().optional(),
+  unusualSpendingEnabled: z.boolean().optional(),
 })
 
 // GET /api/notifications/preferences - Get user notification preferences

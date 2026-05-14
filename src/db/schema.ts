@@ -769,6 +769,10 @@ export const notificationPreferences = pgTable('notification_preferences', {
   // Email Preferences
   preferredEmail: text('preferred_email'),
 
+  // Transaction & Spending Alerts
+  transactionAlertsEnabled: boolean('transaction_alerts_enabled').default(false).notNull(),
+  unusualSpendingEnabled: boolean('unusual_spending_enabled').default(true).notNull(),
+
   // Instagram DM Notifications
   telegramNotificationsEnabled: boolean('telegram_notifications_enabled').default(false).notNull(),
   telegramChatId: text('telegram_chat_id'), // Telegram Chat ID
