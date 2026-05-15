@@ -75,6 +75,8 @@ export default function SettingsPage() {
     unusualSpending: true,
     emailNotifications: true,
     pushNotifications: false,
+    telegramNotifications: false,
+    telegramChatId: '',
   })
   
   const [preferences, setPreferences] = useState({
@@ -153,6 +155,8 @@ export default function SettingsPage() {
           monthlyReports: prefs.digestFrequency === 'daily',
           transactionAlerts: !!prefs.transactionAlertsEnabled,
           unusualSpending: !!prefs.unusualSpendingEnabled,
+          telegramNotifications: !!prefs.telegramNotificationsEnabled,
+          telegramChatId: prefs.telegramChatId || '',
         }))
       } catch (error) {
         console.error('Failed to load notification preferences:', error)
@@ -187,6 +191,8 @@ export default function SettingsPage() {
           digestFrequency,
           transactionAlertsEnabled: notifications.transactionAlerts,
           unusualSpendingEnabled: notifications.unusualSpending,
+          telegramNotificationsEnabled: notifications.telegramNotifications,
+          telegramChatId: notifications.telegramChatId,
         }),
       })
 
@@ -526,7 +532,35 @@ export default function SettingsPage() {
                   />
                 </div>
 
+
                 <Separator />
+
+                {/* Telegram Notifications */}
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Telegram Notifications</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive notifications via Telegram bot
+                    </p>
+                  </div>
+                  <Switch
+                    checked={notifications.telegramNotifications}
+                    onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, telegramNotifications: checked }))}
+                  />
+                </div>
+                {notifications.telegramNotifications && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Label htmlFor="telegramChatId" className="text-sm">Telegram Chat ID</Label>
+                    <Input
+                      id="telegramChatId"
+                      type="text"
+                      placeholder="Enter your Telegram Chat ID"
+                      value={notifications.telegramChatId || ''}
+                      onChange={e => setNotifications(prev => ({ ...prev, telegramChatId: e.target.value }))}
+                      className="max-w-xs"
+                    />
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
