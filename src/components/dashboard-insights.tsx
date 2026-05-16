@@ -9,7 +9,7 @@ import {
   DollarSign,
   Calendar
 } from 'lucide-react'
-import { cn, formatDate } from '@/lib/utils'
+import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import Link from 'next/link'
 
 interface InsightCardProps {
@@ -153,7 +153,7 @@ export function RecentTransactionsCard({ transactions }: RecentTransactionProps)
                   'font-medium shrink-0 whitespace-nowrap text-sm',
                   transaction.amount < 0 ? 'text-red-500' : 'text-green-500'
                 )}>
-                  {transaction.amount < 0 ? '-' : '+'}${Math.abs(transaction.amount).toFixed(2)}
+                  {transaction.amount < 0 ? '-' : '+'}{formatCurrency(Math.abs(transaction.amount))}
                 </div>
               </div>
             ))}
@@ -197,7 +197,7 @@ export function SpendingInsightsCard({ insights }: SpendingInsightsProps) {
           </div>
           <div className="text-center p-3 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground">Daily Average</p>
-            <p className="font-semibold">${insights.avgDailySpend.toFixed(2)}</p>
+            <p className="font-semibold">{formatCurrency(insights.avgDailySpend)}</p>
             <div className="flex items-center justify-center space-x-1 text-sm">
               {insights.monthlyTrend === 'up' ? (
                 <TrendingUp className="h-3 w-3 text-red-500" />

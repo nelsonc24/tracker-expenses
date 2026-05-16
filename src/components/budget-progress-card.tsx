@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Target, PiggyBank, AlertTriangle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 
 interface BudgetData {
   id: string
@@ -125,10 +125,10 @@ export function BudgetProgressCard({ initialBudgets }: BudgetProgressCardProps) 
                       'font-medium',
                       budget.isOverBudget && 'text-red-500'
                     )}>
-                      ${budget.spent.toFixed(2)}
+                      {formatCurrency(budget.spent)}
                     </span>
                     <span className="text-muted-foreground">
-                      {' '}/ ${budget.budget.toFixed(2)}
+                      {' '}/ {formatCurrency(budget.budget)}
                     </span>
                   </div>
                 </div>
@@ -150,14 +150,14 @@ export function BudgetProgressCard({ initialBudgets }: BudgetProgressCardProps) 
                     budget.isOverBudget && 'text-red-500'
                   )}>
                     {budget.isOverBudget ? (
-                      <>Over budget by ${(budget.spent - budget.budget).toFixed(2)}</>
+                      <>Over budget by {formatCurrency(budget.spent - budget.budget)}</>
                     ) : (
-                      <>${budget.remaining.toFixed(2)} remaining</>
+                      <>{formatCurrency(budget.remaining)} remaining</>
                     )}
                   </span>
                   {selectedPeriod !== 'current-month' && (
                     <span className="text-muted-foreground text-[10px]">
-                      {budget.periodType} budget: ${budget.originalBudget}
+                      {budget.periodType} budget: {formatCurrency(budget.originalBudget)}
                     </span>
                   )}
                 </div>
