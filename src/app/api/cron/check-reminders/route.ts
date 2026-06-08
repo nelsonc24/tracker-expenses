@@ -1,15 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/db'
 import { bills, debts, notificationPreferences } from '@/db/schema'
-import { and, eq, gte, lte, isNotNull } from 'drizzle-orm'
+import { and, eq, isNotNull } from 'drizzle-orm'
 import { sendBillReminderEmail, sendDebtReminderEmail, wasNotificationSentRecently } from '@/lib/notifications/email-service'
 import { sendTelegramBillReminder, sendTelegramDebtReminder } from '@/lib/notifications/telegram-service'
-import { format } from 'date-fns'
+import { format, startOfDay, addWeeks, addMonths, addQuarters, addYears, setDate, isAfter } from 'date-fns'
+
+type Bill = typeof bills.$inferSelect
+
+function getNextBillDueDate(bill: Bill, today: Date): Date | null {
+  if (bill.frequency === 'monthly' && bill.dueDay) {
+    let next = startOfDay(setDate(today, bill.dueDay))
+    if (!isAfter(next, today) && next.getTime() !== today.getTime()) {
+      next = addMonths(next, 1)
+    }
+    return next
+  }
+
+  if (!bill.dueDate) return null
+
+  let next = startOfDay(new Date(bill.dueDate))
+  if (next >= today) return next
+
+  // Advance past-due recurring bills to the next occurrence
+  const advanceFn: Record<string, (d: Date) => Date> = {
+    weekly:    d => addWeeks(d, 1),
+    biweekly:  d => addWeeks(d, 2),
+    quarterly: d => addQuarters(d, 1),
+    yearly:    d => addYears(d, 1),
+  }
+  const advance = advanceFn[bill.frequency]
+  if (!advance) return null
+  while (next < today) next = advance(next)
+  return next
+}
 
 /**
  * Cron job to check for upcoming bills and debts and send reminder notifications
  * This endpoint should be called daily via Vercel Cron Jobs
- * 
+ *
  * Security: Protected by CRON_SECRET environment variable
  */
 export async function GET(request: NextRequest) {
@@ -36,30 +65,27 @@ export async function GET(request: NextRequest) {
 
     console.log(`Checking for bills and debts due between ${format(today, 'yyyy-MM-dd')} and ${format(maxDaysAhead, 'yyyy-MM-dd')}`)
 
-    // Get all active bills with upcoming due dates
-    const upcomingBills = await db
+    // Get all active bills — date filtering done in-process to handle recurring bills
+    // whose stored dueDate may be stale (never auto-advanced after the last cycle)
+    const activeBills = await db
       .select()
       .from(bills)
-      .where(
-        and(
-          eq(bills.isActive, true),
-          isNotNull(bills.dueDate),
-          gte(bills.dueDate, today),
-          lte(bills.dueDate, maxDaysAhead)
-        )
-      )
+      .where(eq(bills.isActive, true))
 
-    console.log(`Found ${upcomingBills.length} upcoming bills`)
+    const upcomingBills = activeBills.filter(bill => {
+      const next = getNextBillDueDate(bill, today)
+      return next !== null && next >= today && next <= maxDaysAhead
+    })
+
+    console.log(`Found ${activeBills.length} active bills, ${upcomingBills.length} due within window`)
 
     // Process each bill
     for (const bill of upcomingBills) {
       results.billsProcessed++
 
       try {
-        if (!bill.dueDate) continue
-
-        // Calculate days until due
-        const dueDate = new Date(bill.dueDate)
+        // Calculate days until due using the computed next occurrence
+        const dueDate = getNextBillDueDate(bill, today)!
         const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
         // Get user preferences
@@ -117,20 +143,26 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get all active debts with upcoming due dates
-    const upcomingDebts = await db
+    // Get all active debts — same approach as bills: filter in-process to handle stale nextDueDate
+    const activeDebts = await db
       .select()
       .from(debts)
-      .where(
-        and(
-          eq(debts.status, 'active'),
-          isNotNull(debts.nextDueDate),
-          gte(debts.nextDueDate, today),
-          lte(debts.nextDueDate, maxDaysAhead)
-        )
-      )
+      .where(and(eq(debts.status, 'active'), isNotNull(debts.nextDueDate)))
 
-    console.log(`Found ${upcomingDebts.length} upcoming debts`)
+    const upcomingDebts = activeDebts.filter(debt => {
+      if (!debt.nextDueDate) return false
+      const stored = startOfDay(new Date(debt.nextDueDate))
+      if (stored >= today && stored <= maxDaysAhead) return true
+      // Advance monthly debts with a stale nextDueDate
+      if (debt.paymentFrequency === 'monthly' && debt.paymentDueDay) {
+        let next = startOfDay(setDate(today, debt.paymentDueDay))
+        if (next < today) next = addMonths(next, 1)
+        return next >= today && next <= maxDaysAhead
+      }
+      return false
+    })
+
+    console.log(`Found ${activeDebts.length} active debts, ${upcomingDebts.length} due within window`)
 
     // Process each debt
     for (const debt of upcomingDebts) {
@@ -139,8 +171,12 @@ export async function GET(request: NextRequest) {
       try {
         if (!debt.nextDueDate) continue
 
-        // Calculate days until due
-        const dueDate = new Date(debt.nextDueDate)
+        // Use computed next due date for monthly debts with stale stored date
+        let dueDate = startOfDay(new Date(debt.nextDueDate))
+        if (dueDate < today && debt.paymentFrequency === 'monthly' && debt.paymentDueDay) {
+          dueDate = startOfDay(setDate(today, debt.paymentDueDay))
+          if (dueDate < today) dueDate = addMonths(dueDate, 1)
+        }
         const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 
         // Get user preferences
