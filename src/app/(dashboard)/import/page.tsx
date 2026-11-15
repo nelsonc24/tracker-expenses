@@ -385,7 +385,11 @@ export default function ImportPage() {
         body: JSON.stringify({
           transactions: transactionsToImport,
           uploadId: `upload_${Date.now()}`,
-          accountId: selectedAccountId
+          accountId: selectedAccountId,
+          fileName: selectedFile?.name,
+          fileSize: selectedFile?.size,
+          fileType: selectedFile?.name.split('.').pop()?.toLowerCase(),
+          bankFormat: selectedBankFormat === 'auto' ? null : selectedBankFormat
         })
       })
 

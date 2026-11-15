@@ -251,11 +251,13 @@ export const importSessions = pgTable('import_sessions', {
   fileSize: integer('file_size').notNull(),
   fileType: text('file_type').notNull(),
   bankFormat: text('bank_format'),
+  source: text('source').default('upload').notNull(), // 'upload', 'email', 'watcher', 'api'
   status: text('status').default('processing').notNull(), // 'processing', 'completed', 'failed'
   totalRows: integer('total_rows'),
   processedRows: integer('processed_rows').default(0),
   successfulRows: integer('successful_rows').default(0),
   failedRows: integer('failed_rows').default(0),
+  needsReviewCount: integer('needs_review_count').default(0).notNull(),
   errors: jsonb('errors').$type<Array<{
     row: number
     field?: string

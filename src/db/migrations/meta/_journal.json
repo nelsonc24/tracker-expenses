@@ -43,6 +43,13 @@
       "when": 1757496041457,
       "tag": "0005_legal_hiroim",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794743225654,
+      "tag": "0006_import_session_source",
+      "breakpoints": true
     }
   ]
 }
