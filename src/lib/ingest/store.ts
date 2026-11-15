@@ -1,10 +1,14 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
+import { decrypt } from '@/lib/encryption'
+import { DEFAULT_GEMINI_MODEL, type GeminiConfig } from './ai-pdf'
+import { IngestError } from './types'
 import {
   accounts as accountsTable,
   categories as categoriesTable,
   importSessions as importSessionsTable,
   transactions as transactionsTable,
+  users as usersTable,
 } from '@/db/schema'
 
 export type NewTransactionRow = typeof transactionsTable.$inferInsert
@@ -26,6 +30,8 @@ export interface IngestStore {
   getCategories(userId: string): Promise<CategoryLookup>
   insertTransactions(rows: NewTransactionRow[]): Promise<void>
   createImportSession(row: NewImportSessionRow): Promise<string>
+  /** The user's own Gemini key + model, or null when they haven't set one. */
+  getGeminiConfig(userId: string): Promise<GeminiConfig | null>
 }
 
 async function getOrCreateDefaultCategory(userId: string) {
@@ -79,5 +85,22 @@ export const drizzleStore: IngestStore = {
   async createImportSession(row) {
     const [created] = await db.insert(importSessionsTable).values(row).returning({ id: importSessionsTable.id })
     return created.id
+  },
+  async getGeminiConfig(userId) {
+    const [user] = await db
+      .select({ geminiApiKey: usersTable.geminiApiKey, preferences: usersTable.preferences })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1)
+    if (!user?.geminiApiKey) return null
+
+    try {
+      return {
+        apiKey: decrypt(user.geminiApiKey),
+        model: user.preferences?.geminiModel ?? DEFAULT_GEMINI_MODEL,
+      }
+    } catch {
+      throw new IngestError('Your Gemini API key could not be decrypted. Please re-enter it in Settings.', 'parse_failed')
+    }
   },
 }

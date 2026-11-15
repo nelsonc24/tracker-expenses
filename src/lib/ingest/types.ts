@@ -17,6 +17,8 @@ export interface TransactionData {
   transactionId?: string | null // bank's own unique id when the bank provides one
   isTransfer?: boolean
   type?: 'debit' | 'credit'
+  /** Set by parsers that are unsure of a row (e.g. the AI balance check failed). */
+  needsReview?: boolean
 }
 
 export interface IngestRowError {
@@ -39,6 +41,10 @@ export interface ParsedFile {
   metadata?: Record<string, unknown>
   /** CSV only: the format that was used (detected or supplied). */
   bankFormat?: string
+  /** PDF only: which parser produced the rows. */
+  parsedBy?: 'regex' | 'ai'
+  /** AI-parsed PDFs only: did opening balance + transactions reconcile to the closing balance? */
+  balanceCheck?: import('./ai-pdf').BalanceCheck
   errors: IngestRowError[]
 }
 
@@ -71,6 +77,8 @@ export interface IngestParams {
   buffer: ArrayBuffer | Uint8Array | Buffer
   /** Key of `bankFormats`. Omit (or 'auto') to auto-detect for CSV files. */
   bankFormat?: string
+  /** Test seam: replaces the Gemini call used by the PDF fallback. */
+  generateStatement?: import('./ai-pdf').GenerateStatement
 }
 
 export class IngestError extends Error {

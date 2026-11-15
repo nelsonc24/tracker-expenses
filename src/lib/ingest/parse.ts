@@ -9,6 +9,7 @@ import {
   type BankFormat,
 } from '@/lib/csv-processing'
 import { creditCardStatementToTransactions, parseCreditCardPDF } from '@/lib/pdf-processing'
+import { parseStatementWithAI, type GeminiConfig, type GenerateStatement } from './ai-pdf'
 import { IngestError, type IngestRowError, type ParsedFile, type TransactionData } from './types'
 
 export type FileKind = 'csv' | 'pdf' | 'json'
@@ -55,22 +56,78 @@ function parseJson(buffer: ArrayBuffer, accountId: string): ParsedFile {
   return { kind: 'json', transactions, errors: [] }
 }
 
-async function parsePdf(buffer: ArrayBuffer, accountId: string): Promise<ParsedFile> {
-  const statement = await parseCreditCardPDF(buffer)
+export type AiConfigSource = GeminiConfig | null | (() => Promise<GeminiConfig | null>)
+
+async function parsePdf(
+  buffer: ArrayBuffer,
+  accountId: string,
+  aiConfig?: AiConfigSource,
+  generate?: GenerateStatement
+): Promise<ParsedFile> {
+  // 1. Deterministic, free parser first (Latitude)
+  let regexError: unknown
+  try {
+    const statement = await parseCreditCardPDF(buffer)
+    const count = statement.transactions.length + (statement.interestFreeTransactions?.length ?? 0)
+    if (count > 0) {
+      return {
+        kind: 'pdf',
+        parsedBy: 'regex',
+        transactions: creditCardStatementToTransactions(statement, accountId),
+        metadata: {
+          statementDate: statement.statementDate,
+          accountNumber: statement.accountNumber,
+          openingBalance: statement.openingBalance,
+          closingBalance: statement.closingBalance,
+          creditLimit: statement.creditLimit,
+          availableCredit: statement.availableCredit,
+          minimumPayment: statement.minimumPayment,
+          dueDate: statement.dueDate,
+        },
+        errors: [],
+      }
+    }
+  } catch (error) {
+    regexError = error
+  }
+
+  // 2. Fall back to Gemini, using the user's own key
+  const config = typeof aiConfig === 'function' ? await aiConfig() : aiConfig
+  if (!config) {
+    throw new IngestError(
+      'This PDF is not a supported statement format. Add your Gemini API key in Settings to enable AI parsing of other statements.',
+      'parse_failed'
+    )
+  }
+
+  if (regexError) console.warn('Regex PDF parser failed, using AI fallback:', regexError instanceof Error ? regexError.message : regexError)
+
+  let result
+  try {
+    result = await parseStatementWithAI(new Uint8Array(buffer), accountId, config, generate)
+  } catch (error) {
+    throw new IngestError(
+      `AI parsing of the PDF failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+      'parse_failed'
+    )
+  }
+
   return {
     kind: 'pdf',
-    transactions: creditCardStatementToTransactions(statement, accountId),
+    parsedBy: 'ai',
+    transactions: result.transactions,
+    balanceCheck: result.balanceCheck,
     metadata: {
-      statementDate: statement.statementDate,
-      accountNumber: statement.accountNumber,
-      openingBalance: statement.openingBalance,
-      closingBalance: statement.closingBalance,
-      creditLimit: statement.creditLimit,
-      availableCredit: statement.availableCredit,
-      minimumPayment: statement.minimumPayment,
-      dueDate: statement.dueDate,
+      statementDate: result.statement.statementDate,
+      accountNumber: result.statement.accountNumberLast4,
+      openingBalance: result.statement.openingBalance,
+      closingBalance: result.statement.closingBalance,
+      parsedBy: 'ai',
+      balanceCheck: result.balanceCheck,
     },
-    errors: [],
+    errors: result.balanceCheck.ok
+      ? []
+      : [{ message: result.balanceCheck.reason ?? 'AI balance check failed; all rows need review' }],
   }
 }
 
@@ -169,6 +226,10 @@ export interface ParseFileParams {
   buffer: ArrayBuffer | Uint8Array | Buffer
   accountId: string
   bankFormat?: string
+  /** Gemini settings for the PDF fallback; may be resolved lazily so the key is only read when needed. */
+  aiConfig?: AiConfigSource
+  /** Test seam: replaces the Gemini call. */
+  generateStatement?: GenerateStatement
 }
 
 /** Detect what kind of file this is and turn it into normalised transactions. */
@@ -181,7 +242,7 @@ export async function parseUploadedFile(params: ParseFileParams): Promise<Parsed
   const buffer = toArrayBuffer(params.buffer)
   switch (kind) {
     case 'pdf':
-      return parsePdf(buffer, params.accountId)
+      return parsePdf(buffer, params.accountId, params.aiConfig, params.generateStatement)
     case 'json':
       return parseJson(buffer, params.accountId)
     case 'csv':

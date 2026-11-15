@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { IngestError, parseUploadedFile } from '@/lib/ingest'
+import { IngestError, drizzleStore, parseUploadedFile } from '@/lib/ingest'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,17 +29,23 @@ export async function POST(request: NextRequest) {
       fileType: fileType || undefined,
       buffer: await file.arrayBuffer(),
       accountId,
+      aiConfig: () => drizzleStore.getGeminiConfig(userId),
     })
 
     return NextResponse.json({
       success: true,
       message: `${parsed.kind.toUpperCase()} parsed successfully`,
       transactions: parsed.transactions,
+      parsedBy: parsed.parsedBy,
+      balanceCheck: parsed.balanceCheck,
       ...(parsed.metadata ? { metadata: parsed.metadata } : {}),
     })
   } catch (error) {
     if (error instanceof IngestError && (error.code === 'unsupported_file' || error.code === 'invalid_input')) {
       return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    if (error instanceof IngestError && error.code === 'parse_failed') {
+      return NextResponse.json({ error: 'Failed to parse file', details: error.message }, { status: 422 })
     }
     console.error('Error parsing file:', error)
     return NextResponse.json(

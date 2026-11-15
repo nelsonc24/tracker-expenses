@@ -1,7 +1,8 @@
+import type { GeminiConfig } from '@/lib/ingest/ai-pdf'
 import type { IngestStore, NewImportSessionRow, NewTransactionRow } from '@/lib/ingest/store'
 
 /** In-memory IngestStore for tests. State persists across calls, like a real database. */
-export function createMemoryStore(options: { accountIds?: string[]; userId?: string } = {}) {
+export function createMemoryStore(options: { accountIds?: string[]; userId?: string; gemini?: GeminiConfig | null } = {}) {
   const userId = options.userId ?? 'user_1'
   const accountIds = new Set(options.accountIds ?? ['acc_1'])
   const transactions: NewTransactionRow[] = []
@@ -31,6 +32,9 @@ export function createMemoryStore(options: { accountIds?: string[]; userId?: str
     async createImportSession(row) {
       sessions.push(row)
       return `session_${sessions.length}`
+    },
+    async getGeminiConfig() {
+      return options.gemini ?? null
     },
   }
 

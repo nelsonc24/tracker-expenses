@@ -219,6 +219,11 @@ export default function ImportPage() {
         setProgress(100)
         setImportStatus('completed')
         
+        // AI-parsed statements are checked against the printed balances; make a mismatch visible
+        if (result.balanceCheck && !result.balanceCheck.ok) {
+          alert(`AI-parsed statement needs checking: ${result.balanceCheck.reason}. Review the transactions carefully before importing.`)
+        }
+
         // If it's a PDF, show metadata
         if (result.metadata) {
           console.log('Statement metadata:', result.metadata)

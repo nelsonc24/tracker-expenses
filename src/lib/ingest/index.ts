@@ -15,6 +15,7 @@ import {
 
 export * from './types'
 export { parseUploadedFile, detectFileKind } from './parse'
+export { parseStatementWithAI, checkStatementBalance, type BalanceCheck, type GeminiConfig } from './ai-pdf'
 export { generateTransactionHash, assignHashes } from './dedup'
 export { drizzleStore, type IngestStore } from './store'
 
@@ -29,6 +30,8 @@ function extractMerchant(description: string): string {
 
   return cleaned.split(' ').slice(0, 3).join(' ') || 'Unknown Merchant'
 }
+
+export type { GenerateStatement } from './ai-pdf'
 
 export interface ImportTransactionsParams {
   userId: string
@@ -161,6 +164,8 @@ export async function ingest(params: IngestParams, store: IngestStore = drizzleS
     buffer: params.buffer,
     accountId: params.accountId,
     bankFormat: params.bankFormat,
+    aiConfig: () => store.getGeminiConfig(params.userId),
+    generateStatement: params.generateStatement,
   })
 
   return importTransactions(
