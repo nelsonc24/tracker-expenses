@@ -28,6 +28,16 @@ export interface HashedTransaction<T extends TransactionData = TransactionData> 
 
 /**
  * Decide, for each transaction, whether it is new or a duplicate.
+ *
+ * Two genuinely separate purchases can look identical (same day, merchant and amount: two
+ * coffees). For rows without a bank transaction id we therefore add an occurrence index:
+ * within one import, the n-th identical row hashes to `<base>-n`. The first occurrence keeps
+ * the bare `<base>` hash, so rows saved before this change still match on re-import.
+ *
+ * Comparing against existing rows works the same way: a row is a duplicate only if the stored
+ * set already holds the hash for *that* occurrence. Importing a file with 3 identical coffees
+ * when 2 are already stored adds just the third.
+ *
  * `existingHashes` is mutated: accepted hashes are added so later rows in the same batch collide.
  */
 export function assignHashes<T extends TransactionData>(
@@ -36,13 +46,23 @@ export function assignHashes<T extends TransactionData>(
   accountId: string,
   existingHashes: Set<string>
 ): HashedTransaction<T>[] {
+  const occurrences = new Map<string, number>()
+
   return transactions.map(tx => {
     const amount = parseFloat(tx.amount.toString())
     if (amount === 0) {
       return { tx, hash: '', duplicate: true, reason: 'Transaction has zero amount' }
     }
 
-    const hash = generateTransactionHash(tx, userId, accountId)
+    let hash = generateTransactionHash(tx, userId, accountId)
+
+    // Bank-supplied ids are already unique; only the composite hash can collide
+    if (!tx.transactionId) {
+      const n = (occurrences.get(hash) ?? 0) + 1
+      occurrences.set(hash, n)
+      if (n > 1) hash = `${hash}-${n}`
+    }
+
     if (existingHashes.has(hash)) {
       return { tx, hash, duplicate: true, reason: 'Duplicate transaction already exists' }
     }
