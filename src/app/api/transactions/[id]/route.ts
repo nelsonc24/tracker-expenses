@@ -22,6 +22,7 @@ const updateTransactionSchema = z.object({
   receiptNumber: z.string().optional(),
   taxDeductible: z.boolean().optional(),
   taxCategory: z.string().nullable().optional(),
+  needsReview: z.boolean().optional(),
 })
 
 export async function PUT(
@@ -149,6 +150,9 @@ export async function PUT(
     }
     if (validatedData.taxCategory !== undefined) {
       updateData.taxCategory = validatedData.taxCategory
+    }
+    if (validatedData.needsReview !== undefined) {
+      updateData.needsReview = validatedData.needsReview
     }
 
     // Update the transaction

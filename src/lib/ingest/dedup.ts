@@ -24,6 +24,8 @@ export interface HashedTransaction<T extends TransactionData = TransactionData> 
   hash: string
   duplicate: boolean
   reason?: string
+  /** 1 = first time this (date, description, amount) was seen in the import; >1 = repeat of an identical row. */
+  occurrence: number
 }
 
 /**
@@ -51,23 +53,24 @@ export function assignHashes<T extends TransactionData>(
   return transactions.map(tx => {
     const amount = parseFloat(tx.amount.toString())
     if (amount === 0) {
-      return { tx, hash: '', duplicate: true, reason: 'Transaction has zero amount' }
+      return { tx, hash: '', duplicate: true, reason: 'Transaction has zero amount', occurrence: 0 }
     }
 
     let hash = generateTransactionHash(tx, userId, accountId)
+    let occurrence = 1
 
     // Bank-supplied ids are already unique; only the composite hash can collide
     if (!tx.transactionId) {
-      const n = (occurrences.get(hash) ?? 0) + 1
-      occurrences.set(hash, n)
-      if (n > 1) hash = `${hash}-${n}`
+      occurrence = (occurrences.get(hash) ?? 0) + 1
+      occurrences.set(hash, occurrence)
+      if (occurrence > 1) hash = `${hash}-${occurrence}`
     }
 
     if (existingHashes.has(hash)) {
-      return { tx, hash, duplicate: true, reason: 'Duplicate transaction already exists' }
+      return { tx, hash, duplicate: true, reason: 'Duplicate transaction already exists', occurrence }
     }
 
     existingHashes.add(hash)
-    return { tx, hash, duplicate: false }
+    return { tx, hash, duplicate: false, occurrence }
   })
 }

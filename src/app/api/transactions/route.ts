@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
       transferPairId: transaction.transferPairId || null,
       taxDeductible: transaction.taxDeductible || false,
       taxCategory: transaction.taxCategory || null,
+      needsReview: transaction.needsReview || false,
     }))
 
     return NextResponse.json(transformedTransactions)

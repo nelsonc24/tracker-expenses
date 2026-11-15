@@ -210,6 +210,7 @@ export default function ImportPage() {
           merchant: t.description,
           reference: '',
           balance: 0,
+          needsReview: t.needsReview === true,
           status: 'valid' as const,
           errors: [],
           rawData: t
@@ -379,7 +380,8 @@ export default function ImportPage() {
           balance: transaction.balance || null,
           transactionId: transaction.transactionId || null,
           receiptNumber: transaction.receiptNumber || null,
-          isTransfer: transaction.isTransfer === true
+          isTransfer: transaction.isTransfer === true,
+          needsReview: transaction.needsReview === true
         }))
 
       const response = await fetch('/api/transactions/import', {

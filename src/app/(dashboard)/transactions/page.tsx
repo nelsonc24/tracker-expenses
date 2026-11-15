@@ -22,6 +22,7 @@ interface Transaction {
   transferPairId?: string | null
   taxDeductible?: boolean
   taxCategory?: string | null
+  needsReview?: boolean
 }
 
 interface Account {

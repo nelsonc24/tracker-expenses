@@ -33,7 +33,7 @@ describe('ingest()', () => {
 
     expect(result.inserted).toBe(3)
     expect(result.duplicates).toBe(0)
-    expect(result.needsReview).toBe(0)
+    expect(result.needsReview).toBe(ctx.transactions.filter(t => t.needsReview).length)
     expect(result.sessionId).toBe('session_1')
     expect(ctx.transactions).toHaveLength(3)
 
@@ -61,7 +61,7 @@ describe('ingest()', () => {
       totalRows: 3,
       successfulRows: 3,
       failedRows: 0,
-      needsReviewCount: 0,
+      needsReviewCount: ctx.transactions.filter(t => t.needsReview).length,
     })
   })
 

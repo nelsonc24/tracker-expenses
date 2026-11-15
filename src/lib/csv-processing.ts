@@ -235,6 +235,7 @@ export interface ProcessedTransaction {
   receiptNumber?: string  // Receipt number if available
   balance?: number
   isTransfer?: boolean    // Flag to indicate if this is a transfer between accounts
+  needsReview?: boolean   // Parser was unsure about this row (e.g. AI balance check failed)
   suggestedAsBill?: boolean  // Flag to suggest this is a recurring bill
   status: 'valid' | 'error' | 'warning'
   errors: ValidationError[]

@@ -1,4 +1,4 @@
-# Ingest Pipeline (Phase 1: 1.1, 1.2, 1.3, 1.5)
+# Ingest Pipeline (Phase 1: 1.1–1.6)
 
 Part of `IMPORT_AUTOMATION_AND_WHATSAPP_DEV_PLAN.md`.
 
@@ -20,3 +20,13 @@ Part of `IMPORT_AUTOMATION_AND_WHATSAPP_DEV_PLAN.md`.
 - Westpac format says `DD MMM YYYY` but real exports use `DD/MM/YYYY`, so Westpac dates fail to parse.
 - In the browser preview path, formats without `skipRows` (westpac, anz, nab) treat the header as a data row. The server path handles headers correctly.
 - The old import route's "update account balance from latest row" code never ran (it read `balance` from rows that don't carry it); it was dropped rather than moved.
+
+## PDF fallback (1.4)
+`parseUploadedFile` tries the Latitude regex parser first. If it throws or finds no transactions, it calls Gemini (`src/lib/ingest/ai-pdf.ts`, `generateObject` + zod schema, PDF sent as a file part) using the user's **own** key (`users.geminiApiKey`, model from `preferences.geminiModel`, default `gemini-2.5-flash`). No key = a clear `parse_failed` error ("Add your Gemini API key in Settings").
+
+The result is checked: `opening + Σ(amount) ≈ closing` (±0.01), trying both sign conventions (card balance owed: `opening − Σ`; deposit account: `opening + Σ`). On failure the import still saves, every row is flagged needs-review, the reason is recorded on the import session `errors`, and the import page shows an alert. Rows with unreadable dates are dropped and also fail the check.
+
+## Needs review (1.6)
+`transactions.needs_review` (migration `0007`). Set when: a parser is unsure (AI balance check failed), the category is unmatched or generic (`General` / `Uncategorized`), or a row is the 2nd+ identical row (possible duplicate). `import_sessions.needs_review_count` holds the total. The transactions page has a **Review** filter and a "Needs review" badge on each row; clicking the badge marks it reviewed (`PUT /api/transactions/:id { needsReview: false }`).
+
+Note: because many CSV rows categorise to "General", expect a lot of flagged rows on first imports; that is intended (they're uncategorised).

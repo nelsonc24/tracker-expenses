@@ -108,7 +108,7 @@ describe('ingest() PDF fallback', () => {
     expect(generate.mock.calls[0][0].config).toEqual(gemini)
     expect(result.inserted).toBe(1)
     expect(result.errors).toEqual([])
-    expect(transactions[0].originalData).toMatchObject({ needsReview: false })
+    expect(transactions[0].needsReview).toBe(false)
   })
 
   test('a regex parser failure also falls back to the AI', async () => {
@@ -129,7 +129,7 @@ describe('ingest() PDF fallback', () => {
 
     expect(result.inserted).toBe(1)
     expect(result.errors[0].message).toMatch(/do not add up/)
-    expect(transactions[0].originalData).toMatchObject({ needsReview: true })
+    expect(transactions[0].needsReview).toBe(true)
     expect(sessions[0].errors?.[0].message).toMatch(/do not add up/)
   })
 

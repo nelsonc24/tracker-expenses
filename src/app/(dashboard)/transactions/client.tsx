@@ -121,6 +121,7 @@ type Transaction = {
   billId?: string | null
   taxDeductible?: boolean
   taxCategory?: string | null
+  needsReview?: boolean
 }
 
 type Activity = {
@@ -246,6 +247,7 @@ export function TransactionsPageClient({
   const [accountFilter, setAccountFilter] = useState(initialAccountFilter || 'All Accounts')  
   const [activityFilter, setActivityFilter] = useState('All Activities')
   const [transferFilter, setTransferFilter] = useState('All Transactions')
+  const [reviewFilter, setReviewFilter] = useState('All Transactions')
   const [dateRange, setDateRange] = useState('current_month')
   const [sortField, setSortField] = useState<SortField>('date')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
@@ -432,6 +434,10 @@ export function TransactionsPageClient({
     } else if (transferFilter === 'Unlinked Transfers Only') {
       filters.push('Unlinked Transfers')
     }
+
+    if (reviewFilter === 'Needs Review') {
+      filters.push('Needs review')
+    }
     
     return filters
   }
@@ -546,6 +552,11 @@ export function TransactionsPageClient({
         return false
       }
       if (transferFilter === 'Unlinked Transfers Only' && (!transaction.isTransfer || transaction.transferPairId)) {
+        return false
+      }
+
+      // Needs-review filter
+      if (reviewFilter === 'Needs Review' && !transaction.needsReview) {
         return false
       }
 
@@ -964,6 +975,29 @@ export function TransactionsPageClient({
       
     } catch (error) {
       console.error('Error toggling transfer status:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to update transaction')
+    }
+  }
+
+  const handleMarkReviewed = async (transaction: Transaction) => {
+    try {
+      const response = await fetch(`/api/transactions/${transaction.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ needsReview: false })
+      })
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}))
+        throw new Error(result.error || 'Failed to update transaction')
+      }
+
+      setTransactions(prev => prev.map(t =>
+        t.id === transaction.id ? { ...t, needsReview: false } : t
+      ))
+      toast.success('Marked as reviewed')
+    } catch (error) {
+      console.error('Error marking transaction as reviewed:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to update transaction')
     }
   }
@@ -1557,7 +1591,7 @@ export function TransactionsPageClient({
       </div>
 
       {/* Quick Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
         <div className="space-y-2">
           <Label className="text-xs sm:text-sm font-medium">Time Period</Label>
           <Select value={dateRange} onValueChange={setDateRange}>
@@ -1654,6 +1688,19 @@ export function TransactionsPageClient({
         </div>
 
         <div className="space-y-2">
+          <Label className="text-xs sm:text-sm font-medium">Review</Label>
+          <Select value={reviewFilter} onValueChange={setReviewFilter}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All Transactions">All Transactions</SelectItem>
+              <SelectItem value="Needs Review">Needs review ({transactions.filter(t => t.needsReview).length})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
           <Label className="text-xs sm:text-sm font-medium opacity-0">Clear</Label>
           <Button 
             variant="outline" 
@@ -1664,6 +1711,7 @@ export function TransactionsPageClient({
               setAccountFilter('All Accounts')
               setActivityFilter('All Activities')
               setTransferFilter('All Transactions')
+              setReviewFilter('All Transactions')
             }}
           >
             Clear Filters
@@ -1799,6 +1847,22 @@ export function TransactionsPageClient({
                             <p>{transaction.description}</p>
                           </TooltipContent>
                         </Tooltip>
+                        {transaction.needsReview && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge
+                                variant="outline"
+                                className="cursor-pointer border-amber-500 text-amber-600 text-xs"
+                                onClick={() => handleMarkReviewed(transaction)}
+                              >
+                                Needs review
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>The import wasn&apos;t sure about this one. Click to mark it as reviewed.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                         {(transaction.merchant || transaction.reference) && (
                           <div className="text-xs text-muted-foreground truncate leading-tight">
                             {[transaction.merchant, transaction.reference].filter(Boolean).join(' • ')}

@@ -225,6 +225,7 @@ export const transactions = pgTable('transactions', {
   isTransfer: boolean('is_transfer').default(false).notNull(), // Mark income transactions as transfers between accounts
   transferPairId: uuid('transfer_pair_id'), // UUID linking two transfer transactions together
   taxDeductible: boolean('tax_deductible').default(false).notNull(), // Australian tax deduction flag
+  needsReview: boolean('needs_review').default(false).notNull(), // Import was unsure (low-confidence category, AI balance mismatch, possible duplicate)
   taxCategory: text('tax_category'), // ATO deduction category: 'work_from_home'|'vehicle_travel'|'tools_equipment'|'phone_internet'|'self_education'|'clothing_uniform'|'professional_fees'|'other_work'|'investment'
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -241,6 +242,7 @@ export const transactions = pgTable('transactions', {
   billIdIdx: index('transactions_bill_id_idx').on(table.billId),
   transferPairIdIdx: index('transactions_transfer_pair_id_idx').on(table.transferPairId),
   taxDeductibleIdx: index('transactions_tax_deductible_idx').on(table.taxDeductible),
+  needsReviewIdx: index('transactions_needs_review_idx').on(table.needsReview),
 }))
 
 // Import sessions table (for CSV uploads)

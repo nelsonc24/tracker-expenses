@@ -19,6 +19,23 @@ export { parseStatementWithAI, checkStatementBalance, type BalanceCheck, type Ge
 export { generateTransactionHash, assignHashes } from './dedup'
 export { drizzleStore, type IngestStore } from './store'
 
+// Categories that mean "we couldn't tell what this is"
+const GENERIC_CATEGORIES = new Set(['', 'general', 'uncategorized', 'uncategorised'])
+
+/** Why a row should be looked at by a human, or null if it looks fine. */
+function reviewReason(
+  tx: TransactionData,
+  categoryMatched: boolean,
+  occurrence: number
+): 'parser_unsure' | 'low_confidence_category' | 'possible_duplicate' | null {
+  if (tx.needsReview) return 'parser_unsure'
+  const name = (tx.category || '').trim().toLowerCase()
+  if (!categoryMatched || GENERIC_CATEGORIES.has(name)) return 'low_confidence_category'
+  // An identical row already appeared (or was already saved): probably a real second purchase, but check
+  if (occurrence > 1) return 'possible_duplicate'
+  return null
+}
+
 // Remove common prefixes / suffixes to get a short merchant name
 function extractMerchant(description: string): string {
   const cleaned = description
@@ -65,16 +82,15 @@ export async function importTransactions(
   const rows: NewTransactionRow[] = []
   const skipped: IngestResult['skipped'] = []
 
-  for (const { tx, hash, duplicate, reason } of hashed) {
+  for (const { tx, hash, duplicate, reason, occurrence } of hashed) {
     if (duplicate) {
       skipped.push({ description: tx.description, date: tx.date, amount: tx.amount, reason: reason ?? 'Duplicate' })
       continue
     }
 
     const amount = parseFloat(tx.amount.toString())
-    const categoryId = tx.category
-      ? (categories.byName.get(tx.category.toLowerCase()) ?? categories.defaultCategoryId)
-      : categories.defaultCategoryId
+    const matchedCategoryId = tx.category ? categories.byName.get(tx.category.toLowerCase()) : undefined
+    const categoryId = matchedCategoryId ?? categories.defaultCategoryId
     const detectedTransfer = isTransferTransaction(tx.description || '', tx.reference || '')
 
     rows.push({
@@ -92,6 +108,7 @@ export async function importTransactions(
       type: amount < 0 ? 'debit' : 'credit',
       status: 'cleared',
       isTransfer: tx.isTransfer === true || detectedTransfer,
+      needsReview: reviewReason(tx, matchedCategoryId !== undefined, occurrence) !== null,
       duplicateCheckHash: hash,
       originalData: tx as unknown as Record<string, string | number | boolean | null>,
       createdAt: new Date(),
@@ -130,7 +147,7 @@ export async function importTransactions(
     throw error
   }
 
-  const needsReview = 0 // populated by the needs-review flag (plan step 1.6)
+  const needsReview = rows.filter(r => r.needsReview).length
 
   const sessionId = await store.createImportSession({
     ...sessionBase,
