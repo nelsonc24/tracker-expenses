@@ -107,6 +107,114 @@ export const bankFormats: Record<string, BankFormat> = {
   }
 }
 
+// Parse one CSV line, honouring quoted fields (commas inside quotes are kept)
+export function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+
+    if (char === '"') {
+      inQuotes = !inQuotes
+    } else if (char === ',' && !inQuotes) {
+      result.push(current)
+      current = ''
+    } else {
+      current += char
+    }
+  }
+
+  result.push(current) // Add the last field
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// Bank format auto-detection
+// ---------------------------------------------------------------------------
+
+export interface FormatDetection {
+  /** Key of `bankFormats`, or null when nothing matched. */
+  format: string | null
+  /** 0..1. Below MIN_DETECTION_CONFIDENCE callers should fall back to a manual choice. */
+  confidence: number
+}
+
+export const MIN_DETECTION_CONFIDENCE = 0.8
+
+// Header signatures (lower-cased). A format matches only when every required header is present.
+const headerSignatures: Array<{ key: string; required: string[]; forbidden?: string[]; confidence: number }> = [
+  { key: 'ubank', required: ['date and time', 'description', 'debit', 'credit', 'transaction id'], confidence: 0.98 },
+  { key: 'latitud', required: ['date', 'card', 'description', 'debits', 'credits'], confidence: 0.98 },
+  { key: 'westpac', required: ['date', 'narrative', 'debit amount', 'credit amount'], confidence: 0.95 },
+  { key: 'anz', required: ['date', 'amount', 'transaction details'], confidence: 0.95 },
+  { key: 'nab', required: ['date', 'description', 'debit', 'credit'], forbidden: ['card', 'narrative'], confidence: 0.9 },
+  // Very generic (Date, Description, Amount): deliberately below the confidence threshold
+  { key: 'creditcard', required: ['date', 'description', 'amount'], confidence: 0.6 },
+]
+
+const DATE_SLASH = /^\d{1,2}\/\d{1,2}\/\d{4}$/
+const SIGNED_AMOUNT = /^[+-]?\$?\d[\d,]*(\.\d+)?$/
+
+function stripQuotes(value: string): string {
+  return value.trim().replace(/^["']+|["']+$/g, '').trim()
+}
+
+// Commonwealth Bank exports have no header row: date,"±amount","description","±balance"
+function isCommonwealthRow(fields: string[]): boolean {
+  if (fields.length < 4) return false
+  return (
+    DATE_SLASH.test(stripQuotes(fields[0])) &&
+    SIGNED_AMOUNT.test(stripQuotes(fields[1])) &&
+    SIGNED_AMOUNT.test(stripQuotes(fields[3]))
+  )
+}
+
+/**
+ * Work out which bank produced a CSV.
+ *
+ * @param headers   fields of the file's first line (a header row, or the first data row for header-less banks)
+ * @param firstRows fields of the next few lines, used to confirm the row shape
+ */
+export function detectBankFormat(headers: string[], firstRows: string[][] = []): FormatDetection {
+  const normalised = new Set(headers.map(h => stripQuotes(h).toLowerCase()).filter(Boolean))
+
+  const matches = headerSignatures.filter(sig =>
+    sig.required.every(col => normalised.has(col)) &&
+    !(sig.forbidden ?? []).some(col => normalised.has(col))
+  )
+
+  if (matches.length > 0) {
+    const best = matches.reduce((a, b) => (b.confidence > a.confidence ? b : a))
+    const ambiguous = matches.filter(m => m !== best && m.key !== 'creditcard').length > 0
+    return { format: best.key, confidence: ambiguous ? best.confidence * 0.6 : best.confidence }
+  }
+
+  // No header match: is the first line itself a CommBank data row?
+  if (isCommonwealthRow(headers)) {
+    if (firstRows.length === 0) return { format: 'commonwealth', confidence: 0.85 }
+    const conforming = firstRows.filter(isCommonwealthRow).length
+    return conforming === firstRows.length
+      ? { format: 'commonwealth', confidence: 0.97 }
+      : { format: 'commonwealth', confidence: 0.6 }
+  }
+
+  return { format: null, confidence: 0 }
+}
+
+/** Split CSV text into non-empty lines (handles CRLF). */
+export function splitCsvLines(text: string): string[] {
+  return text.split(/\r?\n/).filter(line => line.trim())
+}
+
+/** Convenience wrapper: detect the format straight from CSV text. */
+export function detectBankFormatFromText(text: string, sampleRows = 5): FormatDetection {
+  const lines = splitCsvLines(text)
+  if (lines.length === 0) return { format: null, confidence: 0 }
+  return detectBankFormat(parseCSVLine(lines[0]), lines.slice(1, 1 + sampleRows).map(parseCSVLine))
+}
+
 // Transaction validation and processing
 export interface ValidationError {
   field: string
