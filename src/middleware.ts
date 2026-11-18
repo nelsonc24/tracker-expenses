@@ -16,7 +16,11 @@ const isProtectedRoute = createRouteMatcher([
 // Clerk would otherwise try to read that header as a session JWT. The route itself verifies the token.
 const isApiTokenRoute = createRouteMatcher(['/api/ingest'])
 
+// Provider webhooks authenticate with their own signatures, never a Clerk session
+const isWebhookRoute = createRouteMatcher(['/api/webhooks/inbound-email(.*)'])
+
 const clerk = clerkMiddleware(async (auth, req) => {
+  if (isWebhookRoute(req)) return
   if (isProtectedRoute(req)) {
     await auth.protect()
   }
