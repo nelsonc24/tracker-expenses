@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { notificationPreferences } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { isE164, normalizePhoneInput } from '@/lib/notifications/phone'
 
 const updatePreferencesSchema = z.object({
   emailNotificationsEnabled: z.boolean().optional(),
@@ -24,6 +25,14 @@ const updatePreferencesSchema = z.object({
   // Telegram notifications
   telegramNotificationsEnabled: z.boolean().optional(),
   telegramChatId: z.string().max(64).optional().nullable(),
+  // WhatsApp notifications (number in E.164, e.g. +61412345678)
+  whatsappNotificationsEnabled: z.boolean().optional(),
+  whatsappPhoneNumber: z
+    .string()
+    .transform(normalizePhoneInput)
+    .refine(isE164, 'Phone number must be in E.164 format, e.g. +61412345678')
+    .optional()
+    .nullable(),
   // Transaction & Spending Alerts
   transactionAlertsEnabled: z.boolean().optional(),
   unusualSpendingEnabled: z.boolean().optional(),

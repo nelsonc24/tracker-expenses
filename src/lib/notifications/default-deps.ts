@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { notificationPreferences, users } from '@/db/schema'
-import { emailChannel, telegramChannel } from './channels'
+import { emailChannel, telegramChannel, whatsappChannel } from './channels'
 import type { NotificationPrefs, NotifyDeps } from './notifier'
 
 const DEFAULT_TIME_ZONE = 'Australia/Sydney'
@@ -32,14 +32,16 @@ function defaultPrefs(userId: string): NotificationPrefs {
     telegramNotificationsEnabled: false,
     telegramChatId: null,
     statementReminderDays: 35,
+    whatsappNotificationsEnabled: false,
+    whatsappPhoneNumber: null,
     createdAt: now,
     updatedAt: now,
   }
 }
 
 export const defaultDeps: NotifyDeps = {
-  // Add further channels here (e.g. WhatsApp) — notify() treats them all the same
-  channels: [emailChannel, telegramChannel],
+  // Add further channels here — notify() treats them all the same
+  channels: [emailChannel, telegramChannel, whatsappChannel],
 
   async loadContext(userId) {
     const [prefs] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId)).limit(1)
