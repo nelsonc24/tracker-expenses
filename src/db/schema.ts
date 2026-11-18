@@ -916,3 +916,41 @@ export const insertInvestmentScenarioSchema = createInsertSchema(investmentScena
 export const selectInvestmentScenarioSchema = createSelectSchema(investmentScenarios)
 export type InsertInvestmentScenario = z.infer<typeof insertInvestmentScenarioSchema>
 export type SelectInvestmentScenario = z.infer<typeof selectInvestmentScenarioSchema>
+
+// ─── Email ingestion ───────────────────────────────────────────────────────
+
+// Import Senders - approved "From" addresses whose statement attachments are
+// imported automatically into an account (see docs/EMAIL_INGESTION.md)
+export const importSenders = pgTable('import_senders', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  senderEmail: text('sender_email').notNull(), // always stored lower-cased
+  accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
+  // Optional case-insensitive glob on the attachment filename, e.g. "Latitude*.pdf"
+  filenamePattern: text('filename_pattern'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('import_senders_user_id_idx').on(table.userId),
+  senderEmailIdx: index('import_senders_sender_email_idx').on(table.senderEmail),
+}))
+
+// Inbound Emails - one row per received email, so a re-delivered webhook
+// doesn't import the same attachments twice
+export const inboundEmails = pgTable('inbound_emails', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  provider: text('provider').notNull(), // 'resend'
+  providerEmailId: text('provider_email_id').notNull(),
+  messageId: text('message_id'),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  status: text('status').notNull(), // 'processing' | 'processed' | 'failed'
+  // Per-attachment outcome (ids, filenames, counts, error messages; never file contents)
+  summary: jsonb('summary').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  providerEmailUnique: unique('inbound_emails_provider_email_unique').on(table.provider, table.providerEmailId),
+  messageIdIdx: index('inbound_emails_message_id_idx').on(table.messageId),
+}))
+
+export type SelectImportSender = typeof importSenders.$inferSelect
+export type SelectInboundEmail = typeof inboundEmails.$inferSelect
