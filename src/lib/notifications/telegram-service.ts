@@ -90,6 +90,35 @@ async function sendTelegramMessage(
   return { messageId: json.result?.message_id }
 }
 
+const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/**
+ * Short import alerts (import_summary / statement_missing). Kept generic on purpose:
+ * account name and counts only, no amounts or balances.
+ */
+export function telegramImportAlertText(
+  event:
+    | { type: 'import_summary'; accountName: string; inserted: number; needsReview: number }
+    | { type: 'statement_missing'; accountName: string; daysSinceImport: number },
+): string {
+  const account = escapeHtml(event.accountName)
+  if (event.type === 'import_summary') {
+    const review = event.needsReview > 0 ? `, <b>${event.needsReview}</b> need review` : ''
+    return `📥 <b>Import complete</b>\n${account}: <b>${event.inserted}</b> new transactions${review}.`
+  }
+  return `📭 <b>Statement missing</b>\nNo statement imported for ${account} in ${event.daysSinceImport} days.`
+}
+
+/** Send a pre-formatted HTML message to a chat. Used by the notifier's Telegram channel. */
+export async function sendTelegramText(chatId: string, text: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await sendTelegramMessage(chatId, text)
+    return error ? { success: false, error } : { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 // ─── Preference helpers ──────────────────────────────────────────────────────
 
 /**

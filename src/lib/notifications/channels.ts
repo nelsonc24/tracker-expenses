@@ -1,5 +1,10 @@
 import { sendBillReminderEmail, sendDebtReminderEmail } from './email-service'
-import { sendTelegramBillReminder, sendTelegramDebtReminder } from './telegram-service'
+import {
+  sendTelegramBillReminder,
+  sendTelegramDebtReminder,
+  sendTelegramText,
+  telegramImportAlertText,
+} from './telegram-service'
 import { isE164 } from './phone'
 import { sendWhatsAppEvent } from './whatsapp-notifications'
 import type { ChannelSendResult, NotificationChannel, NotificationEvent } from './notifier'
@@ -63,6 +68,9 @@ export const telegramChannel: NotificationChannel = {
         return toResult(await sendTelegramBillReminder(billPayload(prefs.userId, event)))
       case 'debt_due':
         return toResult(await sendTelegramDebtReminder(debtPayload(prefs.userId, event)))
+      case 'import_summary':
+      case 'statement_missing':
+        return toResult(await sendTelegramText(prefs.telegramChatId!, telegramImportAlertText(event)))
       default:
         return { status: 'unsupported' }
     }
