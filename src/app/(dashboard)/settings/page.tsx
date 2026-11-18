@@ -45,6 +45,7 @@ import {
   KeyRound,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { ImportSendersSettings } from '@/components/import-senders-settings'
 import { toast } from 'sonner'
 
 // Sample categories data
@@ -762,6 +763,8 @@ export default function SettingsPage() {
 
         {/* Data Management */}
         <TabsContent value="data" className="space-y-6">
+          <ImportSendersSettings />
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
