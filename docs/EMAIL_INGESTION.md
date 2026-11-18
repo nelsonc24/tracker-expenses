@@ -41,7 +41,7 @@ Resend dashboard → **Webhooks** → Add endpoint:
 Redeploy after setting them.
 
 ### 4. Migration
-Run `src/db/migrations/pending/import_senders.sql` against Neon (it creates `import_senders` and `inbound_emails`). It is hand-written and **not** in the drizzle journal, because the drizzle-kit snapshot is stale.
+Run `src/db/migrations/0008_import_automation.sql` (apply with `pnpm db:migrate`) against Neon (it creates `import_senders` and `inbound_emails`). 
 
 ### 5. Approve senders in the app
 Settings → Data → Email Import → add the bank's sending address (e.g. the address Latitude statements come from) and pick the account. If you'll forward by hand instead of using a filter, the From address Resend sees is **your own Gmail address**; approve that too, ideally with a filename pattern.

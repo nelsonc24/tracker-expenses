@@ -33,7 +33,7 @@ WhatsApp is a third channel for `notify()` (see `NOTIFIER.md`), using the **offi
 | `WHATSAPP_TEMPLATE_LANGUAGE` | optional | Language the templates were approved in. Default `en` (use `en_AU` if you approved them in that). |
 
 ## Database
-`notification_preferences.whatsapp_notifications_enabled` (boolean, default false) and `whatsapp_phone_number` (text, E.164). The SQL is hand-written in `src/db/migrations/pending/whatsapp_preferences.sql` and **has not been run anywhere**; fold it into the next numbered migration (or run it manually) before deploying, otherwise every query on `notification_preferences` fails.
+`notification_preferences.whatsapp_notifications_enabled` (boolean, default false) and `whatsapp_phone_number` (text, E.164). They are added by `src/db/migrations/0008_import_automation.sql` (apply with `pnpm db:migrate`), which **has not been run anywhere**. Apply it before deploying, otherwise every query on `notification_preferences` fails.
 
 ## Manual Meta setup (owner)
 1. Buy a prepaid SIM. **Don't install regular WhatsApp on it**: a number registered on the Cloud API can't be used in the consumer app.
