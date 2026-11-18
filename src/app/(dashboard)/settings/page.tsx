@@ -46,6 +46,7 @@ import {
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { CategoryRulesSettings } from '@/components/category-rules-settings'
+import { ApiTokenSettings } from '@/components/api-token-settings'
 import { toast } from 'sonner'
 
 // Sample categories data
@@ -844,6 +845,8 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <ApiTokenSettings />
         </TabsContent>
 
         {/* AI Assistant */}

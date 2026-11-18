@@ -1,0 +1,10 @@
+{
+  "url": "https://your-app.vercel.app/api/ingest",
+  "token": "trk_paste-the-token-from-settings-here",
+  "watchDir": "~/Downloads/bank-imports",
+  "accounts": [
+    { "pattern": "CSVData*.csv", "accountId": "00000000-0000-4000-8000-000000000001", "bankFormat": "commonwealth" },
+    { "pattern": "/^latitude.*\\.pdf$/i", "accountId": "00000000-0000-4000-8000-000000000002" }
+  ],
+  "defaultAccountId": null
+}
