@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { Bell, Mail, Send, Smartphone } from 'lucide-react'
+import { WhatsAppNotificationSettings } from '@/components/whatsapp-notification-settings'
+import { isE164, normalizePhoneInput } from '@/lib/notifications/phone'
 
 interface NotificationPreferences {
   id: string
@@ -30,12 +32,15 @@ interface NotificationPreferences {
   preferredEmail: string | null
   telegramNotificationsEnabled: boolean
   telegramChatId: string | null
+  whatsappNotificationsEnabled: boolean
+  whatsappPhoneNumber: string | null
 }
 
 export function NotificationSettings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null)
+  const [savedWhatsappPhone, setSavedWhatsappPhone] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPreferences()
@@ -47,6 +52,7 @@ export function NotificationSettings() {
       if (!response.ok) throw new Error('Failed to fetch preferences')
       const data = await response.json()
       setPreferences(data)
+      setSavedWhatsappPhone(data.whatsappPhoneNumber ?? null)
     } catch (error) {
       console.error('Error fetching preferences:', error)
       toast.error('Failed to load notification settings')
@@ -57,6 +63,12 @@ export function NotificationSettings() {
 
   const savePreferences = async () => {
     if (!preferences) return
+
+    const whatsappPhone = preferences.whatsappPhoneNumber ? normalizePhoneInput(preferences.whatsappPhoneNumber) : null
+    if (whatsappPhone && !isE164(whatsappPhone)) {
+      toast.error('WhatsApp number must be in international format, e.g. +61412345678')
+      return
+    }
 
     try {
       setSaving(true)
@@ -72,6 +84,7 @@ export function NotificationSettings() {
 
       const updated = await response.json()
       setPreferences(updated)
+      setSavedWhatsappPhone(updated.whatsappPhoneNumber ?? null)
       toast.success('Notification settings saved')
     } catch (error) {
       console.error('Error saving preferences:', error)
@@ -232,6 +245,15 @@ export function NotificationSettings() {
           </div>
         </CardContent>
       </Card>
+
+      {/* WhatsApp Notifications */}
+      <WhatsAppNotificationSettings
+        enabled={preferences.whatsappNotificationsEnabled}
+        phoneNumber={preferences.whatsappPhoneNumber}
+        savedPhoneNumber={savedWhatsappPhone}
+        onEnabledChange={(checked) => updatePreference('whatsappNotificationsEnabled', checked)}
+        onPhoneNumberChange={(value) => updatePreference('whatsappPhoneNumber', value)}
+      />
 
       {/* Bill Reminders */}
       <Card>
