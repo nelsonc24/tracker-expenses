@@ -5,8 +5,8 @@ import { NextRequest } from 'next/server'
 
 const mocks = vi.hoisted(() => ({
   clerkUserId: null as string | null,
-  accountBelongsToUser: vi.fn(async (_userId: string, _accountId: string) => true),
-  ingest: vi.fn(async (_params: Record<string, unknown>) => ({
+  accountBelongsToUser: vi.fn<(userId: string, accountId: string) => Promise<boolean>>(async () => true),
+  ingest: vi.fn<(params: Record<string, unknown>) => Promise<unknown>>(async () => ({
     sessionId: 'session_1',
     inserted: 3,
     duplicates: 1,
