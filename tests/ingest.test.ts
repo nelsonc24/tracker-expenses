@@ -147,7 +147,8 @@ describe('ingest()', () => {
       accountNumber: '1234',
       openingBalance: 0,
       closingBalance: 54.15,
-      transactions: [{ date: '2025-09-09', description: 'Woolworths Epping', amount: 54.15, type: 'debit' }],
+      // parseLatitudPDF emits purchases as negative amounts
+      transactions: [{ date: '2025-09-09', description: 'Woolworths Epping', amount: -54.15, type: 'debit' }],
     })
 
     const result = await ingest(params('statement.pdf', Buffer.from('%PDF-1.4')), ctx.store)

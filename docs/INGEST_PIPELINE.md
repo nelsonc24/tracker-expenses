@@ -17,8 +17,7 @@ Part of `IMPORT_AUTOMATION_AND_WHATSAPP_DEV_PLAN.md`.
 `src/db/migrations/0006_import_session_source.sql` adds `import_sessions.source` and `needs_review_count`. Not yet run anywhere. The raw drizzle-kit output also contained CREATE TABLEs for tables that already exist (stale snapshot); those were removed by hand.
 
 ## Known gaps (not fixed here)
-- Westpac format says `DD MMM YYYY` but real exports use `DD/MM/YYYY`, so Westpac dates fail to parse.
-- In the browser preview path, formats without `skipRows` (westpac, anz, nab) treat the header as a data row. The server path handles headers correctly.
+- ~~Westpac dates~~ and ~~browser preview header rows~~: fixed on `feat/rules-and-reminders` (both formats accepted; preview uses `formatHasHeaderRow`).
 - The old import route's "update account balance from latest row" code never ran (it read `balance` from rows that don't carry it); it was dropped rather than moved.
 
 ## PDF fallback (1.4)

@@ -30,6 +30,7 @@ const prefs = (overrides: Partial<NotificationPrefs> = {}): NotificationPrefs =>
   unusualSpendingEnabled: true,
   telegramNotificationsEnabled: true,
   telegramChatId: '123',
+  statementReminderDays: 35,
   createdAt: new Date(),
   updatedAt: new Date(),
   ...overrides,

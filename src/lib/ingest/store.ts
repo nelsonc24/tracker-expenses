@@ -1,11 +1,13 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { decrypt } from '@/lib/encryption'
+import type { CategoryLookup, CategoryRuleLike } from '@/lib/categorise'
 import { DEFAULT_GEMINI_MODEL, type GeminiConfig } from './ai-pdf'
 import { IngestError } from './types'
 import {
   accounts as accountsTable,
   categories as categoriesTable,
+  categoryRules as categoryRulesTable,
   importSessions as importSessionsTable,
   transactions as transactionsTable,
   users as usersTable,
@@ -14,11 +16,7 @@ import {
 export type NewTransactionRow = typeof transactionsTable.$inferInsert
 export type NewImportSessionRow = typeof importSessionsTable.$inferInsert
 
-export interface CategoryLookup {
-  defaultCategoryId: string
-  /** lower-cased category name -> id */
-  byName: Map<string, string>
-}
+export type { CategoryLookup }
 
 /**
  * Everything `ingest()` needs from the database. Keeping it behind an interface
@@ -28,6 +26,10 @@ export interface IngestStore {
   accountBelongsToUser(userId: string, accountId: string): Promise<boolean>
   getExistingHashes(userId: string): Promise<Set<string>>
   getCategories(userId: string): Promise<CategoryLookup>
+  /** The user's category rules (any order; the categoriser sorts by priority). */
+  getCategoryRules(userId: string): Promise<CategoryRuleLike[]>
+  /** Display name of the account, for the import summary notification. */
+  getAccountName(userId: string, accountId: string): Promise<string | null>
   insertTransactions(rows: NewTransactionRow[]): Promise<void>
   createImportSession(row: NewImportSessionRow): Promise<string>
   /** The user's own Gemini key + model, or null when they haven't set one. */
@@ -75,6 +77,29 @@ export const drizzleStore: IngestStore = {
       defaultCategoryId: defaultCategory.id,
       byName: new Map<string, string>(userCategories.map(c => [c.name.toLowerCase(), c.id])),
     }
+  },
+
+  async getCategoryRules(userId) {
+    return db
+      .select({
+        id: categoryRulesTable.id,
+        matchType: categoryRulesTable.matchType,
+        pattern: categoryRulesTable.pattern,
+        categoryId: categoryRulesTable.categoryId,
+        priority: categoryRulesTable.priority,
+        createdAt: categoryRulesTable.createdAt,
+      })
+      .from(categoryRulesTable)
+      .where(eq(categoryRulesTable.userId, userId))
+  },
+
+  async getAccountName(userId, accountId) {
+    const [row] = await db
+      .select({ name: accountsTable.name })
+      .from(accountsTable)
+      .where(and(eq(accountsTable.id, accountId), eq(accountsTable.userId, userId)))
+      .limit(1)
+    return row?.name ?? null
   },
 
   async insertTransactions(rows) {

@@ -245,6 +245,20 @@ export const transactions = pgTable('transactions', {
   needsReviewIdx: index('transactions_needs_review_idx').on(table.needsReview),
 }))
 
+// Category rules - user-defined "always categorise X as Y" rules applied at import time
+export const categoryRules = pgTable('category_rules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  matchType: text('match_type').$type<'contains' | 'regex' | 'merchant'>().notNull(),
+  pattern: text('pattern').notNull(),
+  categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'cascade' }).notNull(),
+  priority: integer('priority').default(0).notNull(), // higher wins
+  createdFrom: text('created_from').$type<'manual' | 'learned'>().default('manual').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('category_rules_user_id_idx').on(table.userId),
+}))
+
 // Import sessions table (for CSV uploads)
 export const importSessions = pgTable('import_sessions', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -780,7 +794,10 @@ export const notificationPreferences = pgTable('notification_preferences', {
   // Instagram DM Notifications
   telegramNotificationsEnabled: boolean('telegram_notifications_enabled').default(false).notNull(),
   telegramChatId: text('telegram_chat_id'), // Telegram Chat ID
-  
+
+  // Remind the user to import a statement when an account has had no import for this many days
+  statementReminderDays: integer('statement_reminder_days').default(35).notNull(),
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

@@ -27,6 +27,8 @@ const updatePreferencesSchema = z.object({
   // Transaction & Spending Alerts
   transactionAlertsEnabled: z.boolean().optional(),
   unusualSpendingEnabled: z.boolean().optional(),
+  // Missing-statement reminder threshold (days without an import)
+  statementReminderDays: z.number().int().min(7).max(365).optional(),
 })
 
 // GET /api/notifications/preferences - Get user notification preferences

@@ -1,5 +1,8 @@
 import crypto from 'crypto'
 import { isTransferTransaction } from '@/lib/csv-processing'
+import { createCategoriser, isGenericCategoryName, type CategoryRuleLike } from '@/lib/categorise'
+import { suggestCategoriesWithAI, type GenerateSuggestions } from '@/lib/categorise/ai-suggest'
+import type { NotificationEvent } from '@/lib/notifications/notifier'
 import { assignHashes } from './dedup'
 import { parseUploadedFile } from './parse'
 import { drizzleStore, type IngestStore, type NewTransactionRow } from './store'
@@ -19,18 +22,14 @@ export { parseStatementWithAI, checkStatementBalance, type BalanceCheck, type Ge
 export { generateTransactionHash, assignHashes } from './dedup'
 export { drizzleStore, type IngestStore } from './store'
 
-// Categories that mean "we couldn't tell what this is"
-const GENERIC_CATEGORIES = new Set(['', 'general', 'uncategorized', 'uncategorised'])
-
 /** Why a row should be looked at by a human, or null if it looks fine. */
 function reviewReason(
   tx: TransactionData,
-  categoryMatched: boolean,
+  categoryConfident: boolean,
   occurrence: number
 ): 'parser_unsure' | 'low_confidence_category' | 'possible_duplicate' | null {
   if (tx.needsReview) return 'parser_unsure'
-  const name = (tx.category || '').trim().toLowerCase()
-  if (!categoryMatched || GENERIC_CATEGORIES.has(name)) return 'low_confidence_category'
+  if (!categoryConfident) return 'low_confidence_category'
   // An identical row already appeared (or was already saved): probably a real second purchase, but check
   if (occurrence > 1) return 'possible_duplicate'
   return null
@@ -50,6 +49,20 @@ function extractMerchant(description: string): string {
 
 export type { GenerateStatement } from './ai-pdf'
 
+type NotifyFn = (userId: string, event: NotificationEvent) => Promise<unknown>
+
+/** Optional collaborators for `importTransactions` / `ingest` (test seams). */
+export interface ImportHooks {
+  /** Sends the import summary. Defaults to the real `notify()`. */
+  notify?: NotifyFn
+  /** Replaces the Gemini call that suggests categories for uncategorised rows. */
+  generateCategorySuggestions?: GenerateSuggestions
+}
+
+// Loaded lazily so the import pipeline doesn't pull in the email/Telegram clients until needed
+const defaultNotify: NotifyFn = async (userId, event) =>
+  (await import('@/lib/notifications/notifier')).notify(userId, event)
+
 export interface ImportTransactionsParams {
   userId: string
   accountId: string
@@ -62,11 +75,12 @@ export interface ImportTransactionsParams {
 
 /**
  * Save already-parsed transactions: dedupe, categorise, flag transfers, insert,
- * and record an `import_sessions` row.
+ * record an `import_sessions` row and send the import summary.
  */
 export async function importTransactions(
   params: ImportTransactionsParams,
-  store: IngestStore = drizzleStore
+  store: IngestStore = drizzleStore,
+  hooks: ImportHooks = {}
 ): Promise<IngestResult> {
   const { userId, accountId, source, file, transactions, parseErrors = [] } = params
 
@@ -76,11 +90,14 @@ export async function importTransactions(
 
   const existingHashes = await store.getExistingHashes(userId)
   const categories = await store.getCategories(userId)
+  const categoriser = createCategoriser(await loadRules(store, userId), categories)
 
   const hashed = assignHashes(transactions, userId, accountId, existingHashes)
 
   const rows: NewTransactionRow[] = []
   const skipped: IngestResult['skipped'] = []
+  // Rows nothing could categorise (candidates for the optional AI suggestion)
+  const uncategorised: UncategorisedRow[] = []
 
   for (const { tx, hash, duplicate, reason, occurrence } of hashed) {
     if (duplicate) {
@@ -89,18 +106,19 @@ export async function importTransactions(
     }
 
     const amount = parseFloat(tx.amount.toString())
-    const matchedCategoryId = tx.category ? categories.byName.get(tx.category.toLowerCase()) : undefined
-    const categoryId = matchedCategoryId ?? categories.defaultCategoryId
+    const merchant = tx.merchant || extractMerchant(tx.description)
+    const category = categoriser.categorise({ description: tx.description, merchant, amount, category: tx.category })
+    if (category.source === 'default') uncategorised.push({ index: rows.length, description: tx.description, amount })
     const detectedTransfer = isTransferTransaction(tx.description || '', tx.reference || '')
 
     rows.push({
       id: crypto.randomUUID(),
       userId,
       accountId,
-      categoryId,
+      categoryId: category.categoryId,
       amount: amount.toFixed(2),
       description: tx.description.trim(),
-      merchant: tx.merchant || extractMerchant(tx.description),
+      merchant,
       reference: tx.reference || null,
       receiptNumber: tx.receiptNumber || null,
       // Same as before: ISO date string -> Date (UTC midnight)
@@ -108,13 +126,15 @@ export async function importTransactions(
       type: amount < 0 ? 'debit' : 'credit',
       status: 'cleared',
       isTransfer: tx.isTransfer === true || detectedTransfer,
-      needsReview: reviewReason(tx, matchedCategoryId !== undefined, occurrence) !== null,
+      needsReview: reviewReason(tx, category.confident, occurrence) !== null,
       duplicateCheckHash: hash,
       originalData: tx as unknown as Record<string, string | number | boolean | null>,
       createdAt: new Date(),
       updatedAt: new Date(),
     })
   }
+
+  await applyAiSuggestions(store, userId, categories.byName, rows, uncategorised, hooks.generateCategorySuggestions)
 
   const sessionBase = {
     userId,
@@ -158,6 +178,8 @@ export async function importTransactions(
     metadata: { duplicatesFound: skipped.length },
   })
 
+  await sendImportSummary(store, userId, accountId, rows.length, needsReview, hooks.notify ?? defaultNotify)
+
   return {
     sessionId,
     inserted: rows.length,
@@ -170,11 +192,82 @@ export async function importTransactions(
   }
 }
 
+interface UncategorisedRow {
+  /** Index into the rows about to be inserted. */
+  index: number
+  description: string
+  amount: number
+}
+
+/** The user's rules, or none if they can't be loaded (an import must not fail because of rules). */
+async function loadRules(store: IngestStore, userId: string): Promise<CategoryRuleLike[]> {
+  try {
+    return await store.getCategoryRules(userId)
+  } catch (error) {
+    console.error('Failed to load category rules; importing without them:', error)
+    return []
+  }
+}
+
+/**
+ * Ask Gemini (the user's own key) to suggest a category for rows nothing else matched.
+ * Those rows keep `needsReview = true`. Skipped without a key; failures are logged, never thrown.
+ */
+async function applyAiSuggestions(
+  store: IngestStore,
+  userId: string,
+  byName: Map<string, string>,
+  rows: NewTransactionRow[],
+  uncategorised: UncategorisedRow[],
+  generate?: GenerateSuggestions
+): Promise<void> {
+  if (uncategorised.length === 0) return
+  try {
+    const config = await store.getGeminiConfig(userId)
+    if (!config) return
+
+    const names = [...byName.keys()].filter(name => !isGenericCategoryName(name))
+    const suggestions = await suggestCategoriesWithAI(
+      uncategorised.map(u => ({ key: u.index, description: u.description, amount: u.amount })),
+      names,
+      config,
+      generate
+    )
+    for (const [index, name] of suggestions) {
+      const categoryId = byName.get(name.toLowerCase())
+      if (categoryId && rows[index]) rows[index].categoryId = categoryId
+    }
+  } catch (error) {
+    console.error('AI category suggestion failed; leaving rows uncategorised:', error instanceof Error ? error.message : error)
+  }
+}
+
+/** Plan 3.2: tell the user what was imported. Never makes the import fail. */
+async function sendImportSummary(
+  store: IngestStore,
+  userId: string,
+  accountId: string,
+  inserted: number,
+  needsReview: number,
+  notify: NotifyFn
+): Promise<void> {
+  try {
+    const accountName = (await store.getAccountName(userId, accountId)) ?? 'your account'
+    await notify(userId, { type: 'import_summary', accountName, inserted, needsReview })
+  } catch (error) {
+    console.error('Import summary notification failed:', error instanceof Error ? error.message : error)
+  }
+}
+
 /**
  * Turn a file into saved transactions: detect format -> parse -> dedupe ->
- * categorise -> transfer detection -> insert -> import session.
+ * categorise -> transfer detection -> insert -> import session -> summary notification.
  */
-export async function ingest(params: IngestParams, store: IngestStore = drizzleStore): Promise<IngestResult> {
+export async function ingest(
+  params: IngestParams,
+  store: IngestStore = drizzleStore,
+  hooks: ImportHooks = {}
+): Promise<IngestResult> {
   const parsed = await parseUploadedFile({
     fileName: params.fileName,
     mimeType: params.mimeType,
@@ -199,6 +292,7 @@ export async function ingest(params: IngestParams, store: IngestStore = drizzleS
       transactions: parsed.transactions,
       parseErrors: parsed.errors,
     },
-    store
+    store,
+    hooks
   )
 }

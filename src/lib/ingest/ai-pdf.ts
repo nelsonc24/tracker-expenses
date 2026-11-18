@@ -2,7 +2,8 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { generateObject } from 'ai'
 import { isValid, parse } from 'date-fns'
 import { z } from 'zod'
-import { categorizeTransaction, extractMerchant } from '@/lib/csv-processing'
+import { keywordCategory } from '@/lib/categorise'
+import { extractMerchant } from '@/lib/csv-processing'
 import type { TransactionData } from './types'
 
 export interface GeminiConfig {
@@ -139,7 +140,7 @@ export async function parseStatementWithAI(
       date: t.date,
       description,
       amount: t.amount,
-      category: categorizeTransaction(description, merchant, t.amount),
+      category: keywordCategory(description, merchant, t.amount),
       account: accountId,
       merchant,
       type: t.amount < 0 ? 'debit' : 'credit',
