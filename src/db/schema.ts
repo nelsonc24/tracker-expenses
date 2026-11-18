@@ -722,6 +722,11 @@ export const notifications = pgTable('notifications', {
     daysUntilDue?: number
     resendResponse?: Record<string, unknown>
     errorMessage?: string
+    // WhatsApp (status webhooks match on whatsappMessageId)
+    whatsappMessageId?: string
+    whatsappTemplate?: string
+    whatsappStatus?: string
+    dryRun?: boolean
   }>(),
   
   // Error tracking
@@ -777,10 +782,14 @@ export const notificationPreferences = pgTable('notification_preferences', {
   transactionAlertsEnabled: boolean('transaction_alerts_enabled').default(false).notNull(),
   unusualSpendingEnabled: boolean('unusual_spending_enabled').default(true).notNull(),
 
-  // Instagram DM Notifications
+  // Telegram Notifications
   telegramNotificationsEnabled: boolean('telegram_notifications_enabled').default(false).notNull(),
   telegramChatId: text('telegram_chat_id'), // Telegram Chat ID
-  
+
+  // WhatsApp Notifications (Meta Cloud API)
+  whatsappNotificationsEnabled: boolean('whatsapp_notifications_enabled').default(false).notNull(),
+  whatsappPhoneNumber: text('whatsapp_phone_number'), // E.164, e.g. +61412345678
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

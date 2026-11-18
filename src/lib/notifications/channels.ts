@@ -1,5 +1,7 @@
 import { sendBillReminderEmail, sendDebtReminderEmail } from './email-service'
 import { sendTelegramBillReminder, sendTelegramDebtReminder } from './telegram-service'
+import { isE164 } from './phone'
+import { sendWhatsAppEvent } from './whatsapp-notifications'
 import type { ChannelSendResult, NotificationChannel, NotificationEvent } from './notifier'
 
 type ServiceResult = { success: boolean; notificationId?: string; error?: string }
@@ -64,5 +66,17 @@ export const telegramChannel: NotificationChannel = {
       default:
         return { status: 'unsupported' }
     }
+  },
+}
+
+/**
+ * WhatsApp adapter (Meta Cloud API). Every event type has an approved template, see
+ * eventToWhatsAppTemplate(). Runs in dry-run mode while WHATSAPP_TOKEN is unset.
+ */
+export const whatsappChannel: NotificationChannel = {
+  id: 'whatsapp',
+  isEnabled: prefs => prefs.whatsappNotificationsEnabled && isE164(prefs.whatsappPhoneNumber),
+  async send(prefs, event) {
+    return toResult(await sendWhatsAppEvent(prefs.userId, prefs.whatsappPhoneNumber!, event))
   },
 }
