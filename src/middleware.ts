@@ -10,7 +10,11 @@ const isProtectedRoute = createRouteMatcher([
   '/settings(.*)',
 ])
 
+// Provider webhooks authenticate with their own signatures, never a Clerk session
+const isWebhookRoute = createRouteMatcher(['/api/webhooks/inbound-email(.*)'])
+
 export default clerkMiddleware(async (auth, req) => {
+  if (isWebhookRoute(req)) return
   if (isProtectedRoute(req)) {
     await auth.protect()
   }
