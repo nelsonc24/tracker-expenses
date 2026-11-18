@@ -31,6 +31,7 @@ function defaultPrefs(userId: string): NotificationPrefs {
     unusualSpendingEnabled: true,
     telegramNotificationsEnabled: false,
     telegramChatId: null,
+    statementReminderDays: 35,
     createdAt: now,
     updatedAt: now,
   }
