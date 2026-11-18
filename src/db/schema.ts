@@ -916,3 +916,21 @@ export const insertInvestmentScenarioSchema = createInsertSchema(investmentScena
 export const selectInvestmentScenarioSchema = createSelectSchema(investmentScenarios)
 export type InsertInvestmentScenario = z.infer<typeof insertInvestmentScenarioSchema>
 export type SelectInvestmentScenario = z.infer<typeof selectInvestmentScenarioSchema>
+
+// API Tokens table - personal tokens for automated imports (POST /api/ingest).
+// Only the SHA-256 hash of the token is stored; the plaintext is shown once on creation.
+export const apiTokens = pgTable('api_tokens', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  lastUsedAt: timestamp('last_used_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  revokedAt: timestamp('revoked_at'),
+}, (table) => ({
+  userIdIdx: index('api_tokens_user_id_idx').on(table.userId),
+  tokenHashUnique: unique('api_tokens_token_hash_unique').on(table.tokenHash),
+}))
+
+export type ApiToken = typeof apiTokens.$inferSelect
+export type NewApiToken = typeof apiTokens.$inferInsert
