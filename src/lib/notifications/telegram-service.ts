@@ -99,8 +99,13 @@ const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
 export function telegramImportAlertText(
   event:
     | { type: 'import_summary'; accountName: string; inserted: number; needsReview: number }
-    | { type: 'statement_missing'; accountName: string; daysSinceImport: number },
+    | { type: 'statement_missing'; accountName: string; daysSinceImport: number }
+    | { type: 'import_failed'; source: 'email'; fileCount: number },
 ): string {
+  if (event.type === 'import_failed') {
+    const files = event.fileCount === 1 ? '1 statement' : `${event.fileCount} statements`
+    return `⚠️ <b>Import failed</b>\n${files} received by email could not be imported. Please upload ${event.fileCount === 1 ? 'it' : 'them'} manually.`
+  }
   const account = escapeHtml(event.accountName)
   if (event.type === 'import_summary') {
     const review = event.needsReview > 0 ? `, <b>${event.needsReview}</b> need review` : ''

@@ -29,7 +29,7 @@ export interface WhatsAppSendResult {
 }
 
 /** Template names that must exist (approved, Utility category) in WhatsApp Manager. */
-export type WhatsAppTemplateName = 'bill_due' | 'debt_due' | 'budget_alert' | 'import_summary' | 'statement_missing'
+export type WhatsAppTemplateName = 'bill_due' | 'debt_due' | 'budget_alert' | 'import_summary' | 'statement_missing' | 'import_failed'
 
 export interface WhatsAppTemplate {
   name: WhatsAppTemplateName
@@ -184,6 +184,7 @@ export function describeDueDate(dueDate: string, daysUntilDue: number): string {
  *   budget_alert      "You've used {{1}}% of your {{2}} budget."
  *   import_summary    "{{1}} new transactions imported, {{2}} need review."
  *   statement_missing "No statement imported for {{1}} in {{2}} days."
+ *   import_failed     "{{1}} statement(s) received by email could not be imported. Please upload manually."
  */
 export function eventToWhatsAppTemplate(event: NotificationEvent): WhatsAppTemplate {
   switch (event.type) {
@@ -197,6 +198,8 @@ export function eventToWhatsAppTemplate(event: NotificationEvent): WhatsAppTempl
       return { name: 'import_summary', params: [String(event.inserted), String(event.needsReview)] }
     case 'statement_missing':
       return { name: 'statement_missing', params: [event.accountName, String(event.daysSinceImport)] }
+    case 'import_failed':
+      return { name: 'import_failed', params: [String(event.fileCount)] }
     default: {
       const unhandled: never = event
       throw new Error(`No WhatsApp template for event ${JSON.stringify(unhandled)}`)
@@ -212,6 +215,7 @@ export function renderTemplatePreview(template: WhatsAppTemplate): string {
     budget_alert: "You've used {{1}}% of your {{2}} budget.",
     import_summary: '{{1}} new transactions imported, {{2}} need review.',
     statement_missing: 'No statement imported for {{1}} in {{2}} days.',
+    import_failed: '{{1}} statement(s) received by email could not be imported. Please upload manually.',
   }
   return bodies[template.name].replace(/\{\{(\d+)\}\}/g, (_, n: string) => template.params[Number(n) - 1] ?? '')
 }

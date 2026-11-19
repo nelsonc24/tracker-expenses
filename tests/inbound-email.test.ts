@@ -3,7 +3,10 @@ import { Webhook } from 'svix'
 import type { IngestParams, IngestResult } from '@/lib/ingest'
 import {
   handleInboundEmailWebhook,
+  retryInboundEmails,
+  RETRY,
   type ClaimResult,
+  type FinishStatus,
   type InboundEmailDeps,
   type InboundEmailStore,
   type InboundEmailSummary,
@@ -88,36 +91,64 @@ function fakeResendFetch(attachments: Att[], contents: Record<string, Uint8Array
 }
 
 /** In-memory version of the drizzle store, with the same claim semantics. */
+type MemEmail = {
+  status: string
+  messageId: string | null
+  userId: string
+  senderEmail: string
+  summary: InboundEmailSummary | null
+  attempts: number
+  createdAt: Date
+  updatedAt: Date
+}
+
 class MemoryStore implements InboundEmailStore {
   rules: SenderRule[] = []
-  emails = new Map<string, { status: string; messageId: string | null; userId: string; summary: InboundEmailSummary | null }>()
+  emails = new Map<string, MemEmail>()
   claims = 0
+  clock = () => new Date()
 
   async findSenderRules(senderEmail: string) {
     return this.rules.filter(r => r.senderEmail === senderEmail)
   }
 
-  async claim({ emailId, messageId, userId }: { provider: string; emailId: string; messageId: string | null; userId: string }): Promise<ClaimResult> {
+  async claim({ emailId, messageId, userId, senderEmail }: { provider: string; emailId: string; messageId: string | null; userId: string; senderEmail: string }): Promise<ClaimResult> {
     this.claims++
+    const now = this.clock()
     const existing = this.emails.get(emailId)
     if (!existing) {
       const sameMessage = [...this.emails.values()].some(
         e => messageId && e.messageId === messageId && e.userId === userId && e.status !== 'failed'
       )
       if (sameMessage) return { claimed: false, reason: 'duplicate_message' }
-      this.emails.set(emailId, { status: 'processing', messageId, userId, summary: null })
-      return { claimed: true, previous: null }
+      this.emails.set(emailId, { status: 'processing', messageId, userId, senderEmail, summary: null, attempts: 1, createdAt: now, updatedAt: now })
+      return { claimed: true, previous: null, attempts: 1 }
     }
-    if (existing.status === 'processed') return { claimed: false, reason: 'already_processed' }
-    if (existing.status === 'processing') return { claimed: false, reason: 'in_progress' }
+    if (existing.status === 'processed' || existing.status === 'abandoned') return { claimed: false, reason: 'already_processed' }
+    const stale = existing.updatedAt.getTime() < now.getTime() - RETRY.staleMinutes * 60_000
+    if (existing.status === 'processing' && !stale) return { claimed: false, reason: 'in_progress' }
     existing.status = 'processing'
-    return { claimed: true, previous: existing.summary }
+    existing.attempts++
+    existing.updatedAt = now
+    return { claimed: true, previous: existing.summary, attempts: existing.attempts }
   }
 
-  async finish(_provider: string, emailId: string, status: 'processed' | 'failed', summary: InboundEmailSummary) {
+  async finish(_provider: string, emailId: string, status: FinishStatus, summary: InboundEmailSummary) {
     const e = this.emails.get(emailId)!
     e.status = status
     e.summary = summary
+    e.updatedAt = this.clock()
+  }
+
+  async listRetryable({ now }: { now: Date }) {
+    return [...this.emails.entries()]
+      .filter(([, e]) =>
+        e.attempts < RETRY.maxAttempts &&
+        e.createdAt.getTime() > now.getTime() - RETRY.maxAgeDays * 86_400_000 &&
+        (e.status === 'failed' ||
+          (e.status === 'processing' && e.updatedAt.getTime() < now.getTime() - RETRY.staleMinutes * 60_000))
+      )
+      .map(([emailId, e]) => ({ provider: 'resend', emailId, messageId: e.messageId, userId: e.userId, senderEmail: e.senderEmail }))
   }
 }
 
@@ -415,5 +446,100 @@ describe('sender helpers', () => {
     ]
     expect(pickSenderRule(rules, 'my-card.pdf')?.id).toBe('card')
     expect(pickSenderRule(rules, 'savings.csv')?.id).toBe('all')
+  })
+})
+
+// ─── retry cron ──────────────────────────────────────────────────────────────
+
+describe('retryInboundEmails', () => {
+  const T0 = new Date('2026-11-19T00:00:00.000Z')
+  const later = (minutes: number) => new Date(T0.getTime() + minutes * 60_000)
+  const pdf = (id: string) => ({ id, filename: `${id}.pdf`, size: 1000 })
+
+  function retryDeps(fetchImpl: typeof fetch, notify = vi.fn(async () => undefined)) {
+    const { schedule: _schedule, ...rest } = deps(fetchImpl, { notify })
+    return { deps: rest, notify }
+  }
+
+  beforeEach(() => {
+    store.clock = () => T0
+  })
+
+  test('an email whose background import never ran (timeout) is imported by the retry', async () => {
+    const fetchImpl = fakeResendFetch([pdf('a1')])
+    const res = await handleInboundEmailWebhook(signedRequest(receivedEvent()), deps(fetchImpl))
+    expect(res.body.status).toBe('accepted')
+    tasks = [] // simulate the function being killed before after() ran
+
+    // Not stale yet: nothing to retry
+    const { deps: rd, notify } = retryDeps(fetchImpl)
+    expect((await retryInboundEmails(rd, later(5))).checked).toBe(0)
+
+    store.clock = () => later(20)
+    const summary = await retryInboundEmails(rd, later(20))
+    expect(summary).toMatchObject({ checked: 1, processed: 1 })
+    expect(ingest).toHaveBeenCalledTimes(1)
+    expect(store.emails.get('email_1')).toMatchObject({ status: 'processed', attempts: 2 })
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  test('gives up after the last attempt, marks it abandoned and tells the user once', async () => {
+    ingest.mockRejectedValue(new Error('parse failed'))
+    const fetchImpl = fakeResendFetch([pdf('a1')])
+    const { deps: rd, notify } = retryDeps(fetchImpl)
+
+    await handleInboundEmailWebhook(signedRequest(receivedEvent()), deps(fetchImpl, { notify }))
+    await runScheduled()
+    expect(store.emails.get('email_1')).toMatchObject({ status: 'failed', attempts: 1 })
+
+    expect(await retryInboundEmails(rd, later(60))).toMatchObject({ failed: 1 })
+    expect(await retryInboundEmails(rd, later(120))).toMatchObject({ abandoned: 1 })
+    expect(store.emails.get('email_1')).toMatchObject({ status: 'abandoned', attempts: RETRY.maxAttempts })
+    expect(notify).toHaveBeenCalledTimes(1)
+    expect(notify).toHaveBeenCalledWith(USER, { type: 'import_failed', source: 'email', fileCount: 1 })
+
+    // Abandoned is final: no more retries, and a redelivered webhook doesn't re-import
+    expect((await retryInboundEmails(rd, later(180))).checked).toBe(0)
+    const again = await handleInboundEmailWebhook(signedRequest(receivedEvent()), deps(fetchImpl, { notify }))
+    expect(again.body).toMatchObject({ status: 'duplicate', reason: 'already_processed' })
+  })
+
+  test('only re-imports the attachments that failed', async () => {
+    ingest.mockImplementation(async (p: IngestParams) => {
+      if (p.fileName === 'b1.pdf') throw new Error('boom')
+      return okResult()
+    })
+    const fetchImpl = fakeResendFetch([pdf('a1'), pdf('b1')])
+    await handleInboundEmailWebhook(signedRequest(receivedEvent()), deps(fetchImpl))
+    await runScheduled()
+    expect(ingest).toHaveBeenCalledTimes(2)
+
+    ingest.mockImplementation(async () => okResult())
+    const { deps: rd } = retryDeps(fetchImpl)
+    expect(await retryInboundEmails(rd, later(30))).toMatchObject({ processed: 1 })
+    expect(ingest).toHaveBeenCalledTimes(3)
+    expect(ingest.mock.calls[2][0].fileName).toBe('b1.pdf')
+  })
+
+  test('stops retrying without alerting when the sender is no longer approved', async () => {
+    ingest.mockRejectedValue(new Error('boom'))
+    const fetchImpl = fakeResendFetch([pdf('a1')])
+    await handleInboundEmailWebhook(signedRequest(receivedEvent()), deps(fetchImpl))
+    await runScheduled()
+
+    store.rules = []
+    const { deps: rd, notify } = retryDeps(fetchImpl)
+    expect(await retryInboundEmails(rd, later(30))).toMatchObject({ abandoned: 1 })
+    expect(notify).not.toHaveBeenCalled()
+  })
+
+  test('emails older than the retry window are left alone', async () => {
+    ingest.mockRejectedValue(new Error('boom'))
+    const fetchImpl = fakeResendFetch([pdf('a1')])
+    await handleInboundEmailWebhook(signedRequest(receivedEvent()), deps(fetchImpl))
+    await runScheduled()
+
+    const { deps: rd } = retryDeps(fetchImpl)
+    expect((await retryInboundEmails(rd, later((RETRY.maxAgeDays + 1) * 24 * 60))).checked).toBe(0)
   })
 })

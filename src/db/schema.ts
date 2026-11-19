@@ -984,7 +984,9 @@ export const inboundEmails = pgTable('inbound_emails', {
   providerEmailId: text('provider_email_id').notNull(),
   messageId: text('message_id'),
   userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  status: text('status').notNull(), // 'processing' | 'processed' | 'failed'
+  senderEmail: text('sender_email'), // lower-cased From, so the retry cron can re-resolve sender rules
+  status: text('status').notNull(), // 'processing' | 'processed' | 'failed' | 'abandoned'
+  attempts: integer('attempts').default(0).notNull(), // claims taken so far (webhook + cron retries)
   // Per-attachment outcome (ids, filenames, counts, error messages; never file contents)
   summary: jsonb('summary').$type<Record<string, unknown>>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),

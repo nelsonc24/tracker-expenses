@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { ingest } from '@/lib/ingest'
+import { notify } from '@/lib/notifications/notifier'
 import { handleInboundEmailWebhook } from '@/lib/inbound-email/process'
 import { resendProviderFromEnv } from '@/lib/inbound-email/resend'
 import { drizzleInboundEmailStore } from '@/lib/inbound-email/store'
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
       store: drizzleInboundEmailStore,
       ingest: params => ingest(params),
       schedule: task => after(task),
+      notify: (userId, event) => notify(userId, event),
     }
   )
 

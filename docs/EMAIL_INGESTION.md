@@ -13,6 +13,15 @@ Forward a bank statement email (or let a Gmail filter do it) to the app's import
 6. The route answers **200 straight away** with that summary. Downloading and `ingest()` run afterwards (Next `after()`, `maxDuration = 60`). The per-attachment outcome (session id, inserted / duplicate / needs-review counts, or a short error) is saved on the `inbound_emails` row. Attachment contents and email bodies are never logged or stored.
 7. If any attachment fails, the row is marked `failed`. Re-sending the webhook from the Resend dashboard retries **only** the failed attachments.
 
+### Retries and failure alerts
+
+If an import fails (a download or parse error), or the function times out before `after()` finishes, the email isn't lost:
+
+- **Retry cron:** `/api/cron/retry-inbound-email` runs daily at 08:30 UTC (`vercel.json`, protected by `CRON_SECRET`). It retries emails that are `failed`, or stuck in `processing` for more than 15 minutes. It takes up to 5 emails per run and only emails from the last 3 days. Attachments that were already imported are skipped.
+- **Giving up:** an email gets 3 attempts in total (the webhook plus 2 retries). After the last one it's marked `abandoned`, and you get an `import_failed` alert on Telegram/WhatsApp asking you to upload the statement manually. Abandoned is final: a re-sent webhook won't import it again.
+- **Sender removed:** if the sender was removed from your approved list in the meantime, the email is abandoned without an alert.
+- **Faster retries:** on a Vercel Pro plan you can change the cron to hourly (`0 * * * *`) to retry sooner. Hobby plans only allow daily crons.
+
 ### Sender rules
 Settings → **Data** → **Email Import**. Each rule is `sender email → account`, with an optional filename glob (`*`, `?`, case-insensitive), e.g. `Latitude*.pdf`. A rule whose pattern matches wins over a rule without a pattern for the same sender. A sender approved by two different users is rejected as ambiguous.
 
@@ -41,7 +50,7 @@ Resend dashboard → **Webhooks** → Add endpoint:
 Redeploy after setting them.
 
 ### 4. Migration
-Run `src/db/migrations/0008_import_automation.sql` (apply with `pnpm db:migrate`) against Neon (it creates `import_senders` and `inbound_emails`). 
+Run migrations `0008_import_automation.sql` and `0009_inbound_email_retries.sql` (apply with `pnpm db:migrate`) against Neon (it creates `import_senders` and `inbound_emails`). 
 
 ### 5. Approve senders in the app
 Settings → Data → Email Import → add the bank's sending address (e.g. the address Latitude statements come from) and pick the account. If you'll forward by hand instead of using a filter, the From address Resend sees is **your own Gmail address**; approve that too, ideally with a filename pattern.
@@ -60,4 +69,4 @@ Forward a real statement email. Resend → Webhooks shows the delivery and the J
 ## Security notes / limits
 - The From header can be spoofed. The protections are: an approved-sender list, an unpublished inbound address, CSV/PDF only, 10 MB cap, and dedup on every row. Resend's webhook doesn't expose SPF/DKIM results, so they aren't checked here.
 - Only one Resend inbound address is shown in Settings (single-owner app). There's no per-user address.
-- A row stuck in `processing` (e.g. the function timed out) can be retaken after 15 minutes by re-sending the webhook.
+- A row stuck in `processing` (e.g. the function timed out) is picked up by the retry cron after 15 minutes, or can be retaken by re-sending the webhook.

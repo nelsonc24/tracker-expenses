@@ -71,6 +71,7 @@ export const telegramChannel: NotificationChannel = {
         return toResult(await sendTelegramDebtReminder(debtPayload(prefs.userId, event)))
       case 'import_summary':
       case 'statement_missing':
+      case 'import_failed':
         return toResult(await sendTelegramText(prefs.telegramChatId!, telegramImportAlertText(event)))
       default:
         return { status: 'unsupported' }

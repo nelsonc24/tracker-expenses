@@ -47,7 +47,15 @@ export interface StatementMissingEvent {
   daysSinceImport: number
 }
 
+/** Statements that arrived (e.g. by email) but could not be imported after retrying. */
+export interface ImportFailedEvent {
+  type: 'import_failed'
+  source: 'email'
+  fileCount: number
+}
+
 export type NotificationEvent =
+  | ImportFailedEvent
   | BillDueEvent
   | DebtDueEvent
   | BudgetAlertEvent

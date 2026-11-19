@@ -15,6 +15,7 @@ WhatsApp is a third channel for `notify()` (see `NOTIFIER.md`), using the **offi
   | `budget_alert` | `budget_alert` | You've used {{1}}% of your {{2}} budget. | rounded %, budget name |
   | `import_summary` | `import_summary` | {{1}} new transactions imported, {{2}} need review. | counts |
   | `statement_missing` | `statement_missing` | No statement imported for {{1}} in {{2}} days. | account name, days |
+  | `import_failed` | `import_failed` | {{1}} statement(s) received by email could not be imported. Please upload manually. | file count |
 
 - **Settings UI:** a WhatsApp card under Telegram (`whatsapp-notification-settings.tsx`) with a toggle, an E.164 phone input and **Send test message**. The test (`POST /api/notifications/whatsapp/test`, Clerk-authenticated) always goes to the user's **saved** number, never to a number from the request, and uses Meta's pre-approved `hello_world` sample template (`en_US`).
 - **Webhook:** `/api/webhooks/whatsapp`
@@ -43,7 +44,7 @@ WhatsApp is a third channel for `notify()` (see `NOTIFIER.md`), using the **offi
 4. Add your personal number as a recipient.
 5. Business Settings → System Users → create a system user with `whatsapp_business_messaging` and generate a **permanent** token (the API Setup page token expires after 24 hours).
 6. Add a payment method in Meta Business Settings. Utility templates are charged per message (inside the 24-hour window too, since 1 Oct 2026). Check current AU rates.
-7. Create these **Utility** templates (language `en`, or `en_AU` and set `WHATSAPP_TEMPLATE_LANGUAGE`) and wait for approval: `bill_due`, `debt_due`, `budget_alert`, `import_summary`, `statement_missing`, with the bodies in the table above.
+7. Create these **Utility** templates (language `en`, or `en_AU` and set `WHATSAPP_TEMPLATE_LANGUAGE`) and wait for approval: `bill_due`, `debt_due`, `budget_alert`, `import_summary`, `statement_missing`, `import_failed`, with the bodies in the table above.
 8. Set the Vercel env vars above.
 9. WhatsApp → Configuration → Webhook: callback URL `https://<your-domain>/api/webhooks/whatsapp`, verify token = `WHATSAPP_VERIFY_TOKEN`, then subscribe to the `messages` field.
 10. In Settings → Notifications, enable WhatsApp, save your number, and press **Send test message**.
