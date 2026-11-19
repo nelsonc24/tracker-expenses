@@ -19,9 +19,10 @@ const updatePreferencesSchema = z.object({
   budgetAlertThreshold: z.number().min(0).max(100).optional(),
   budgetAlertChannel: z.enum(['email', 'push', 'both']).optional(),
   digestFrequency: z.enum(['immediate', 'daily', 'weekly', 'never']).optional(),
-  quietHoursStart: z.string().optional(),
-  quietHoursEnd: z.string().optional(),
-  preferredEmail: z.string().email().optional(),
+  // null is the stored default for these, and the settings form posts the whole record back
+  quietHoursStart: z.string().optional().nullable(),
+  quietHoursEnd: z.string().optional().nullable(),
+  preferredEmail: z.string().email().optional().nullable(),
   // Telegram notifications
   telegramNotificationsEnabled: z.boolean().optional(),
   telegramChatId: z.string().max(64).optional().nullable(),
