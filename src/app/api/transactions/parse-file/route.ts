@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { parseCreditCardPDF, creditCardStatementToTransactions } from '@/lib/pdf-processing'
+import { IngestError, drizzleStore, parseUploadedFile } from '@/lib/ingest'
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,75 +23,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account ID is required' }, { status: 400 })
     }
 
-    let transactions: Array<{
-      date: string
-      description: string
-      amount: number
-      category: string
-      account: string
-      type: 'debit' | 'credit'
-    }> = []
+    const parsed = await parseUploadedFile({
+      fileName: file.name,
+      mimeType: file.type,
+      fileType: fileType || undefined,
+      buffer: await file.arrayBuffer(),
+      accountId,
+      aiConfig: () => drizzleStore.getGeminiConfig(userId),
+    })
 
-    // Handle different file types
-    if (fileType === 'pdf' || file.name.endsWith('.pdf')) {
-      // Parse PDF file
-      const arrayBuffer = await file.arrayBuffer()
-      const statement = await parseCreditCardPDF(arrayBuffer)
-      transactions = creditCardStatementToTransactions(statement, accountId)
-
-      return NextResponse.json({
-        success: true,
-        message: 'PDF parsed successfully',
-        transactions,
-        metadata: {
-          statementDate: statement.statementDate,
-          accountNumber: statement.accountNumber,
-          openingBalance: statement.openingBalance,
-          closingBalance: statement.closingBalance,
-          creditLimit: statement.creditLimit,
-          availableCredit: statement.availableCredit,
-          minimumPayment: statement.minimumPayment,
-          dueDate: statement.dueDate
-        }
-      })
-    } else if (fileType === 'json' || file.name.endsWith('.json')) {
-      // Parse JSON file
-      const text = await file.text()
-      const data = JSON.parse(text)
-
-      // Validate JSON structure
-      if (!Array.isArray(data) && !data.transactions) {
-        return NextResponse.json(
-          { error: 'Invalid JSON format. Expected an array of transactions or an object with a transactions array.' },
-          { status: 400 }
-        )
-      }
-
-      const transactionsArray = Array.isArray(data) ? data : data.transactions
-
-      // Map JSON to transaction format
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      transactions = transactionsArray.map((t: any) => ({
-        date: t.date || t.transaction_date || t.transactionDate,
-        description: t.description || t.merchant || t.name,
-        amount: parseFloat(t.amount),
-        category: t.category || 'Uncategorized',
-        account: accountId,
-        type: (parseFloat(t.amount) >= 0 ? 'credit' : 'debit') as 'debit' | 'credit'
-      }))
-
-      return NextResponse.json({
-        success: true,
-        message: 'JSON parsed successfully',
-        transactions
-      })
-    } else {
-      return NextResponse.json(
-        { error: 'Unsupported file type. Please upload a PDF, CSV, or JSON file.' },
-        { status: 400 }
-      )
-    }
+    return NextResponse.json({
+      success: true,
+      message: `${parsed.kind.toUpperCase()} parsed successfully`,
+      transactions: parsed.transactions,
+      parsedBy: parsed.parsedBy,
+      balanceCheck: parsed.balanceCheck,
+      ...(parsed.metadata ? { metadata: parsed.metadata } : {}),
+    })
   } catch (error) {
+    if (error instanceof IngestError && (error.code === 'unsupported_file' || error.code === 'invalid_input')) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    if (error instanceof IngestError && error.code === 'parse_failed') {
+      return NextResponse.json({ error: 'Failed to parse file', details: error.message }, { status: 422 })
+    }
     console.error('Error parsing file:', error)
     return NextResponse.json(
       { 

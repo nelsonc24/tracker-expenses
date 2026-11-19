@@ -20,7 +20,16 @@ import {
   Building2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { bankFormats, validateTransactionRow, validateParsedTransactions, ProcessedTransaction, type BankFormat } from '@/lib/csv-processing'
+import {
+  bankFormats,
+  validateTransactionRow,
+  validateParsedTransactions,
+  ProcessedTransaction,
+  parseCSVLine,
+  detectBankFormatFromText,
+  MIN_DETECTION_CONFIDENCE,
+  type BankFormat
+} from '@/lib/csv-processing'
 
 const bankTemplates = [
   {
@@ -45,50 +54,14 @@ const bankTemplates = [
   }
 ]
 
-// Helper function to detect bank format from CSV content
-function detectBankFormat(csvContent: string): BankFormat {
-  const lines = csvContent.split('\n').filter(line => line.trim())
-  const firstLine = lines[0]
-  
-  // Check for Commonwealth Bank format (no headers, specific structure)
-  if (!firstLine.includes('Date') && !firstLine.includes('Description')) {
-    const fields = parseCSVLine(firstLine)
-    // Commonwealth Bank: Date, Amount, Description, Balance
-    if (fields.length >= 4 && fields[0].match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-      return bankFormats.commonwealth
-    }
+// Detect the bank format from CSV content. When detection isn't confident we
+// keep the previous behaviour and default to Commonwealth Bank.
+function detectFormatForUpload(csvContent: string): BankFormat {
+  const { format, confidence } = detectBankFormatFromText(csvContent)
+  if (format && confidence >= MIN_DETECTION_CONFIDENCE && bankFormats[format]) {
+    return bankFormats[format]
   }
-  
-  // Check for UBank format (specific header pattern)
-  if (firstLine.includes('Date and time') || firstLine.includes('Payment type')) {
-    return bankFormats.ubank
-  }
-  
-  // Default to Commonwealth for now if unclear
   return bankFormats.commonwealth
-}
-
-// Helper function to parse CSV line handling quoted fields
-const parseCSVLine = (line: string): string[] => {
-  const result: string[] = []
-  let current = ''
-  let inQuotes = false
-  
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-    
-    if (char === '"') {
-      inQuotes = !inQuotes
-    } else if (char === ',' && !inQuotes) {
-      result.push(current)
-      current = ''
-    } else {
-      current += char
-    }
-  }
-  
-  result.push(current) // Add the last field
-  return result
 }
 
 interface ImportStep {
@@ -237,6 +210,7 @@ export default function ImportPage() {
           merchant: t.description,
           reference: '',
           balance: 0,
+          needsReview: t.needsReview === true,
           status: 'valid' as const,
           errors: [],
           rawData: t
@@ -246,6 +220,11 @@ export default function ImportPage() {
         setProgress(100)
         setImportStatus('completed')
         
+        // AI-parsed statements are checked against the printed balances; make a mismatch visible
+        if (result.balanceCheck && !result.balanceCheck.ok) {
+          alert(`AI-parsed statement needs checking: ${result.balanceCheck.reason}. Review the transactions carefully before importing.`)
+        }
+
         // If it's a PDF, show metadata
         if (result.metadata) {
           console.log('Statement metadata:', result.metadata)
@@ -271,7 +250,7 @@ export default function ImportPage() {
         
         // Detect bank format or use selected format
         const bankFormat = selectedBankFormat === 'auto' 
-          ? detectBankFormat(text) 
+          ? detectFormatForUpload(text) 
           : bankFormats[selectedBankFormat]
         
         // Skip header rows if specified in format
@@ -353,29 +332,6 @@ export default function ImportPage() {
     reader.readAsText(file)
   }
 
-  // Helper function to parse CSV line handling quoted fields
-  const parseCSVLine = (line: string): string[] => {
-    const result: string[] = []
-    let current = ''
-    let inQuotes = false
-    
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i]
-      
-      if (char === '"') {
-        inQuotes = !inQuotes
-      } else if (char === ',' && !inQuotes) {
-        result.push(current)
-        current = ''
-      } else {
-        current += char
-      }
-    }
-    
-    result.push(current) // Add the last field
-    return result
-  }
-
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
@@ -424,7 +380,8 @@ export default function ImportPage() {
           balance: transaction.balance || null,
           transactionId: transaction.transactionId || null,
           receiptNumber: transaction.receiptNumber || null,
-          isTransfer: transaction.isTransfer === true
+          isTransfer: transaction.isTransfer === true,
+          needsReview: transaction.needsReview === true
         }))
 
       const response = await fetch('/api/transactions/import', {
@@ -435,7 +392,11 @@ export default function ImportPage() {
         body: JSON.stringify({
           transactions: transactionsToImport,
           uploadId: `upload_${Date.now()}`,
-          accountId: selectedAccountId
+          accountId: selectedAccountId,
+          fileName: selectedFile?.name,
+          fileSize: selectedFile?.size,
+          fileType: selectedFile?.name.split('.').pop()?.toLowerCase(),
+          bankFormat: selectedBankFormat === 'auto' ? null : selectedBankFormat
         })
       })
 

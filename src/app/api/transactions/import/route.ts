@@ -1,41 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import crypto from 'crypto'
-import { db } from '@/db'
-import { transactions as transactionsTable, accounts as accountsTable, categories as categoriesTable } from '@/db/schema'
-import { eq, and } from 'drizzle-orm'
-import { isTransferTransaction } from '@/lib/csv-processing'
-
-// Types for transaction processing
-interface TransactionData {
-  date: string
-  description: string
-  amount: number
-  category: string
-  account: string
-  merchant?: string
-  reference?: string
-  balance?: number
-  receiptNumber?: string  // Added receipt number field
-  transactionId?: string  // Added bank transaction ID
-  isTransfer?: boolean    // Flag to indicate transfer between accounts
-}
-
-// Generate a consistent hash for duplicate detection
-function generateTransactionHash(tx: TransactionData, userId: string, accountId: string): string {
-  // Use transaction ID as primary identifier if available, otherwise fall back to composite hash
-  if (tx.transactionId) {
-    return crypto.createHash('sha256').update(`${userId}-${accountId}-${tx.transactionId}`).digest('hex').substring(0, 16)
-  }
-  
-  // Fallback to composite hash for banks that don't provide unique transaction IDs
-  // Normalize description to lowercase for case-insensitive duplicate detection
-  const normalizedDescription = tx.description.toLowerCase().trim()
-  // Use accountId instead of account name from CSV for consistency
-  const hashInput = `${userId}-${accountId}-${tx.date}-${normalizedDescription}-${tx.amount}`
-  return crypto.createHash('sha256').update(hashInput).digest('hex').substring(0, 16)
-}
+import { importTransactions, IngestError } from '@/lib/ingest'
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,7 +11,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { transactions: transactionData, accountId } = body
+    const { transactions: transactionData, accountId, fileName, fileSize, fileType, bankFormat } = body
 
     // Validate request data
     if (!transactionData || !Array.isArray(transactionData)) {
@@ -58,145 +23,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account ID is required' }, { status: 400 })
     }
 
-    // Verify the account belongs to the user
-    const userAccount = await db
-      .select()
-      .from(accountsTable)
-      .where(and(eq(accountsTable.id, accountId), eq(accountsTable.userId, userId)))
-      .limit(1)
-
-    if (userAccount.length === 0) {
-      return NextResponse.json({ error: 'Invalid account or account does not belong to user' }, { status: 403 })
-    }
-
-    // Get existing transaction hashes from database to check for duplicates
-    const existingHashes = await db
-      .select({ hash: transactionsTable.duplicateCheckHash })
-      .from(transactionsTable)
-      .where(eq(transactionsTable.userId, userId))
-    
-    const existingTransactionHashes = new Set<string>(
-      existingHashes.map(row => row.hash).filter((hash): hash is string => Boolean(hash))
-    )
-
-    // Get or create default category for imports (fallback when category not found)
-    const defaultCategory = await getOrCreateDefaultCategory(userId)
-
-    // Fetch all user categories to match detected category names from CSV preview
-    const userCategories = await db
-      .select({ id: categoriesTable.id, name: categoriesTable.name })
-      .from(categoriesTable)
-      .where(eq(categoriesTable.userId, userId))
-
-    const categoryNameToId = new Map<string, string>(
-      userCategories.map(cat => [cat.name.toLowerCase(), cat.id])
-    )
-
-    // Process transactions and check for duplicates
-    const newTransactions: any[] = []
-    const duplicateTransactions: any[] = []
-
-    for (const tx of transactionData) {
-      // Skip transactions with zero amount
-      const amount = parseFloat(tx.amount.toString())
-      if (amount === 0) {
-        duplicateTransactions.push({
-          ...tx,
-          reason: 'Transaction has zero amount'
-        })
-        continue
-      }
-
-      const transactionHash = generateTransactionHash(tx, userId, accountId)
-      
-      if (existingTransactionHashes.has(transactionHash)) {
-        duplicateTransactions.push({
-          ...tx,
-          hash: transactionHash,
-          reason: 'Duplicate transaction already exists'
-        })
-      } else {
-        // Resolve category: match by name (case-insensitive), fallback to default
-        const resolvedCategoryId = tx.category
-          ? (categoryNameToId.get(tx.category.toLowerCase()) ?? defaultCategory.id)
-          : defaultCategory.id
-
-        const detectedTransfer = isTransferTransaction(
-          tx.description || '',
-          tx.reference || ''
-        )
-
-        newTransactions.push({
-          id: crypto.randomUUID(),
-          userId,
-          accountId: accountId, // Use the selected account ID
-          categoryId: resolvedCategoryId,
-          amount: amount.toFixed(2),
-          description: tx.description.trim(),
-          merchant: tx.merchant || extractMerchant(tx.description),
-          reference: tx.reference || null,
-          receiptNumber: tx.receiptNumber || null,
-          transactionDate: new Date(tx.date),
-          type: amount < 0 ? 'debit' : 'credit',
-          status: 'cleared',
-          isTransfer: tx.isTransfer === true || detectedTransfer,
-          duplicateCheckHash: transactionHash,
-          originalData: tx,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        })
-        
-        // Add to existing set to prevent duplicates within the same batch
-        existingTransactionHashes.add(transactionHash)
-      }
-    }
-
-    // Save transactions to database
-    if (newTransactions.length > 0) {
-      await db.insert(transactionsTable).values(newTransactions)
-      
-      // Update account balance if transactions have balance information (e.g., Commonwealth Bank CSV)
-      // Use the latest transaction's balance as the current account balance
-      const transactionsWithBalance = newTransactions.filter(tx => tx.balance !== null && tx.balance !== undefined)
-      if (transactionsWithBalance.length > 0) {
-        // Sort by date to find the latest transaction
-        const sortedTransactions = transactionsWithBalance.sort((a, b) => 
-          new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime()
-        )
-        const latestBalance = sortedTransactions[0].balance
-        
-        // Update the account balance
-        await db
-          .update(accountsTable)
-          .set({ 
-            balance: latestBalance.toString(),
-            updatedAt: new Date()
-          })
-          .where(eq(accountsTable.id, accountId))
-        
-        console.log(`Updated account ${accountId} balance to ${latestBalance}`)
-      }
-    }
-    
-    // For now, simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 500))
+    const result = await importTransactions({
+      userId,
+      accountId,
+      source: 'upload',
+      file: {
+        fileName: typeof fileName === 'string' && fileName ? fileName : 'Manual upload',
+        fileSize: typeof fileSize === 'number' ? fileSize : 0,
+        fileType: typeof fileType === 'string' && fileType ? fileType : 'csv',
+        bankFormat: typeof bankFormat === 'string' ? bankFormat : null,
+      },
+      transactions: transactionData,
+    })
 
     return NextResponse.json({
       success: true,
-      message: `Successfully imported ${newTransactions.length} transactions${duplicateTransactions.length > 0 ? `, skipped ${duplicateTransactions.length} duplicates` : ''}`,
-      importedCount: newTransactions.length,
-      skippedCount: duplicateTransactions.length,
-      totalProcessed: transactionData.length,
-      newTransactions,
-      duplicateTransactions: duplicateTransactions.map(tx => ({
-        description: tx.description,
-        date: tx.date,
-        amount: tx.amount,
-        reason: tx.reason
-      }))
+      message: `Successfully imported ${result.inserted} transactions${result.duplicates > 0 ? `, skipped ${result.duplicates} duplicates` : ''}`,
+      importedCount: result.inserted,
+      skippedCount: result.duplicates,
+      totalProcessed: result.totalProcessed,
+      sessionId: result.sessionId,
+      newTransactions: result.insertedRows,
+      duplicateTransactions: result.skipped,
     })
 
   } catch (error) {
+    if (error instanceof IngestError && error.code === 'invalid_account') {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('Transaction import error:', error)
     return NextResponse.json(
       { error: 'Failed to import transactions' }, 
@@ -256,63 +110,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-// Helper functions to get or create default account and category
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function getOrCreateDefaultAccount(userId: string) {
-  // Try to get existing account
-  const existingAccounts = await db.select().from(accountsTable).where(eq(accountsTable.userId, userId)).limit(1)
-  
-  if (existingAccounts.length === 0) {
-    // Create default account
-    const insertedAccounts = await db.insert(accountsTable).values({
-      userId,
-      name: 'Primary Account',
-      institution: 'Imported Data',
-      accountNumber: 'IMPORTED',
-      accountType: 'checking',
-      balance: '0.00',
-      currency: 'AUD',
-      isActive: true
-    }).returning()
-    
-    return insertedAccounts[0]
-  }
-  
-  return existingAccounts[0]
-}
-
-async function getOrCreateDefaultCategory(userId: string) {
-  // Try to get existing category
-  const existingCategories = await db.select().from(categoriesTable).where(eq(categoriesTable.userId, userId)).limit(1)
-  
-  if (existingCategories.length === 0) {
-    // Create default category
-    const insertedCategories = await db.insert(categoriesTable).values({
-      userId,
-      name: 'General',
-      color: '#6B7280',
-      icon: '💳',
-      isDefault: true
-    }).returning()
-    
-    return insertedCategories[0]
-  }
-  
-  return existingCategories[0]
-}
-
-// Helper function to extract merchant name from description
-function extractMerchant(description: string): string {
-  // Remove common transaction prefixes and clean up
-  const cleaned = description
-    .replace(/^(EFTPOS|CARD|ATM|TRANSFER|DIRECT DEBIT|DD)\s*/i, '')
-    .replace(/\s+\d{2}\/\d{2}.*$/, '') // Remove dates at the end
-    .replace(/\s+\d{4}.*$/, '') // Remove years at the end
-    .replace(/\s+AUS.*$/, '') // Remove country codes
-    .trim()
-  
-  // Take first few words as merchant name
-  return cleaned.split(' ').slice(0, 3).join(' ') || 'Unknown Merchant'
 }
