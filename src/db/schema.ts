@@ -278,6 +278,21 @@ export const importSessions = pgTable('import_sessions', {
   createdAtIdx: index('import_sessions_created_at_idx').on(table.createdAt),
 }))
 
+// Personal API tokens (for /api/ingest). Only the SHA-256 hash is stored; the token is shown once.
+export const apiTokens = pgTable('api_tokens', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  name: text('name').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  tokenPrefix: text('token_prefix').notNull(), // first few chars, so the UI can tell tokens apart
+  lastUsedAt: timestamp('last_used_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  revokedAt: timestamp('revoked_at'),
+}, (table) => ({
+  tokenHashUnique: unique('api_tokens_token_hash_unique').on(table.tokenHash),
+  userIdIdx: index('api_tokens_user_id_idx').on(table.userId),
+}))
+
 // Recurring transactions table
 export const recurringTransactions = pgTable('recurring_transactions', {
   id: uuid('id').defaultRandom().primaryKey(),
