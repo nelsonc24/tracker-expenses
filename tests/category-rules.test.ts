@@ -193,3 +193,20 @@ describe('AI category suggestion', () => {
     expect(generate).toHaveBeenCalledOnce()
   })
 })
+
+describe('regex rule ReDoS guard (structural)', () => {
+  test.each(['((a+))+$', '(a|a)+$', '(a|aa)*$', '(a+)+$', '.*.*.*.*x', '(a|b){2,}'])('rejects %s', pattern => {
+    expect(validateRulePattern('regex', pattern).ok).toBe(false)
+  })
+
+  test.each(['woolworths\\s+\\d+', '^(coles|aldi) ', '[+*]{2}', 'a\\*b\\*c\\*d\\*e', '.*uber.*eats'])('accepts %s', pattern => {
+    expect(validateRulePattern('regex', pattern).ok).toBe(true)
+  })
+
+  test('does not hang on a pattern the old check let through', () => {
+    const start = Date.now()
+    const result = validateRulePattern('regex', '(a|a)+$')
+    expect(result.ok).toBe(false)
+    expect(Date.now() - start).toBeLessThan(100)
+  })
+})

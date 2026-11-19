@@ -38,6 +38,45 @@ const NESTED_QUANTIFIER = /\((?:[^()\\]|\\.)*[+*}](?:[^()\\]|\\.)*\)\s*(?:[+*]|\
 // Back-references can also blow up and are never needed for categorising.
 const BACK_REFERENCE = /\\[1-9]|\\k</
 
+/** Most unbounded quantifiers (`*`, `+`, `{n,}`) a regex may have: more makes run time polynomial in the subject length. */
+const MAX_UNBOUNDED_QUANTIFIERS = 3
+
+/**
+ * Structural ReDoS check, aware of escapes and character classes. Rejects a quantified group
+ * that contains alternation or another group ((a|a)+, ((a+))+), and too many unbounded quantifiers.
+ * Returns an error message, or null when the pattern looks safe.
+ */
+function unsafeRegexReason(pattern: string): string | null {
+  const stack: Array<{ hasAlternation: boolean; hasGroup: boolean }> = []
+  let unbounded = 0
+  let inClass = false
+
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i]
+    if (ch === '\\') { i++; continue }
+    if (inClass) { if (ch === ']') inClass = false; continue }
+
+    if (ch === '[') inClass = true
+    else if (ch === '(') {
+      if (stack.length) stack[stack.length - 1].hasGroup = true
+      stack.push({ hasAlternation: false, hasGroup: false })
+    } else if (ch === '|') {
+      if (stack.length) stack[stack.length - 1].hasAlternation = true
+    } else if (ch === ')') {
+      const group = stack.pop()
+      const next = pattern.slice(i + 1).match(/^(?:[*+]|\{\d*,\d*\})/)
+      if (group && next && (group.hasAlternation || group.hasGroup)) {
+        return 'Repeated groups containing "|" or another group are not allowed'
+      }
+    } else if (ch === '*' || ch === '+') unbounded++
+    else if (ch === '{' && /^\{\d+,\}/.test(pattern.slice(i))) unbounded++
+  }
+
+  return unbounded > MAX_UNBOUNDED_QUANTIFIERS
+    ? `Use at most ${MAX_UNBOUNDED_QUANTIFIERS} "*" or "+" quantifiers in a regex`
+    : null
+}
+
 function isRuleMatchType(value: string): value is RuleMatchType {
   return (RULE_MATCH_TYPES as readonly string[]).includes(value)
 }
@@ -69,6 +108,8 @@ export function validateRulePattern(matchType: string, rawPattern: string): Patt
     if (BACK_REFERENCE.test(pattern)) {
       return { ok: false, error: 'Back-references are not allowed' }
     }
+    const unsafe = unsafeRegexReason(pattern)
+    if (unsafe) return { ok: false, error: unsafe }
     try {
       new RegExp(pattern, 'i')
     } catch (error) {
