@@ -286,6 +286,8 @@ export function parseDate(dateStr: string, format: string): Date | null {
       
       case 'DD MMM YYYY': {
         // Westpac: docs say "01 Jan 2024", but real exports use "01/01/2024". Accept both.
+        // date-fns 'yyyy' would read "01/01/24" as the year 0024, so insist on a 4-digit year
+        if (!/\d{4}$/.test(cleaned)) return null
         for (const pattern of WESTPAC_DATE_PATTERNS) {
           const parsed = parseDateFns(cleaned, pattern, new Date())
           if (isValidDate(parsed)) return parsed

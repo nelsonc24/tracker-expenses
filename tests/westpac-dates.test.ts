@@ -79,3 +79,10 @@ describe('header handling used by the browser preview', () => {
     expect(rows[0]).toMatchObject({ date: '2024-01-15', amount: -85.5 })
   })
 })
+
+describe('Westpac two-digit years', () => {
+  test('are rejected instead of becoming year 0024', () => {
+    expect(parseDate('01/01/24', 'DD MMM YYYY')).toBeNull()
+    expect(parseDate('01 Jan 24', 'DD MMM YYYY')).toBeNull()
+  })
+})
