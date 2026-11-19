@@ -1,0 +1,2 @@
+ALTER TABLE "notification_preferences" ADD COLUMN "whatsapp_notifications_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "notification_preferences" ADD COLUMN "whatsapp_phone_number" text;

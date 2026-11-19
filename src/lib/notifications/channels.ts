@@ -1,5 +1,10 @@
+import { eq } from 'drizzle-orm'
+import { db } from '@/db'
+import { notifications } from '@/db/schema'
+import { isE164 } from '@/lib/phone'
 import { sendBillReminderEmail, sendDebtReminderEmail } from './email-service'
 import { sendTelegramBillReminder, sendTelegramDebtReminder } from './telegram-service'
+import { buildWhatsAppTemplate, isDryRun, sendWhatsAppTemplate } from './whatsapp-service'
 import type { ChannelSendResult, NotificationChannel, NotificationEvent } from './notifier'
 
 type ServiceResult = { success: boolean; notificationId?: string; error?: string }
@@ -64,5 +69,67 @@ export const telegramChannel: NotificationChannel = {
       default:
         return { status: 'unsupported' }
     }
+  },
+}
+
+// ─── WhatsApp ────────────────────────────────────────────────────────────────
+
+const NOTIFICATION_TYPE: Record<NotificationEvent['type'], string> = {
+  bill_due: 'bill_reminder',
+  debt_due: 'debt_reminder',
+  budget_alert: 'budget_alert',
+  import_summary: 'import_summary',
+  statement_missing: 'statement_missing',
+}
+
+function relatedEntity(event: NotificationEvent): { type: string; id: string } | null {
+  if (event.type === 'bill_due') return { type: 'bill', id: event.billId }
+  if (event.type === 'debt_due') return { type: 'debt', id: event.debtId }
+  return null
+}
+
+export const whatsappChannel: NotificationChannel = {
+  id: 'whatsapp',
+  isEnabled: prefs => prefs.whatsappNotificationsEnabled && Boolean(prefs.whatsappPhoneNumber && isE164(prefs.whatsappPhoneNumber)),
+  async send(prefs, event) {
+    const template = buildWhatsAppTemplate(event)
+    const to = prefs.whatsappPhoneNumber!
+
+    // Dry-run (no token): log the payload only. No notification row, so it can't count as "already notified".
+    if (isDryRun()) {
+      const dry = await sendWhatsAppTemplate(to, template.name, template.params)
+      return dry.success ? { status: 'sent' } : { status: 'failed', error: dry.error ?? 'Unknown error' }
+    }
+
+    const entity = relatedEntity(event)
+    const [row] = await db
+      .insert(notifications)
+      .values({
+        userId: prefs.userId,
+        notificationType: NOTIFICATION_TYPE[event.type],
+        title: `WhatsApp: ${template.name}`,
+        message: `${template.name}: ${template.params.join(' | ')}`,
+        channel: 'whatsapp',
+        status: 'pending',
+        relatedEntityType: entity?.type,
+        relatedEntityId: entity?.id,
+      })
+      .returning()
+
+    const result = await sendWhatsAppTemplate(to, template.name, template.params)
+
+    if (!result.success) {
+      await db
+        .update(notifications)
+        .set({ status: 'failed', errorCount: 1, lastErrorMessage: result.error, lastErrorAt: new Date(), updatedAt: new Date() })
+        .where(eq(notifications.id, row.id))
+      return { status: 'failed', error: result.error ?? 'Unknown error' }
+    }
+
+    await db
+      .update(notifications)
+      .set({ status: 'sent', sentAt: new Date(), whatsappMessageId: result.messageId, updatedAt: new Date() })
+      .where(eq(notifications.id, row.id))
+    return { status: 'sent', notificationId: row.id }
   },
 }
