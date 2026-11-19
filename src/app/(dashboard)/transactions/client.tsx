@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { offerCategoryRule } from '@/components/category-rule-prompt'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -871,6 +872,14 @@ export function TransactionsPageClient({
       }))
 
       toast.success('Transaction updated successfully')
+      if (selectedCategory && editingTransaction.category !== originalEditingCategory) {
+        offerCategoryRule({
+          description: editingTransaction.description,
+          merchant: editingTransaction.merchant,
+          categoryId: selectedCategory.id,
+          categoryName: selectedCategory.name,
+        })
+      }
       setIsEditDialogOpen(false)
       setEditingTransaction(null)
       
@@ -1112,6 +1121,14 @@ export function TransactionsPageClient({
       }))
 
       toast.success('Category updated successfully')
+      if (selectedCategory && selectedCategory.id !== categoryEditingTransaction.categoryId) {
+        offerCategoryRule({
+          description: categoryEditingTransaction.description,
+          merchant: categoryEditingTransaction.merchant,
+          categoryId: selectedCategory.id,
+          categoryName: selectedCategory.name,
+        })
+      }
       setIsCategoryDialogOpen(false)
       setCategoryEditingTransaction(null)
       

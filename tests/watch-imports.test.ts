@@ -1,125 +1,162 @@
-import { mkdtemp, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, test, vi } from 'vitest'
 import {
-  findReadyFiles,
-  isSupportedFile,
-  loadConfig,
-  moveFile,
-  resolveAccountId,
+  buildConfig,
+  expandHome,
+  isCandidateFile,
+  matchAccount,
+  patternToRegExp,
+  uniqueDestination,
   uploadFile,
-} from '../scripts/watch-imports-core'
+  type AccountRule,
+} from '../scripts/watch-imports-lib'
 
-let dir: string
-beforeEach(async () => {
-  dir = await mkdtemp(path.join(os.tmpdir(), 'watch-imports-'))
-})
-afterEach(async () => {
-  await rm(dir, { recursive: true, force: true })
-})
+const CBA = '11111111-1111-4111-8111-111111111111'
+const LATITUDE = '22222222-2222-4222-8222-222222222222'
+const FALLBACK = '33333333-3333-4333-8333-333333333333'
+const TOKEN = 'trk_' + 'a'.repeat(43)
 
-describe('resolveAccountId', () => {
-  const accounts = { commbank: 'acc-cba', '/^anz.*visa/': 'acc-anz', Latitude: 'acc-lat' }
-  it('matches substrings case-insensitively and regex patterns, first match wins', () => {
-    expect(resolveAccountId('CommBank_March.csv', accounts)).toBe('acc-cba')
-    expect(resolveAccountId('ANZ-visa-2026.pdf', accounts)).toBe('acc-anz')
-    expect(resolveAccountId('latitude statement.pdf', accounts)).toBe('acc-lat')
+const rules: AccountRule[] = [
+  { pattern: 'CSVData*.csv', accountId: CBA, bankFormat: 'commonwealth' },
+  { pattern: '/^latitude.*statement.*\\.pdf$/i', accountId: LATITUDE },
+  { pattern: 'westpac-??.csv', accountId: FALLBACK, bankFormat: 'westpac' },
+]
+
+describe('patternToRegExp', () => {
+  test('globs match the whole name, case-insensitively', () => {
+    expect(patternToRegExp('CSVData*.csv').test('csvdata (3).CSV')).toBe(true)
+    expect(patternToRegExp('CSVData*.csv').test('old-CSVData.csv')).toBe(false)
+    expect(patternToRegExp('a.b').test('axb')).toBe(false) // dot is literal
   })
-  it('falls back to the default, or null', () => {
-    expect(resolveAccountId('other.csv', accounts, 'acc-default')).toBe('acc-default')
-    expect(resolveAccountId('other.csv', accounts)).toBeNull()
-  })
-})
 
-describe('isSupportedFile', () => {
-  it('accepts csv/pdf and ignores hidden and temp files', () => {
-    expect(isSupportedFile('a.CSV')).toBe(true)
-    expect(isSupportedFile('a.pdf')).toBe(true)
-    expect(isSupportedFile('a.xlsx')).toBe(false)
-    expect(isSupportedFile('.DS_Store')).toBe(false)
-    expect(isSupportedFile('.a.csv')).toBe(false)
-    expect(isSupportedFile('a.csv.crdownload')).toBe(false)
+  test('/regex/flags is used as a regex', () => {
+    expect(patternToRegExp('/^nab_\\d+\\.csv$/').test('nab_123.csv')).toBe(true)
+    expect(patternToRegExp('/^nab_\\d+\\.csv$/').test('NAB_123.csv')).toBe(false)
   })
 })
 
-describe('findReadyFiles', () => {
-  it('skips files still being written, empty files and unsupported ones', async () => {
-    const now = Date.now()
-    const old = new Date(now - 60_000)
-    await writeFile(path.join(dir, 'ready.csv'), 'x')
-    await utimes(path.join(dir, 'ready.csv'), old, old)
-    await writeFile(path.join(dir, 'fresh.csv'), 'x')
-    await writeFile(path.join(dir, 'empty.csv'), '')
-    await utimes(path.join(dir, 'empty.csv'), old, old)
-    await writeFile(path.join(dir, 'notes.txt'), 'x')
-    await utimes(path.join(dir, 'notes.txt'), old, old)
+describe('matchAccount', () => {
+  test('first matching rule wins and carries its bankFormat', () => {
+    expect(matchAccount('CSVData-2026-11.csv', rules)).toEqual({
+      accountId: CBA,
+      bankFormat: 'commonwealth',
+      matchedBy: 'CSVData*.csv',
+    })
+    expect(matchAccount('Latitude_Statement_Nov.pdf', rules)?.accountId).toBe(LATITUDE)
+    expect(matchAccount('westpac-01.csv', rules)?.bankFormat).toBe('westpac')
+  })
 
-    const ready = await findReadyFiles(dir, 3000, now)
-    expect(ready.map(f => path.basename(f))).toEqual(['ready.csv'])
+  test('uses only the base name', () => {
+    expect(matchAccount('/Users/me/Downloads/bank-imports/CSVData.csv', rules)?.accountId).toBe(CBA)
+  })
+
+  test('falls back to the default account, or null', () => {
+    expect(matchAccount('random.csv', rules, FALLBACK)).toEqual({ accountId: FALLBACK, matchedBy: 'default' })
+    expect(matchAccount('random.csv', rules)).toBeNull()
+    expect(matchAccount('westpac-123.csv', rules)).toBeNull() // ? is exactly one char
   })
 })
 
-describe('moveFile', () => {
-  it('moves into processed/ or failed/ with a timestamp and an optional error note', async () => {
-    const file = path.join(dir, 'a.csv')
-    await writeFile(file, 'x')
-    const dest = await moveFile(file, 'failed', new Date('2026-01-02T03:04:05.000Z'), 'bad file')
-    expect(dest).toBe(path.join(dir, 'failed', '2026-01-02T03-04-05-000Z_a.csv'))
-    expect(await readdir(dir)).toEqual(['failed'])
-    expect(await readFile(`${dest}.error.txt`, 'utf8')).toBe('bad file\n')
+describe('isCandidateFile', () => {
+  test('accepts csv/pdf only, skips hidden and partial downloads', () => {
+    expect(isCandidateFile('a.csv')).toBe(true)
+    expect(isCandidateFile('a.PDF')).toBe(true)
+    expect(isCandidateFile('a.csv.crdownload')).toBe(false)
+    expect(isCandidateFile('a.pdf.download')).toBe(false)
+    expect(isCandidateFile('.DS_Store')).toBe(false)
+    expect(isCandidateFile('.~lock.a.csv')).toBe(false)
+    expect(isCandidateFile('notes.txt')).toBe(false)
+    expect(isCandidateFile('processed')).toBe(false)
+  })
+})
+
+describe('buildConfig', () => {
+  const env = { INGEST_URL: 'https://example.vercel.app/api/ingest', INGEST_TOKEN: TOKEN }
+
+  test('env + file, env wins; ~ is expanded', () => {
+    const { config, errors } = buildConfig(
+      { ...env, INGEST_WATCH_DIR: '~/bank' },
+      { url: 'https://ignored.example/api/ingest', accounts: rules }
+    )
+    expect(errors).toEqual([])
+    expect(config?.url).toBe(env.INGEST_URL)
+    expect(config?.watchDir).toBe(path.join(os.homedir(), 'bank'))
+    expect(config?.accounts).toHaveLength(3)
+  })
+
+  test('defaults the watch dir to ~/Downloads/bank-imports', () => {
+    const { config } = buildConfig({ ...env, INGEST_DEFAULT_ACCOUNT_ID: FALLBACK })
+    expect(config?.watchDir).toBe(expandHome('~/Downloads/bank-imports'))
+  })
+
+  test('requires https except for localhost', () => {
+    expect(buildConfig({ ...env, INGEST_URL: 'http://example.com/api/ingest' }, { accounts: rules }).errors).toContain(
+      'INGEST_URL must use https (http is only allowed for localhost)'
+    )
+    expect(buildConfig({ ...env, INGEST_URL: 'http://localhost:3001/api/ingest' }, { accounts: rules }).errors).toEqual([])
+  })
+
+  test('reports missing token, bad token, bad account ids and no rules', () => {
+    expect(buildConfig({ INGEST_URL: env.INGEST_URL }, { accounts: rules }).errors[0]).toMatch(/INGEST_TOKEN is required/)
+    expect(buildConfig({ ...env, INGEST_TOKEN: 'abc' }, { accounts: rules }).errors[0]).toMatch(/trk_/)
+    expect(buildConfig(env, { accounts: [{ pattern: '*.csv', accountId: 'nope' }] }).errors[0]).toMatch(/UUID/)
+    expect(buildConfig(env, {}).errors[0]).toMatch(/at least one/)
+  })
+})
+
+describe('uniqueDestination', () => {
+  let dir: string
+  afterAll(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true })
+  })
+
+  test('adds a timestamp when the name is taken', async () => {
+    dir = await mkdtemp(path.join(os.tmpdir(), 'watch-imports-'))
+    expect(await uniqueDestination(dir, 'a.csv')).toBe(path.join(dir, 'a.csv'))
+    await writeFile(path.join(dir, 'a.csv'), 'x')
+    const second = await uniqueDestination(dir, 'a.csv', new Date(2026, 10, 19, 9, 30, 0))
+    expect(second).toBe(path.join(dir, 'a-20261119-093000.csv'))
   })
 })
 
 describe('uploadFile', () => {
-  const config = { ingestUrl: 'http://localhost/api/ingest', token: 'txk_abc', bankFormat: undefined }
+  const config = { url: 'https://example.vercel.app/api/ingest', token: TOKEN }
+  const match = { accountId: CBA, bankFormat: 'commonwealth', matchedBy: 'x' }
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 
-  async function upload(fetchImpl: typeof fetch) {
-    const file = path.join(dir, 'a.csv')
-    await writeFile(file, 'a,b')
-    return uploadFile(file, 'acc1', config, fetchImpl)
-  }
+  test('sends the bearer token and multipart fields', async () => {
+    const fetchImpl = vi.fn(async () => json(200, { success: true, inserted: 2 }))
+    const outcome = await uploadFile(config, 'a.csv', new TextEncoder().encode('x'), match, fetchImpl as typeof fetch)
 
-  it('sends the file, account and bearer token, and summarises success', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(Response.json({ inserted: 3, duplicates: 1, needsReview: 2 }))
-    const outcome = await upload(fetchImpl as unknown as typeof fetch)
-    expect(outcome).toEqual({ kind: 'processed', summary: '3 new, 1 duplicates, 2 to review' })
-
-    const [url, init] = fetchImpl.mock.calls[0]
-    expect(url).toBe(config.ingestUrl)
-    expect(init.headers.Authorization).toBe('Bearer txk_abc')
+    expect(outcome).toEqual({ kind: 'ok', body: { success: true, inserted: 2 } })
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
+    expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${TOKEN}`)
     const form = init.body as FormData
-    expect(form.get('accountId')).toBe('acc1')
+    expect(form.get('accountId')).toBe(CBA)
+    expect(form.get('bankFormat')).toBe('commonwealth')
     expect((form.get('file') as File).name).toBe('a.csv')
   })
 
-  it('treats 4xx as failed and 5xx / network errors as retry', async () => {
-    expect(await upload((async () => Response.json({ error: 'nope' }, { status: 422 })) as typeof fetch)).toEqual({
-      kind: 'failed',
-      reason: '422 nope',
-    })
-    expect((await upload((async () => Response.json({}, { status: 503 })) as typeof fetch)).kind).toBe('retry')
+  test('4xx is a permanent rejection, 5xx and network errors are transient', async () => {
+    const data = new Uint8Array([1])
+    expect(await uploadFile(config, 'a.csv', data, match, (async () => json(403, { error: 'nope' })) as typeof fetch)).toEqual(
+      { kind: 'rejected', status: 403, message: 'nope' }
+    )
+    expect((await uploadFile(config, 'a.csv', data, match, (async () => json(502, {})) as typeof fetch)).kind).toBe('transient')
     expect(
       (
-        await upload((async () => {
-          throw new Error('offline')
+        await uploadFile(config, 'a.csv', data, match, (async () => {
+          throw new Error('ECONNREFUSED')
         }) as typeof fetch)
       ).kind
-    ).toBe('retry')
-  })
-})
-
-describe('loadConfig', () => {
-  it('requires a url, a token and an account', async () => {
-    await expect(loadConfig({})).rejects.toThrow(/INGEST_URL/)
-    await expect(loadConfig({ INGEST_URL: 'http://x' })).rejects.toThrow(/INGEST_TOKEN/)
-    await expect(loadConfig({ INGEST_URL: 'http://x', INGEST_TOKEN: 't' })).rejects.toThrow(/accounts map/)
+    ).toBe('transient')
   })
 
-  it('merges a JSON file under env vars', async () => {
-    const cfg = path.join(dir, 'watch.json')
-    await writeFile(cfg, JSON.stringify({ INGEST_URL: 'http://file', accounts: { cba: 'a1' }, WATCH_DIR: dir }))
-    const config = await loadConfig({ WATCH_CONFIG: cfg, INGEST_TOKEN: 't', INGEST_URL: 'http://env' })
-    expect(config).toMatchObject({ ingestUrl: 'http://env', token: 't', watchDir: dir, accounts: { cba: 'a1' } })
+  test('a 401 is reported as unauthorized so the file is not moved to failed/', async () => {
+    const outcome = await uploadFile(config, 'a.csv', new Uint8Array([1]), match, (async () => json(401, { error: 'Token has been revoked' })) as typeof fetch)
+    expect(outcome).toEqual({ kind: 'unauthorized', message: 'Token has been revoked' })
   })
 })

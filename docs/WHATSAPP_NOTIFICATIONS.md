@@ -1,51 +1,54 @@
-# WhatsApp notifications (Meta Cloud API)
+# WhatsApp notifications (plan 5.2–5.5)
 
-Official Meta WhatsApp Cloud API on a **dedicated business number**. No unofficial libraries. Messages are sent as pre-approved **Utility templates** and are deliberately generic: no account numbers, balances or transaction details.
+WhatsApp is a third channel for `notify()` (see `NOTIFIER.md`), using the **official Meta WhatsApp Cloud API** from a dedicated business number. No unofficial libraries.
 
 ## How it works
-- `src/lib/notifications/whatsapp-service.ts` – `sendWhatsAppTemplate(to, template, params)` and `buildWhatsAppTemplate(event)` (event → template + params).
-- `whatsappChannel` in `channels.ts` plugs it into `notify()` (see `NOTIFIER.md`). Enabled when `whatsappNotificationsEnabled` is on and `whatsappPhoneNumber` is a valid E.164 number.
-- **Dry-run mode:** if `WHATSAPP_TOKEN` is not set, the payload is logged (number masked) and the send reports success with `dryRun: true`. Nothing is sent and no `notifications` row is written. So the code can ship before the setup below is done.
-- Real sends write a `notifications` row (`channel = 'whatsapp'`) and store the returned message id in `whatsapp_message_id`, so delivery-status webhooks can update it.
+- **Client:** `src/lib/notifications/whatsapp-service.ts` → `sendWhatsAppTemplate(to, templateName, params, { languageCode? })` posts a template message to `https://graph.facebook.com/{WHATSAPP_API_VERSION}/{WHATSAPP_PHONE_NUMBER_ID}/messages`. Never throws; returns `{ success, messageId?, dryRun?, error? }`.
+- **Dry-run:** when `WHATSAPP_TOKEN` is unset, the payload is logged (`[whatsapp] DRY RUN …`) and the call reports success with `dryRun: true`. Safe to deploy before the Meta setup is done.
+- **Channel:** `whatsappChannel` in `channels.ts` (registered in `default-deps.ts`). Enabled when `whatsappNotificationsEnabled` is on and `whatsappPhoneNumber` is valid E.164. Each send is logged in `notifications` with `channel = 'whatsapp'` and the WhatsApp message ID in `metadata.whatsappMessageId` (dry runs have `metadata.dryRun = true`).
+- **Templates** (all event types are mapped; wording is generic: no amounts, balances or account numbers):
 
-## Environment variables (Vercel)
-| Var | Purpose |
-|---|---|
-| `WHATSAPP_TOKEN` | Permanent system-user token. Unset = dry-run. |
-| `WHATSAPP_PHONE_NUMBER_ID` | Id of the business phone number. |
-| `WHATSAPP_API_VERSION` | Graph API version, e.g. `v23.0` (code defaults to `v23.0` if unset; check Meta for the current one). |
-| `WHATSAPP_APP_SECRET` | Verifies webhook signatures (`X-Hub-Signature-256`). |
-| `WHATSAPP_VERIFY_TOKEN` | Any string you choose; used for the webhook verification handshake. |
-| `WHATSAPP_TEMPLATE_LANGUAGE` | Optional. Template language code, default `en` (use `en_AU` if the templates were created in that locale). |
+  | Event | Template | Body | Params |
+  |---|---|---|---|
+  | `bill_due` | `bill_due` | {{1}} is due {{2}}. | bill name, "today" / "tomorrow" / "on Tue 24 Nov" |
+  | `debt_due` | `debt_due` | Payment for {{1}} is due {{2}}. | debt name, same date wording |
+  | `budget_alert` | `budget_alert` | You've used {{1}}% of your {{2}} budget. | rounded %, budget name |
+  | `import_summary` | `import_summary` | {{1}} new transactions imported, {{2}} need review. | counts |
+  | `statement_missing` | `statement_missing` | No statement imported for {{1}} in {{2}} days. | account name, days |
+  | `import_failed` | `import_failed` | {{1}} statement(s) received by email could not be imported. Please upload manually. | file count |
 
-## Owner setup (cannot be done by code)
+- **Settings UI:** a WhatsApp card under Telegram (`whatsapp-notification-settings.tsx`) with a toggle, an E.164 phone input and **Send test message**. The test (`POST /api/notifications/whatsapp/test`, Clerk-authenticated) always goes to the user's **saved** number, never to a number from the request, and uses Meta's pre-approved `hello_world` sample template (`en_US`).
+- **Webhook:** `/api/webhooks/whatsapp`
+  - `GET`: verification handshake. Echoes `hub.challenge` when `hub.mode=subscribe` and `hub.verify_token` equals `WHATSAPP_VERIFY_TOKEN`; otherwise 403.
+  - `POST`: checks `X-Hub-Signature-256` (`sha256=` + hex HMAC-SHA256 of the raw body, keyed with `WHATSAPP_APP_SECRET`, timing-safe compare; 401 if missing or wrong). Delivery statuses are logged and applied to the matching `notifications` row: `delivered`/`read` set `deliveredAt`/`readAt` and `metadata.whatsappStatus` but keep `status = 'sent'` (the cron's once-a-day dedupe looks for `'sent'`); `failed` sets `status = 'failed'` with the error. Inbound user messages are ignored (out of scope).
+  - Middleware: API routes are not in the Clerk-protected list, so this route is public, same as the Clerk webhook.
+
+## Environment variables
+| Variable | Required | Notes |
+|---|---|---|
+| `WHATSAPP_TOKEN` | for live sends | Permanent System User token. Unset = dry-run. |
+| `WHATSAPP_PHONE_NUMBER_ID` | for live sends | Phone number **ID** from API Setup, not the number. |
+| `WHATSAPP_APP_SECRET` | for the webhook | App Dashboard → App settings → Basic. |
+| `WHATSAPP_VERIFY_TOKEN` | for the webhook | Any random string; enter the same value in the webhook config. |
+| `WHATSAPP_API_VERSION` | recommended | e.g. `v24.0`. Defaults to `v24.0`; set it to the current Graph API version. |
+| `WHATSAPP_TEMPLATE_LANGUAGE` | optional | Language the templates were approved in. Default `en` (use `en_AU` if you approved them in that). |
+| `WHATSAPP_ALLOWED_USER_IDS` | recommended | Comma-separated Clerk user ids allowed to use WhatsApp (settings test button and all alerts). Unset = every user. **Set it to your own user id** if sign-ups are open, since every message is billed to your Meta account. The test button is also limited to 3 per hour and 10 per day per user. |
+
+## Database
+`notification_preferences.whatsapp_notifications_enabled` (boolean, default false) and `whatsapp_phone_number` (text, E.164). They are added by `0008_whatsapp_preferences.sql`, and `notifications.whatsapp_message_id` (matched by the delivery-status webhook) by `0009_notification_whatsapp_message_id.sql`. Both came from PR #4. Run `pnpm db:migrate` before deploying, otherwise every query on `notification_preferences` fails.
+
+## Manual Meta setup (owner)
 1. Buy a prepaid SIM. **Don't install regular WhatsApp on it**: a number registered on the Cloud API can't be used in the consumer app.
 2. developers.facebook.com → Create App (Business) → add the WhatsApp product.
-3. WhatsApp → API Setup → add the new number, verify by SMS, set the display name (e.g. "Expense Tracker").
-4. Add your personal number as a recipient (needed while the app is in development mode).
-5. Business Settings → System Users → create a system user with `whatsapp_business_messaging` and generate a **permanent** token. (The token on the API Setup page expires after 24 hours.)
+3. WhatsApp → API Setup → add the new number, verify it by SMS, and set the display name (e.g. "Expense Tracker").
+4. Add your personal number as a recipient.
+5. Business Settings → System Users → create a system user with `whatsapp_business_messaging` and generate a **permanent** token (the API Setup page token expires after 24 hours).
 6. Add a payment method in Meta Business Settings. Utility templates are charged per message (inside the 24-hour window too, since 1 Oct 2026). Check current AU rates.
-7. Create and get approved these **Utility** templates (language `en`, or `en_AU`):
+7. Create these **Utility** templates (language `en`, or `en_AU` and set `WHATSAPP_TEMPLATE_LANGUAGE`) and wait for approval: `bill_due`, `debt_due`, `budget_alert`, `import_summary`, `statement_missing`, `import_failed`, with the bodies in the table above.
+8. Set the Vercel env vars above.
+9. WhatsApp → Configuration → Webhook: callback URL `https://<your-domain>/api/webhooks/whatsapp`, verify token = `WHATSAPP_VERIFY_TOKEN`, then subscribe to the `messages` field.
+10. In Settings → Notifications, enable WhatsApp, save your number, and press **Send test message**.
 
-   | Name | Body |
-   |---|---|
-   | `bill_due` | `{{1}} is due {{2}}.` |
-   | `debt_due` | `Payment for {{1}} is due {{2}}.` |
-   | `budget_alert` | `You've used {{1}}% of your {{2}} budget.` |
-   | `import_summary` | `{{1}} new transactions imported, {{2}} need review.` |
-   | `statement_missing` | `No statement imported for {{1}} in {{2}} days.` |
-
-   For `bill_due` / `debt_due`, `{{2}}` is "today", "tomorrow" or "on Dec 01, 2026".
-8. Set the env vars above in Vercel.
-9. Webhook (after 5.5): in the app's WhatsApp → Configuration, set the callback URL to `https://<your-domain>/api/webhooks/whatsapp` and the verify token to `WHATSAPP_VERIFY_TOKEN`; subscribe to the `messages` field.
-
-## Checked against Meta's docs
-Send endpoint and template payload, the webhook verification handshake, and the `X-Hub-Signature-256` scheme (HMAC-SHA256 of the raw body with the app secret, `sha256=` prefix) were checked against Meta's published docs. The exact delivery-status (`statuses`) payload was **not** confirmed against a live webhook; the handler is written defensively.
-
-## Webhook (`/api/webhooks/whatsapp`)
-- `GET` – Meta's verification handshake: `hub.mode=subscribe` and `hub.verify_token == WHATSAPP_VERIFY_TOKEN` → echoes `hub.challenge`, otherwise 403.
-- `POST` – delivery statuses. The `X-Hub-Signature-256` HMAC is checked against the **raw** body with `WHATSAPP_APP_SECRET` (bad signature → 401). Each status is matched to a notification by `whatsapp_message_id`:
-  - `delivered` → `delivered_at`, `read` → `read_at`, `failed` → `status = 'failed'` plus the error message.
-  - `status` deliberately stays `'sent'` for delivered/read, because the reminder dedupe only counts `'sent'` rows.
-  - Out-of-order webhooks never regress a newer state. Unknown message ids (e.g. test sends) are ignored.
-- Inbound replies (e.g. "1" to approve review items) are **not** handled; out of scope for now.
+## Not verified yet
+- No real send to Meta has been made (no credentials); the request shape follows Meta's docs and is covered by unit tests with a mocked `fetch`.
+- The webhook has not received a real Meta delivery.

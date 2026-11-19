@@ -245,6 +245,20 @@ export const transactions = pgTable('transactions', {
   needsReviewIdx: index('transactions_needs_review_idx').on(table.needsReview),
 }))
 
+// Category rules - user-defined "always categorise X as Y" rules applied at import time
+export const categoryRules = pgTable('category_rules', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  matchType: text('match_type').$type<'contains' | 'regex' | 'merchant'>().notNull(),
+  pattern: text('pattern').notNull(),
+  categoryId: uuid('category_id').references(() => categories.id, { onDelete: 'cascade' }).notNull(),
+  priority: integer('priority').default(0).notNull(), // higher wins
+  createdFrom: text('created_from').$type<'manual' | 'learned'>().default('manual').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('category_rules_user_id_idx').on(table.userId),
+}))
+
 // Import sessions table (for CSV uploads)
 export const importSessions = pgTable('import_sessions', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -740,6 +754,11 @@ export const notifications = pgTable('notifications', {
     daysUntilDue?: number
     resendResponse?: Record<string, unknown>
     errorMessage?: string
+    // WhatsApp (status webhooks match on whatsappMessageId)
+    whatsappMessageId?: string
+    whatsappTemplate?: string
+    whatsappStatus?: string
+    dryRun?: boolean
   }>(),
   
   // Error tracking
@@ -800,10 +819,12 @@ export const notificationPreferences = pgTable('notification_preferences', {
   telegramNotificationsEnabled: boolean('telegram_notifications_enabled').default(false).notNull(),
   telegramChatId: text('telegram_chat_id'), // Telegram Chat ID
 
+  // Remind the user to import a statement when an account has had no import for this many days
+  statementReminderDays: integer('statement_reminder_days').default(35).notNull(),
   // WhatsApp Notifications (Meta Cloud API)
   whatsappNotificationsEnabled: boolean('whatsapp_notifications_enabled').default(false).notNull(),
-  whatsappPhoneNumber: text('whatsapp_phone_number'), // E.164, e.g. +614XXXXXXXX
-  
+  whatsappPhoneNumber: text('whatsapp_phone_number'), // E.164, e.g. +61412345678
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -939,3 +960,45 @@ export const insertInvestmentScenarioSchema = createInsertSchema(investmentScena
 export const selectInvestmentScenarioSchema = createSelectSchema(investmentScenarios)
 export type InsertInvestmentScenario = z.infer<typeof insertInvestmentScenarioSchema>
 export type SelectInvestmentScenario = z.infer<typeof selectInvestmentScenarioSchema>
+
+export type ApiToken = typeof apiTokens.$inferSelect
+export type NewApiToken = typeof apiTokens.$inferInsert
+// ─── Email ingestion ───────────────────────────────────────────────────────
+
+// Import Senders - approved "From" addresses whose statement attachments are
+// imported automatically into an account (see docs/EMAIL_INGESTION.md)
+export const importSenders = pgTable('import_senders', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  senderEmail: text('sender_email').notNull(), // always stored lower-cased
+  accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
+  // Optional case-insensitive glob on the attachment filename, e.g. "Latitude*.pdf"
+  filenamePattern: text('filename_pattern'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index('import_senders_user_id_idx').on(table.userId),
+  senderEmailIdx: index('import_senders_sender_email_idx').on(table.senderEmail),
+}))
+
+// Inbound Emails - one row per received email, so a re-delivered webhook
+// doesn't import the same attachments twice
+export const inboundEmails = pgTable('inbound_emails', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  provider: text('provider').notNull(), // 'resend'
+  providerEmailId: text('provider_email_id').notNull(),
+  messageId: text('message_id'),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  senderEmail: text('sender_email'), // lower-cased From, so the retry cron can re-resolve sender rules
+  status: text('status').notNull(), // 'processing' | 'processed' | 'failed' | 'abandoned'
+  attempts: integer('attempts').default(0).notNull(), // claims taken so far (webhook + cron retries)
+  // Per-attachment outcome (ids, filenames, counts, error messages; never file contents)
+  summary: jsonb('summary').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  providerEmailUnique: unique('inbound_emails_provider_email_unique').on(table.provider, table.providerEmailId),
+  messageIdIdx: index('inbound_emails_message_id_idx').on(table.messageId),
+}))
+
+export type SelectImportSender = typeof importSenders.$inferSelect
+export type SelectInboundEmail = typeof inboundEmails.$inferSelect

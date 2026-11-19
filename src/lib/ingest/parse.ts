@@ -5,8 +5,9 @@ import {
   detectBankFormatFromText,
   parseCSVLine,
   splitCsvLines,
+  formatHasHeaderRow,
   validateTransactionRow,
-  type BankFormat,
+  withFormatAliases,
 } from '@/lib/csv-processing'
 import { creditCardStatementToTransactions, parseCreditCardPDF } from '@/lib/pdf-processing'
 import { parseStatementWithAI, type GeminiConfig, type GenerateStatement } from './ai-pdf'
@@ -131,19 +132,6 @@ async function parsePdf(
   }
 }
 
-/** Case-insensitively copy header values onto the column names a BankFormat expects. */
-function withFormatAliases(row: Record<string, string>, format: BankFormat): Record<string, string> {
-  const lowerToKey = new Map(Object.keys(row).map(key => [key.toLowerCase(), key]))
-  const aliased = { ...row }
-  for (const column of format.columns) {
-    if (aliased[column] === undefined) {
-      const source = lowerToKey.get(column.toLowerCase())
-      if (source !== undefined) aliased[column] = row[source]
-    }
-  }
-  return aliased
-}
-
 function parseCsv(buffer: ArrayBuffer, accountId: string, requestedFormat?: string): ParsedFile {
   const text = new TextDecoder().decode(buffer).replace(/^﻿/, '')
   const lines = splitCsvLines(text)
@@ -174,7 +162,7 @@ function parseCsv(buffer: ArrayBuffer, accountId: string, requestedFormat?: stri
   }
 
   // Only CommBank has no header row (skipRows is explicitly 0)
-  const hasHeader = format.skipRows !== 0
+  const hasHeader = formatHasHeaderRow(format)
   const headers = hasHeader ? parseCSVLine(lines[0]) : []
   const dataLines = hasHeader ? lines.slice(1) : lines
 

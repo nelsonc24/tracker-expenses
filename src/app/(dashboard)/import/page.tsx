@@ -28,6 +28,8 @@ import {
   parseCSVLine,
   detectBankFormatFromText,
   MIN_DETECTION_CONFIDENCE,
+  formatHasHeaderRow,
+  withFormatAliases,
   type BankFormat
 } from '@/lib/csv-processing'
 
@@ -253,28 +255,24 @@ export default function ImportPage() {
           ? detectFormatForUpload(text) 
           : bankFormats[selectedBankFormat]
         
-        // Skip header rows if specified in format
-        const dataLines = bankFormat.skipRows ? lines.slice(bankFormat.skipRows) : lines
-        
-        // Get headers for formats that use them (like UBank)
-        let headers: string[] = []
-        if (bankFormat.skipRows && bankFormat.skipRows > 0) {
-          headers = parseCSVLine(lines[0])
-        }
-        
+        // Every format except CommBank starts with a header row (same rule as the server path)
+        const hasHeader = formatHasHeaderRow(bankFormat)
+        const dataLines = hasHeader ? lines.slice(1) : lines
+        const headers: string[] = hasHeader ? parseCSVLine(lines[0]).map(h => h.trim()) : []
+
         // Process each line using the detected format
         const processedTransactions = dataLines.map((line, index) => {
           const fields = parseCSVLine(line)
-          
+
           // Convert array to object for formats with headers
           let rowData: Record<string, string> | string[]
           if (headers.length > 0) {
             // Convert fields array to object using headers
             const rowObject: Record<string, string> = {}
             headers.forEach((header, i) => {
-              rowObject[header] = fields[i] || ''
+              rowObject[header] = (fields[i] || '').trim()
             })
-            rowData = rowObject
+            rowData = withFormatAliases(rowObject, bankFormat)
           } else {
             // Use array format (for Commonwealth Bank)
             rowData = fields
