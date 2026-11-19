@@ -712,6 +712,9 @@ export const notifications = pgTable('notifications', {
   emailTo: text('email_to'),
   emailSubject: text('email_subject'),
   emailMessageId: text('email_message_id'), // Resend message ID for tracking
+
+  // WhatsApp specifics
+  whatsappMessageId: text('whatsapp_message_id'), // wamid returned by the Cloud API; matched by delivery-status webhooks
   
   // Metadata
   metadata: jsonb('metadata').$type<{
@@ -738,6 +741,7 @@ export const notifications = pgTable('notifications', {
   channelIdx: index('notifications_channel_idx').on(table.channel),
   relatedEntityIdx: index('notifications_related_entity_idx').on(table.relatedEntityType, table.relatedEntityId),
   sentAtIdx: index('notifications_sent_at_idx').on(table.sentAt),
+  whatsappMessageIdIdx: index('notifications_whatsapp_message_id_idx').on(table.whatsappMessageId),
   createdAtIdx: index('notifications_created_at_idx').on(table.createdAt),
 }))
 
