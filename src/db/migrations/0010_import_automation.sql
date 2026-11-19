@@ -35,7 +35,9 @@ CREATE TABLE "inbound_emails" (
 	"provider_email_id" text NOT NULL,
 	"message_id" text,
 	"user_id" text NOT NULL,
+	"sender_email" text,
 	"status" text NOT NULL,
+	"attempts" integer DEFAULT 0 NOT NULL,
 	"summary" jsonb,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
@@ -43,8 +45,6 @@ CREATE TABLE "inbound_emails" (
 );
 --> statement-breakpoint
 ALTER TABLE "notification_preferences" ADD COLUMN "statement_reminder_days" integer DEFAULT 35 NOT NULL;--> statement-breakpoint
-ALTER TABLE "notification_preferences" ADD COLUMN "whatsapp_notifications_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "notification_preferences" ADD COLUMN "whatsapp_phone_number" text;--> statement-breakpoint
 ALTER TABLE "api_tokens" ADD CONSTRAINT "api_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "category_rules" ADD CONSTRAINT "category_rules_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "category_rules" ADD CONSTRAINT "category_rules_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

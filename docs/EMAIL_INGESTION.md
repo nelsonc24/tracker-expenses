@@ -50,7 +50,7 @@ Resend dashboard → **Webhooks** → Add endpoint:
 Redeploy after setting them.
 
 ### 4. Migration
-Run migrations `0008_import_automation.sql` and `0009_inbound_email_retries.sql` (apply with `pnpm db:migrate`) against Neon (it creates `import_senders` and `inbound_emails`). 
+Run migration `0010_import_automation.sql` (apply with `pnpm db:migrate`) against Neon (it creates `import_senders` and `inbound_emails`). 
 
 ### 5. Approve senders in the app
 Settings → Data → Email Import → add the bank's sending address (e.g. the address Latitude statements come from) and pick the account. If you'll forward by hand instead of using a filter, the From address Resend sees is **your own Gmail address**; approve that too, ideally with a filename pattern.

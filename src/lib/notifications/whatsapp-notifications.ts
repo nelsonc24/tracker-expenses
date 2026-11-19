@@ -3,7 +3,7 @@
  * reported by the WhatsApp webhook. The API client itself lives in whatsapp-service.ts.
  */
 
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, or, sql } from 'drizzle-orm'
 import { fromUnixTime } from 'date-fns'
 import { db } from '@/db'
 import { notifications } from '@/db/schema'
@@ -75,6 +75,7 @@ export async function sendWhatsAppEvent(
       status: 'sent',
       sentAt: new Date(),
       updatedAt: new Date(),
+      whatsappMessageId: result.messageId ?? null,
       metadata: {
         whatsappTemplate: template.name,
         whatsappMessageId: result.messageId,
@@ -105,7 +106,13 @@ export async function applyWhatsAppStatus(update: WhatsAppStatusUpdate): Promise
   const [row] = await db
     .select()
     .from(notifications)
-    .where(and(eq(notifications.channel, 'whatsapp'), sql`${notifications.metadata}->>'whatsappMessageId' = ${update.id}`))
+    // Indexed column (migration 0009); older rows only have it in metadata
+    .where(
+      and(
+        eq(notifications.channel, 'whatsapp'),
+        or(eq(notifications.whatsappMessageId, update.id), sql`${notifications.metadata}->>'whatsappMessageId' = ${update.id}`)
+      )
+    )
     .limit(1)
 
   if (!row) return false

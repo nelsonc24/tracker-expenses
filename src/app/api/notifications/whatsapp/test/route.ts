@@ -79,6 +79,7 @@ export async function POST() {
       channel: 'whatsapp',
       status: result.success ? 'sent' : 'failed',
       sentAt: result.success ? now : null,
+      whatsappMessageId: result.messageId ?? null,
       metadata: {
         ...(result.messageId ? { whatsappMessageId: result.messageId } : {}),
         ...(result.dryRun ? { dryRun: true } : {}),

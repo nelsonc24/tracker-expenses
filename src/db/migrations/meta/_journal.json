@@ -61,15 +61,22 @@
     {
       "idx": 8,
       "version": "7",
-      "when": 1795045240285,
-      "tag": "0008_import_automation",
+      "when": 1795088428296,
+      "tag": "0008_whatsapp_preferences",
       "breakpoints": true
     },
     {
       "idx": 9,
       "version": "7",
-      "when": 1795080079407,
-      "tag": "0009_inbound_email_retries",
+      "when": 1795088549862,
+      "tag": "0009_notification_whatsapp_message_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795115544943,
+      "tag": "0010_import_automation",
       "breakpoints": true
     }
   ]

@@ -35,7 +35,7 @@ WhatsApp is a third channel for `notify()` (see `NOTIFIER.md`), using the **offi
 | `WHATSAPP_ALLOWED_USER_IDS` | recommended | Comma-separated Clerk user ids allowed to use WhatsApp (settings test button and all alerts). Unset = every user. **Set it to your own user id** if sign-ups are open, since every message is billed to your Meta account. The test button is also limited to 3 per hour and 10 per day per user. |
 
 ## Database
-`notification_preferences.whatsapp_notifications_enabled` (boolean, default false) and `whatsapp_phone_number` (text, E.164). They are added by `src/db/migrations/0008_import_automation.sql` (apply with `pnpm db:migrate`), which **has not been run anywhere**. Apply it before deploying, otherwise every query on `notification_preferences` fails.
+`notification_preferences.whatsapp_notifications_enabled` (boolean, default false) and `whatsapp_phone_number` (text, E.164). They are added by `0008_whatsapp_preferences.sql`, and `notifications.whatsapp_message_id` (matched by the delivery-status webhook) by `0009_notification_whatsapp_message_id.sql`. Both came from PR #4. Run `pnpm db:migrate` before deploying, otherwise every query on `notification_preferences` fails.
 
 ## Manual Meta setup (owner)
 1. Buy a prepaid SIM. **Don't install regular WhatsApp on it**: a number registered on the Cloud API can't be used in the consumer app.

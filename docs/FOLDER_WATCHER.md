@@ -27,7 +27,7 @@ import_sessions + transactions      file moved to processed/ (or failed/)
 
 Endpoints (Clerk session only): `GET /api/api-tokens`, `POST /api/api-tokens { name }`, `DELETE /api/api-tokens/:id`.
 
-**Migration:** `src/db/migrations/0008_import_automation.sql` (apply with `pnpm db:migrate`). Not yet run anywhere. Apply it before using tokens.
+**Migration:** `src/db/migrations/0010_import_automation.sql` (apply with `pnpm db:migrate`). Not yet run anywhere. Apply it before using tokens.
 
 ## 2. `POST /api/ingest`
 
