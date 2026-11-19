@@ -137,6 +137,10 @@ class ImportWatcher {
         await this.move(filePath, fileName, PROCESSED_DIR)
         return
       }
+      case 'unauthorized':
+        // Not the file's fault: leave it in place and keep retrying until the token is fixed
+        log(`${fileName}: token not accepted (${outcome.message}). Create a new token in Settings and update INGEST_TOKEN; file left in place`)
+        return
       case 'rejected':
         log(`${fileName}: rejected (${outcome.status}) ${outcome.message}`)
         this.attempts.delete(fileName)

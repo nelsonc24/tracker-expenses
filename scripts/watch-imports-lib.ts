@@ -215,6 +215,8 @@ export async function waitUntilStable(filePath: string, settleMs: number, maxChe
 
 export type UploadOutcome =
   | { kind: 'ok'; body: Record<string, unknown> }
+  /** 401: the token is bad or revoked. The file is fine, so it must stay in the folder. */
+  | { kind: 'unauthorized'; message: string }
   /** The server said no (4xx): retrying won't help. */
   | { kind: 'rejected'; status: number; message: string }
   /** Network error or 5xx: worth retrying later. */
@@ -248,6 +250,7 @@ export async function uploadFile(
   if (response.ok) return { kind: 'ok', body }
 
   const message = [body.error, body.details].filter(Boolean).join(': ') || `HTTP ${response.status}`
+  if (response.status === 401) return { kind: 'unauthorized', message }
   if (response.status >= 500 || response.status === 429) return { kind: 'transient', message }
   return { kind: 'rejected', status: response.status, message }
 }

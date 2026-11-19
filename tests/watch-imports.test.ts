@@ -154,4 +154,9 @@ describe('uploadFile', () => {
       ).kind
     ).toBe('transient')
   })
+
+  test('a 401 is reported as unauthorized so the file is not moved to failed/', async () => {
+    const outcome = await uploadFile(config, 'a.csv', new Uint8Array([1]), match, (async () => json(401, { error: 'Token has been revoked' })) as typeof fetch)
+    expect(outcome).toEqual({ kind: 'unauthorized', message: 'Token has been revoked' })
+  })
 })
