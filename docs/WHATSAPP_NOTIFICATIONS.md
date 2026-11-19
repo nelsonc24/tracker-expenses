@@ -41,3 +41,11 @@ Official Meta WhatsApp Cloud API on a **dedicated business number**. No unoffici
 
 ## Checked against Meta's docs
 Send endpoint and template payload, the webhook verification handshake, and the `X-Hub-Signature-256` scheme (HMAC-SHA256 of the raw body with the app secret, `sha256=` prefix) were checked against Meta's published docs. The exact delivery-status (`statuses`) payload was **not** confirmed against a live webhook; the handler is written defensively.
+
+## Webhook (`/api/webhooks/whatsapp`)
+- `GET` – Meta's verification handshake: `hub.mode=subscribe` and `hub.verify_token == WHATSAPP_VERIFY_TOKEN` → echoes `hub.challenge`, otherwise 403.
+- `POST` – delivery statuses. The `X-Hub-Signature-256` HMAC is checked against the **raw** body with `WHATSAPP_APP_SECRET` (bad signature → 401). Each status is matched to a notification by `whatsapp_message_id`:
+  - `delivered` → `delivered_at`, `read` → `read_at`, `failed` → `status = 'failed'` plus the error message.
+  - `status` deliberately stays `'sent'` for delivered/read, because the reminder dedupe only counts `'sent'` rows.
+  - Out-of-order webhooks never regress a newer state. Unknown message ids (e.g. test sends) are ignored.
+- Inbound replies (e.g. "1" to approve review items) are **not** handled; out of scope for now.
