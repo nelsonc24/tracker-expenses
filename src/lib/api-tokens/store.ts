@@ -7,6 +7,7 @@ import type { ApiTokenLookup } from './tokens'
 export const publicTokenColumns = {
   id: apiTokens.id,
   name: apiTokens.name,
+  tokenPrefix: apiTokens.tokenPrefix,
   createdAt: apiTokens.createdAt,
   lastUsedAt: apiTokens.lastUsedAt,
 }
@@ -47,8 +48,8 @@ export async function countActiveTokens(userId: string): Promise<number> {
   return row?.value ?? 0
 }
 
-export async function insertToken(userId: string, name: string, tokenHash: string) {
-  const [row] = await db.insert(apiTokens).values({ userId, name, tokenHash }).returning(publicTokenColumns)
+export async function insertToken(userId: string, name: string, tokenHash: string, tokenPrefix: string) {
+  const [row] = await db.insert(apiTokens).values({ userId, name, tokenHash, tokenPrefix }).returning(publicTokenColumns)
   return row
 }
 

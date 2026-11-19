@@ -1,6 +1,9 @@
 // Header parsing only, with no Node imports, so it can run in edge middleware.
 
 export const API_TOKEN_PREFIX = 'trk_'
+/** Prefix used by tokens created before PR #3 (PR #5's version); still accepted. */
+export const LEGACY_API_TOKEN_PREFIX = 'txk_'
+const ACCEPTED_PREFIXES = [API_TOKEN_PREFIX, LEGACY_API_TOKEN_PREFIX]
 
 /**
  * Pull the token out of an `Authorization` header.
@@ -15,5 +18,5 @@ export function parseBearerToken(header: string | null | undefined): string | nu
 /** True when the request carries one of our personal API tokens (not a Clerk session JWT). */
 export function hasApiTokenBearer(header: string | null | undefined): boolean {
   const token = parseBearerToken(header)
-  return token !== null && token.startsWith(API_TOKEN_PREFIX)
+  return token !== null && ACCEPTED_PREFIXES.some(prefix => token.startsWith(prefix))
 }

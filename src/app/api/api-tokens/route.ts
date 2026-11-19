@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { token, hash } = generateApiToken()
-    const created = await insertToken(userId, parsed.data.name, hash)
+    const { token, hash, prefix } = generateApiToken()
+    const created = await insertToken(userId, parsed.data.name, hash, prefix)
 
     return NextResponse.json({ token: created, secret: token }, { status: 201, headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {

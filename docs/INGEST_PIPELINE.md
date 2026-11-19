@@ -29,3 +29,5 @@ The result is checked: `opening + Σ(amount) ≈ closing` (±0.01), trying both 
 `transactions.needs_review` (migration `0007`). Set when: a parser is unsure (AI balance check failed), the category is unmatched or generic (`General` / `Uncategorized`), or a row is the 2nd+ identical row (possible duplicate). `import_sessions.needs_review_count` holds the total. The transactions page has a **Review** filter and a "Needs review" badge on each row; clicking the badge marks it reviewed (`PUT /api/transactions/:id { needsReview: false }`).
 
 Note: because many CSV rows categorise to "General", expect a lot of flagged rows on first imports; that is intended (they're uncategorised).
+
+Other entry points: `POST /api/ingest` (API token or session, `source: 'api'`) and the folder watcher are described in [FOLDER_WATCHER.md](./FOLDER_WATCHER.md).

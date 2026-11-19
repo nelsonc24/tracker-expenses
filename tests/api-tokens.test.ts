@@ -121,3 +121,22 @@ describe('authenticateBearer', () => {
     spy.mockRestore()
   })
 })
+
+describe('tokens from the earlier txk_ version (PR #5)', () => {
+  const legacy = 'txk_' + 'A'.repeat(43)
+
+  test('are still accepted by the shape check and the middleware bypass', () => {
+    expect(isWellFormedApiToken(legacy)).toBe(true)
+    expect(hasApiTokenBearer(`Bearer ${legacy}`)).toBe(true)
+  })
+
+  test('verify against their stored SHA-256 hash', () => {
+    expect(verifyApiToken(legacy, hashApiToken(legacy))).toBe(true)
+  })
+
+  test('new tokens use the trk_ prefix and record a display prefix', () => {
+    const { token, prefix } = generateApiToken()
+    expect(token.startsWith(API_TOKEN_PREFIX)).toBe(true)
+    expect(prefix).toBe(token.slice(0, API_TOKEN_PREFIX.length + 4))
+  })
+})

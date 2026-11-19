@@ -20,7 +20,8 @@ export { API_TOKEN_PREFIX, hasApiTokenBearer, parseBearerToken } from './bearer'
 
 const TOKEN_BYTES = 32
 // base64url of 32 bytes, no padding
-const TOKEN_PATTERN = /^trk_[A-Za-z0-9_-]{43}$/
+// trk_ (current) or txk_ (tokens created by the earlier PR #5 version); both are 32 random bytes, base64url
+const TOKEN_PATTERN = /^t[rx]k_[A-Za-z0-9_-]{43}$/
 
 export const MAX_TOKEN_NAME_LENGTH = 100
 export const MAX_ACTIVE_TOKENS_PER_USER = 20
@@ -30,11 +31,13 @@ export interface GeneratedApiToken {
   token: string
   /** Store this. */
   hash: string
+  /** First few characters, stored so the UI can tell tokens apart. */
+  prefix: string
 }
 
 export function generateApiToken(): GeneratedApiToken {
   const token = API_TOKEN_PREFIX + crypto.randomBytes(TOKEN_BYTES).toString('base64url')
-  return { token, hash: hashApiToken(token) }
+  return { token, hash: hashApiToken(token), prefix: token.slice(0, API_TOKEN_PREFIX.length + 4) }
 }
 
 export function hashApiToken(token: string): string {

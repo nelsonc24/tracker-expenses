@@ -26,7 +26,7 @@ Part of `IMPORT_AUTOMATION_AND_WHATSAPP_DEV_PLAN.md`.
 - De-dup: a delivered reminder is stored in `notifications` (`notification_type = 'statement_missing'`, `related_entity_type = 'account'`). Next reminder only after another full period, or after a new import followed by a new gap. Undelivered attempts (quiet hours, no channel) are not stored and retry the next day.
 
 ## Migration
-`src/db/migrations/0010_import_automation.sql` (apply with `pnpm db:migrate`). **Not run anywhere.** Run it before deploying: Drizzle selects every column of `notification_preferences`, so the new column must exist first.
+`src/db/migrations/0011_import_automation.sql` (apply with `pnpm db:migrate`). **Not run anywhere.** Run it before deploying: Drizzle selects every column of `notification_preferences`, so the new column must exist first.
 
 ## Known limits
 - Email and Telegram have no templates for `import_summary` / `statement_missing` yet, so `notify()` reports them `unsupported` there; they are delivered once a channel (e.g. WhatsApp, plan 5.2) supports them.

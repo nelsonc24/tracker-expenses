@@ -1,14 +1,3 @@
-CREATE TABLE "api_tokens" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"user_id" text NOT NULL,
-	"name" text NOT NULL,
-	"token_hash" text NOT NULL,
-	"last_used_at" timestamp,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"revoked_at" timestamp,
-	CONSTRAINT "api_tokens_token_hash_unique" UNIQUE("token_hash")
-);
---> statement-breakpoint
 CREATE TABLE "category_rules" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" text NOT NULL,
@@ -45,13 +34,11 @@ CREATE TABLE "inbound_emails" (
 );
 --> statement-breakpoint
 ALTER TABLE "notification_preferences" ADD COLUMN "statement_reminder_days" integer DEFAULT 35 NOT NULL;--> statement-breakpoint
-ALTER TABLE "api_tokens" ADD CONSTRAINT "api_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "category_rules" ADD CONSTRAINT "category_rules_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "category_rules" ADD CONSTRAINT "category_rules_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "import_senders" ADD CONSTRAINT "import_senders_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "import_senders" ADD CONSTRAINT "import_senders_account_id_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "public"."accounts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "inbound_emails" ADD CONSTRAINT "inbound_emails_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "api_tokens_user_id_idx" ON "api_tokens" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "category_rules_user_id_idx" ON "category_rules" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "import_senders_user_id_idx" ON "import_senders" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "import_senders_sender_email_idx" ON "import_senders" USING btree ("sender_email");--> statement-breakpoint
