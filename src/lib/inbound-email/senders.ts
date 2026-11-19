@@ -36,15 +36,33 @@ export function supportedExtension(filename: string): (typeof SUPPORTED_EXTENSIO
 
 /**
  * Case-insensitive glob: `*` = any run of characters, `?` = one character.
- * A glob rather than a user-supplied regex, so a pattern can't be used for ReDoS.
+ * Matched with an iterative two-pointer walk (O(pattern x filename), no backtracking
+ * blow-up), not a RegExp: a pattern like `*a*a*a*a*b` compiled to a regex can hang on a long filename.
  */
 export function matchesFilenamePattern(pattern: string, filename: string): boolean {
-  const escaped = pattern
-    .trim()
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*+/g, '.*')
-    .replace(/\?/g, '.')
-  return new RegExp(`^${escaped}$`, 'i').test(filename)
+  const p = pattern.trim().toLowerCase()
+  const f = filename.toLowerCase()
+  let pi = 0
+  let fi = 0
+  let starPi = -1
+  let starFi = 0
+
+  while (fi < f.length) {
+    if (pi < p.length && p[pi] === '*') {
+      starPi = pi++
+      starFi = fi
+    } else if (pi < p.length && (p[pi] === '?' || p[pi] === f[fi])) {
+      pi++
+      fi++
+    } else if (starPi !== -1) {
+      pi = starPi + 1
+      fi = ++starFi
+    } else {
+      return false
+    }
+  }
+  while (pi < p.length && p[pi] === '*') pi++
+  return pi === p.length
 }
 
 /**
