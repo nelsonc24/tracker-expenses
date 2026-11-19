@@ -6,6 +6,7 @@ import {
   telegramImportAlertText,
 } from './telegram-service'
 import { isE164 } from './phone'
+import { isWhatsAppAllowedUser } from './whatsapp-access'
 import { sendWhatsAppEvent } from './whatsapp-notifications'
 import type { ChannelSendResult, NotificationChannel, NotificationEvent } from './notifier'
 
@@ -83,7 +84,8 @@ export const telegramChannel: NotificationChannel = {
  */
 export const whatsappChannel: NotificationChannel = {
   id: 'whatsapp',
-  isEnabled: prefs => prefs.whatsappNotificationsEnabled && isE164(prefs.whatsappPhoneNumber),
+  isEnabled: prefs =>
+    prefs.whatsappNotificationsEnabled && isE164(prefs.whatsappPhoneNumber) && isWhatsAppAllowedUser(prefs.userId),
   async send(prefs, event) {
     return toResult(await sendWhatsAppEvent(prefs.userId, prefs.whatsappPhoneNumber!, event))
   },

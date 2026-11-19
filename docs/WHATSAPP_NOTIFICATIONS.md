@@ -31,6 +31,7 @@ WhatsApp is a third channel for `notify()` (see `NOTIFIER.md`), using the **offi
 | `WHATSAPP_VERIFY_TOKEN` | for the webhook | Any random string; enter the same value in the webhook config. |
 | `WHATSAPP_API_VERSION` | recommended | e.g. `v24.0`. Defaults to `v24.0`; set it to the current Graph API version. |
 | `WHATSAPP_TEMPLATE_LANGUAGE` | optional | Language the templates were approved in. Default `en` (use `en_AU` if you approved them in that). |
+| `WHATSAPP_ALLOWED_USER_IDS` | recommended | Comma-separated Clerk user ids allowed to use WhatsApp (settings test button and all alerts). Unset = every user. **Set it to your own user id** if sign-ups are open, since every message is billed to your Meta account. The test button is also limited to 3 per hour and 10 per day per user. |
 
 ## Database
 `notification_preferences.whatsapp_notifications_enabled` (boolean, default false) and `whatsapp_phone_number` (text, E.164). They are added by `src/db/migrations/0008_import_automation.sql` (apply with `pnpm db:migrate`), which **has not been run anywhere**. Apply it before deploying, otherwise every query on `notification_preferences` fails.
