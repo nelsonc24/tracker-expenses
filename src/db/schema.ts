@@ -293,6 +293,19 @@ export const apiTokens = pgTable('api_tokens', {
   userIdIdx: index('api_tokens_user_id_idx').on(table.userId),
 }))
 
+// Approved sender addresses for email ingestion: sender email -> account the attachments import into.
+export const importSenders = pgTable('import_senders', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  senderEmail: text('sender_email').notNull(), // lower-cased
+  accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  // One inbound address serves everyone, so a sender can map to only one user
+  senderUnique: unique('import_senders_sender_email_unique').on(table.senderEmail),
+  userIdIdx: index('import_senders_user_id_idx').on(table.userId),
+}))
+
 // Recurring transactions table
 export const recurringTransactions = pgTable('recurring_transactions', {
   id: uuid('id').defaultRandom().primaryKey(),

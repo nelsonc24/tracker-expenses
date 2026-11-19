@@ -46,6 +46,7 @@ import {
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { ApiTokensCard } from '@/components/api-tokens-card'
+import { ImportSendersCard } from '@/components/import-senders-card'
 import { toast } from 'sonner'
 
 // Sample categories data
@@ -764,6 +765,7 @@ export default function SettingsPage() {
         {/* Data Management */}
         <TabsContent value="data" className="space-y-6">
           <ApiTokensCard />
+          <ImportSendersCard />
 
           <Card>
             <CardHeader>

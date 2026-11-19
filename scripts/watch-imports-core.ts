@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { isSupportedFile } from '../src/lib/ingest/supported'
 
 export interface WatchConfig {
   ingestUrl: string
@@ -17,7 +18,6 @@ export interface WatchConfig {
   settleMs: number
 }
 
-export const SUPPORTED_EXTENSIONS = ['.csv', '.pdf']
 
 function expandHome(p: string): string {
   return p.startsWith('~') ? path.join(os.homedir(), p.slice(1)) : p
@@ -53,10 +53,7 @@ export async function loadConfig(env: Record<string, string | undefined> = proce
   }
 }
 
-export function isSupportedFile(fileName: string): boolean {
-  if (fileName.startsWith('.')) return false // .DS_Store, .crdownload temp names, etc.
-  return SUPPORTED_EXTENSIONS.includes(path.extname(fileName).toLowerCase())
-}
+export { isSupportedFile }
 
 function patternMatches(pattern: string, fileName: string): boolean {
   const regex = /^\/(.+)\/([a-z]*)$/.exec(pattern)
