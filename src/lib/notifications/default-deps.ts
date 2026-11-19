@@ -31,6 +31,8 @@ function defaultPrefs(userId: string): NotificationPrefs {
     unusualSpendingEnabled: true,
     telegramNotificationsEnabled: false,
     telegramChatId: null,
+    whatsappNotificationsEnabled: false,
+    whatsappPhoneNumber: null,
     createdAt: now,
     updatedAt: now,
   }

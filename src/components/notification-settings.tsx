@@ -30,6 +30,8 @@ interface NotificationPreferences {
   preferredEmail: string | null
   telegramNotificationsEnabled: boolean
   telegramChatId: string | null
+  whatsappNotificationsEnabled: boolean
+  whatsappPhoneNumber: string | null
 }
 
 export function NotificationSettings() {
