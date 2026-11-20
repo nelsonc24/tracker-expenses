@@ -76,6 +76,38 @@ npm run db:push
 npm run db:studio
 ```
 
+#### Changing the schema and applying it (read this before touching the database)
+
+**Do not run `pnpm db:migrate` against the Neon database.** Its `drizzle` migration log is empty (the tables were created outside Drizzle's migrator), so `db:migrate` tries to re-create every table from `0000` and fails with `relation "accounts" already exists`. `drizzle.config.ts` also only loads a file named `.env` (via `dotenv/config`), not `.env.local`, so `DATABASE_URL` must be exported in your shell.
+
+Workflow when you change `src/db/schema.ts`:
+
+1. **Generate the SQL** (this never touches the database; any dummy URL works):
+   ```bash
+   DATABASE_URL=postgres://u:p@localhost:5432/x pnpm db:generate
+   ```
+   Open the new `src/db/migrations/NNNN_*.sql` and check it. It must contain **only** your change (`ADD COLUMN`, `CREATE TABLE`, `CREATE INDEX`). If it contains `CREATE TABLE` for tables that already exist, delete those lines by hand (the snapshot in `src/db/migrations/meta` can lag behind).
+2. **Make it re-runnable.** Copy the statements into a scratch file and add `IF NOT EXISTS` (`ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`). Put foreign keys inline in `CREATE TABLE`.
+3. **Back up first.** In the Neon dashboard create a branch of the production database (instant, free restore point).
+4. **Apply it in one transaction**, loading the URL from the env file without printing it:
+   ```bash
+   set -a && . ./.env.local && set +a
+   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -1 -f /path/to/your-change.sql
+   ```
+   `-1` wraps it in a single transaction (all or nothing) and `ON_ERROR_STOP` aborts on the first error.
+5. **Verify** with a read-only query, for example:
+   ```bash
+   psql "$DATABASE_URL" -At -c "select column_name from information_schema.columns where table_name='transactions' and column_name='needs_review'"
+   ```
+6. Deploy the code **after** the columns exist (the app selects new columns, so deploying first causes errors).
+
+Check which database you are pointing at before step 4. `.env.local` / `.env.vercel` use the `ep-blue-pine` Neon host; `.env.prod` uses a different one (`ep-quiet-block`). Never run migrations from another project folder (e.g. `expenses-tracker`): it has a different migration history.
+
+Common errors:
+- `password authentication failed`: stale or masked password in the connection string. Copy it again from Neon with "Show password" on.
+- `relation "..." already exists` from `db:migrate`: see above, use the manual workflow.
+- `column ... does not exist` at runtime: the migration was not applied to that database, or you deployed before applying it.
+
 ### 4. Start Development
 ```bash
 npm run dev
