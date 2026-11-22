@@ -43,3 +43,6 @@ next-env.d.ts
 # ignore files
 /files
 .playwright-cli/*
+
+# clerk configuration (can include secrets)
+/.clerk/
