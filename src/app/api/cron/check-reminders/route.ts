@@ -4,6 +4,7 @@ import { bills, debts, notificationPreferences } from '@/db/schema'
 import { and, eq, isNotNull } from 'drizzle-orm'
 import { wasNotificationSentRecently } from '@/lib/notifications/email-service'
 import { notify } from '@/lib/notifications/notifier'
+import { checkMissingStatements, drizzleStatementReminderDeps } from '@/lib/statement-reminders'
 import { format, startOfDay, addWeeks, addMonths, addQuarters, addYears, setDate, isAfter } from 'date-fns'
 
 type Bill = typeof bills.$inferSelect
@@ -54,6 +55,8 @@ export async function GET(request: NextRequest) {
       billsNotified: 0,
       debtsProcessed: 0,
       debtsNotified: 0,
+      statementAccountsChecked: 0,
+      statementRemindersSent: 0,
       errors: [] as string[],
     }
 
@@ -219,6 +222,17 @@ export async function GET(request: NextRequest) {
         results.errors.push(`Error processing debt ${debt.id}: ${errorMsg}`)
         console.error(`Error processing debt ${debt.id}:`, error)
       }
+    }
+
+    // Missing-statement reminders (one per account per period; see statement-reminders.ts)
+    try {
+      const statements = await checkMissingStatements({ ...drizzleStatementReminderDeps, notify })
+      results.statementAccountsChecked = statements.accountsChecked
+      results.statementRemindersSent = statements.remindersSent
+      results.errors.push(...statements.errors)
+    } catch (error) {
+      results.errors.push(`Statement reminder check failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      console.error('Statement reminder check failed:', error)
     }
 
     console.log('Cron job completed:', results)

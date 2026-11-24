@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { isE164, normalizePhoneInput } from '@/lib/phone'
+import { isE164, normalizePhoneInput } from '@/lib/notifications/phone'
 
 describe('isE164', () => {
   test.each(['+61412345678', '+14155552671', '+442071838750'])('accepts %s', n => expect(isE164(n)).toBe(true))

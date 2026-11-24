@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Bell, Mail, MessageCircle, Send, Smartphone } from 'lucide-react'
-import { isE164, normalizePhoneInput } from '@/lib/phone'
+import { Bell, Mail, Send, Smartphone } from 'lucide-react'
+import { WhatsAppNotificationSettings } from '@/components/whatsapp-notification-settings'
+import { isE164, normalizePhoneInput } from '@/lib/notifications/phone'
 
 interface NotificationPreferences {
   id: string
@@ -39,7 +40,7 @@ export function NotificationSettings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null)
-  const [sendingWhatsAppTest, setSendingWhatsAppTest] = useState(false)
+  const [savedWhatsappPhone, setSavedWhatsappPhone] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPreferences()
@@ -51,6 +52,7 @@ export function NotificationSettings() {
       if (!response.ok) throw new Error('Failed to fetch preferences')
       const data = await response.json()
       setPreferences(data)
+      setSavedWhatsappPhone(data.whatsappPhoneNumber ?? null)
     } catch (error) {
       console.error('Error fetching preferences:', error)
       toast.error('Failed to load notification settings')
@@ -59,37 +61,12 @@ export function NotificationSettings() {
     }
   }
 
-  const whatsappNumberInvalid =
-    Boolean(preferences?.whatsappPhoneNumber) && !isE164(preferences!.whatsappPhoneNumber!)
-
-  const sendWhatsAppTest = async () => {
-    if (!preferences?.whatsappPhoneNumber || whatsappNumberInvalid) {
-      toast.error('Enter your WhatsApp number in international format, e.g. +614XXXXXXXX')
-      return
-    }
-    try {
-      setSendingWhatsAppTest(true)
-      const response = await fetch('/api/notifications/whatsapp/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber: preferences.whatsappPhoneNumber }),
-      })
-      const result = await response.json()
-      if (!response.ok) throw new Error(result.error || 'Failed to send test message')
-      if (result.dryRun) toast.info(result.message)
-      else toast.success(result.message)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to send test message')
-    } finally {
-      setSendingWhatsAppTest(false)
-    }
-  }
-
   const savePreferences = async () => {
     if (!preferences) return
 
-    if (whatsappNumberInvalid) {
-      toast.error('Fix your WhatsApp number first: use international format, e.g. +614XXXXXXXX')
+    const whatsappPhone = preferences.whatsappPhoneNumber ? normalizePhoneInput(preferences.whatsappPhoneNumber) : null
+    if (whatsappPhone && !isE164(whatsappPhone)) {
+      toast.error('WhatsApp number must be in international format, e.g. +61412345678')
       return
     }
 
@@ -107,6 +84,7 @@ export function NotificationSettings() {
 
       const updated = await response.json()
       setPreferences(updated)
+      setSavedWhatsappPhone(updated.whatsappPhoneNumber ?? null)
       toast.success('Notification settings saved')
     } catch (error) {
       console.error('Error saving preferences:', error)
@@ -269,76 +247,13 @@ export function NotificationSettings() {
       </Card>
 
       {/* WhatsApp Notifications */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5" />
-            WhatsApp Notifications
-          </CardTitle>
-          <CardDescription>
-            Receive bill and debt reminders on WhatsApp. Messages are short and never include account numbers or balances.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Enable WhatsApp Notifications</Label>
-              <p className="text-sm text-muted-foreground">Send reminders via WhatsApp</p>
-            </div>
-            <Switch
-              checked={preferences.whatsappNotificationsEnabled}
-              onCheckedChange={(checked) => updatePreference('whatsappNotificationsEnabled', checked)}
-            />
-          </div>
-
-          {preferences.whatsappNotificationsEnabled && (
-            <div className="space-y-2">
-              <Label htmlFor="whatsappPhoneNumber">Your WhatsApp number</Label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  id="whatsappPhoneNumber"
-                  type="tel"
-                  inputMode="tel"
-                  placeholder="+614XXXXXXXX"
-                  value={preferences.whatsappPhoneNumber || ''}
-                  aria-invalid={whatsappNumberInvalid}
-                  onChange={(e) => updatePreference('whatsappPhoneNumber', e.target.value || null)}
-                  onBlur={(e) => {
-                    const normalized = normalizePhoneInput(e.target.value)
-                    updatePreference('whatsappPhoneNumber', normalized || null)
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={sendWhatsAppTest}
-                  disabled={sendingWhatsAppTest || !preferences.whatsappPhoneNumber || whatsappNumberInvalid}
-                >
-                  {sendingWhatsAppTest ? 'Sending...' : 'Send test message'}
-                </Button>
-              </div>
-              {whatsappNumberInvalid ? (
-                <p className="text-xs text-destructive">
-                  Use international format with the country code, e.g. +614XXXXXXXX
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  International format, e.g. +614XXXXXXXX. An Australian number like 0412 345 678 is converted for you.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm dark:border-blue-800 dark:bg-blue-950">
-            <p className="font-medium text-blue-800 dark:text-blue-200">Setup required</p>
-            <p className="mt-1 text-blue-700 dark:text-blue-300">
-              WhatsApp messages use the official Meta WhatsApp Cloud API with a dedicated business number and approved
-              message templates. Until that is configured on the server, &quot;Send test message&quot; runs as a dry run and
-              nothing is sent. See <code className="rounded bg-blue-100 px-1 dark:bg-blue-900">docs/WHATSAPP_NOTIFICATIONS.md</code>.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <WhatsAppNotificationSettings
+        enabled={preferences.whatsappNotificationsEnabled}
+        phoneNumber={preferences.whatsappPhoneNumber}
+        savedPhoneNumber={savedWhatsappPhone}
+        onEnabledChange={(checked) => updatePreference('whatsappNotificationsEnabled', checked)}
+        onPhoneNumberChange={(value) => updatePreference('whatsappPhoneNumber', value)}
+      />
 
       {/* Bill Reminders */}
       <Card>

@@ -45,7 +45,9 @@ import {
   KeyRound,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { ApiTokensCard } from '@/components/api-tokens-card'
+import { CategoryRulesSettings } from '@/components/category-rules-settings'
+import { ApiTokenSettings } from '@/components/api-token-settings'
+import { ImportSendersSettings } from '@/components/import-senders-settings'
 import { toast } from 'sonner'
 
 // Sample categories data
@@ -682,6 +684,8 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <CategoryRulesSettings />
         </TabsContent>
 
         {/* Security */}
@@ -763,7 +767,7 @@ export default function SettingsPage() {
 
         {/* Data Management */}
         <TabsContent value="data" className="space-y-6">
-          <ApiTokensCard />
+          <ImportSendersSettings />
 
           <Card>
             <CardHeader>
@@ -844,6 +848,8 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <ApiTokenSettings />
         </TabsContent>
 
         {/* AI Assistant */}

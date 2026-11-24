@@ -1,3 +1,5 @@
+import { isValid as isValidDate, parse as parseDateFns } from 'date-fns'
+
 // Bank CSV format configurations
 export interface BankFormat {
   name: string
@@ -203,6 +205,27 @@ export function detectBankFormat(headers: string[], firstRows: string[][] = []):
   return { format: null, confidence: 0 }
 }
 
+/**
+ * Does this format's file start with a header row? Only CommBank has none (skipRows: 0);
+ * the custom format has no column list and keeps the old array-row behaviour.
+ */
+export function formatHasHeaderRow(format: BankFormat): boolean {
+  return format.skipRows !== 0 && format.columns.length > 0
+}
+
+/** Case-insensitively copy header values onto the column names a BankFormat expects. */
+export function withFormatAliases(row: Record<string, string>, format: BankFormat): Record<string, string> {
+  const lowerToKey = new Map(Object.keys(row).map(key => [key.toLowerCase(), key]))
+  const aliased = { ...row }
+  for (const column of format.columns) {
+    if (aliased[column] === undefined) {
+      const source = lowerToKey.get(column.toLowerCase())
+      if (source !== undefined) aliased[column] = row[source]
+    }
+  }
+  return aliased
+}
+
 /** Split CSV text into non-empty lines (handles CRLF). */
 export function splitCsvLines(text: string): string[] {
   return text.split(/\r?\n/).filter(line => line.trim())
@@ -243,6 +266,10 @@ export interface ProcessedTransaction {
 }
 
 // Date parsing utilities
+
+// date-fns patterns tried for the Westpac format ('d' / 'M' accept 1 or 2 digits)
+const WESTPAC_DATE_PATTERNS = ['d/M/yyyy', 'd MMM yyyy']
+
 export function parseDate(dateStr: string, format: string): Date | null {
   if (!dateStr) return null
   
@@ -258,8 +285,14 @@ export function parseDate(dateStr: string, format: string): Date | null {
       }
       
       case 'DD MMM YYYY': {
-        // Handle formats like "01 Jan 2024"
-        return new Date(cleaned)
+        // Westpac: docs say "01 Jan 2024", but real exports use "01/01/2024". Accept both.
+        // date-fns 'yyyy' would read "01/01/24" as the year 0024, so insist on a 4-digit year
+        if (!/\d{4}$/.test(cleaned)) return null
+        for (const pattern of WESTPAC_DATE_PATTERNS) {
+          const parsed = parseDateFns(cleaned, pattern, new Date())
+          if (isValidDate(parsed)) return parsed
+        }
+        return null
       }
       
       case 'YYYY-MM-DD': {

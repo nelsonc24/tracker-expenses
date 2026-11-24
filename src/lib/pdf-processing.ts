@@ -1,3 +1,5 @@
+import { keywordCategory } from '@/lib/categorise'
+
 // Import PDF2JSON for parsing PDFs
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const PDFParser = require('pdf2json')
@@ -278,40 +280,10 @@ export function creditCardStatementToTransactions(
     date: transaction.date,
     description: transaction.description,
     amount: transaction.amount,
-    category: categorizeTransaction(transaction.description, transaction.amount),
+    // Shared keyword categoriser (the hard-coded PDF-only one was retired). User rules are
+    // applied later, at import time, by the shared categoriser in src/lib/categorise.
+    category: keywordCategory(transaction.description, null, transaction.amount),
     account: accountId,
     type: transaction.type
   }))
-}
-
-/**
- * Categorize credit card transactions
- */
-function categorizeTransaction(description: string, amount: number): string {
-  const desc = description.toLowerCase()
-  
-  // Payments and fees
-  if (desc.includes('payment') || desc.includes('bpay')) return 'Payment'
-  if (desc.includes('fee') || desc.includes('interest')) return 'Fees & Charges'
-  
-  // Shopping
-  if (desc.match(/(temu|amazon|ebay|costco)/)) return 'Shopping'
-  
-  // Groceries
-  if (desc.match(/(woolworths|coles|aldi|iga)/)) return 'Groceries'
-  
-  // Dining
-  if (desc.match(/(restaurant|cafe|mcdonald|kfc|hungry jack)/)) return 'Dining'
-  
-  // Bills
-  if (desc.match(/(electricity|gas|water|internet|phone)/)) return 'Utilities'
-  
-  // Healthcare
-  if (desc.match(/(pharmacy|medical|doctor|dentist|chemist)/)) return 'Healthcare'
-  
-  // Transport
-  if (desc.match(/(petrol|fuel|uber|taxi|myki|opal)/)) return 'Transport'
-  
-  // Default category
-  return amount > 0 ? 'Refund' : 'General'
 }

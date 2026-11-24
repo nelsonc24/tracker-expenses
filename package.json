@@ -8,6 +8,7 @@
     "start": "next start -p 3001",
     "lint": "eslint",
     "test": "vitest run",
+    "watch-imports": "tsx scripts/watch-imports.ts",
     "deploy:vercel": "vercel --prod 2>&1 | grep -E \"(Production|https://|✓|Error)\" | tail -10",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
